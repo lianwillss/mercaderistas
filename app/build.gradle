@@ -16,15 +16,20 @@ android {
         resConfigs "es"
     }
 
-    // ── Signing config for CI (GitHub Actions secrets) ──
-    def keystorePath = System.getenv("KEYSTORE_PATH")
-    if (keystorePath != null) {
+    // ── Signing config (local Untitled.jks OR CI env vars) ──
+    def localKs = file("Untitled.jks")
+    def ksPath = System.getenv("KEYSTORE_PATH") ?: (localKs.exists() ? localKs.absolutePath : null)
+    def ksPassword = System.getenv("KEYSTORE_PASSWORD") ?: "123456"
+    def ksAlias = System.getenv("KEY_ALIAS") ?: "will"
+    def ksKeyPassword = System.getenv("KEY_PASSWORD") ?: "123456"
+
+    if (ksPath != null) {
         signingConfigs {
             release {
-                storeFile = file(keystorePath)
-                storePassword = System.getenv("KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("KEY_ALIAS")
-                keyPassword = System.getenv("KEY_PASSWORD")
+                storeFile = file(ksPath)
+                storePassword = ksPassword
+                keyAlias = ksAlias
+                keyPassword = ksKeyPassword
             }
         }
     }
@@ -34,7 +39,7 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            if (keystorePath != null) {
+            if (ksPath != null) {
                 signingConfig = signingConfigs.release
             }
         }
