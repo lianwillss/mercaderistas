@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@android:color/transparent">
+
+    <!-- Search container -->
+    <LinearLayout
+        android:id="@+id/searchContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="12dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="2dp"
+        android:visibility="gone">
+
+        <EditText
+            android:id="@+id/editTextBuscar"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:hint="Buscar local o dirección..."
+            android:textSize="13sp"
+            android:paddingHorizontal="12dp"
+            android:background="@drawable/bg_liquid_glass"
+            android:textColor="@color/texto_primario"
+            android:textColorHint="@color/texto_secundario"
+            android:inputType="text"
+            android:imeOptions="actionSearch"
+            android:maxLines="1"/>
+
+        <ImageView
+            android:id="@+id/btnCerrarBusqueda"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="48dp"
+            android:minHeight="48dp"
+            android:layout_marginStart="4dp"
+            android:src="@drawable/ic_close"
+            android:tint="@color/texto_secundario"
+            android:scaleType="centerInside"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground"
+            android:contentDescription="@string/cerrar_busqueda"/>
+    </LinearLayout>
+
+    <!-- Filtro de marcas iOS Glass -->
+    <HorizontalScrollView
+        android:id="@+id/filtroScrollView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:scrollbars="none"
+        android:paddingVertical="8dp">
+
+        <LinearLayout
+            android:id="@+id/layoutFiltroMarcas"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp">
+
+            <TextView
+                android:id="@+id/btnFiltroTodas"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:minWidth="48dp"
+                android:gravity="center"
+                android:text="@string/todas"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="0dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_glass_button"
+                android:textColor="@color/texto_secundario"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:clickable="true"
+                android:focusable="true"/>
+
+            <ImageView
+                android:id="@+id/btnBuscar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="48dp"
+                android:minHeight="48dp"
+                android:src="@drawable/ic_search"
+                android:tint="@color/texto_secundario"
+                android:scaleType="centerInside"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackground"
+                android:contentDescription="@string/buscar_locales"/>
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+            android:id="@+id/swipeRefresh"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recyclerLocales"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingBottom="@dimen/recycler_bottom_padding"
+                android:background="@android:color/transparent"
+                android:visibility="gone"/>
+        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+        <!-- Skeleton loading -->
+        <com.facebook.shimmer.ShimmerFrameLayout
+            android:id="@+id/shimmerLayout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/layoutSkeleton"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:paddingTop="8dp">
+
+                <include layout="@layout/item_store_skeleton"/>
+                <include layout="@layout/item_store_skeleton"/>
+                <include layout="@layout/item_store_skeleton"/>
+                <include layout="@layout/item_store_skeleton"/>
+            </LinearLayout>
+        </com.facebook.shimmer.ShimmerFrameLayout>
+
+        <!-- Sin resultados de búsqueda -->
+        <TextView
+            android:id="@+id/tvSinResultados"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:text="@string/sin_resultados"
+            android:textColor="@color/texto_secundario"
+            android:textSize="14sp"
+            android:gravity="center"
+            android:visibility="gone"/>
+
+        <!-- Panel vacío -->
+        <LinearLayout
+            android:id="@+id/panelVacio"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:src="@drawable/ic_store"
+                android:tint="@color/texto_secundario"
+                android:alpha="0.3"
+                android:importantForAccessibility="no"/>
+
+            <TextView
+                android:id="@+id/tvVacioMensaje"
+                android:text="@string/sin_visitas"
+                android:textSize="16sp"
+                android:textColor="@color/texto_secundario"
+                android:gravity="center"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"/>
+        </LinearLayout>
+    </FrameLayout>
+</LinearLayout>

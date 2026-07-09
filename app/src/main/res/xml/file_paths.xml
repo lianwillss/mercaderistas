@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <files-path name="docs" path="thumbnails/"/>
+    <files-path name="pdfs" path="manual_marcas.pdf"/>
+    <files-path name="manual" path="manual.pdf"/>
+    <cache-path name="apk" path="update.apk"/>
+</paths>

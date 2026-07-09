@@ -1,0 +1,388 @@
+package com.rutamercaderistas.ui.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Store
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.rutamercaderistas.ui.theme.AccentBlue
+import com.rutamercaderistas.ui.theme.AccentBlueSoft
+import com.rutamercaderistas.ui.theme.AccentGreen
+import com.rutamercaderistas.ui.theme.AccentGreenSoft
+import com.rutamercaderistas.ui.theme.AccentOrange
+import com.rutamercaderistas.ui.theme.Outline
+import com.rutamercaderistas.ui.theme.StoreColorFuchsia
+import com.rutamercaderistas.ui.theme.StoreColorFuchsiaSoft
+import com.rutamercaderistas.ui.theme.StoreColorPurple
+import com.rutamercaderistas.ui.theme.StoreColorPurpleSoft
+import com.rutamercaderistas.ui.theme.StoreColorRed
+import com.rutamercaderistas.ui.theme.StoreColorRedSoft
+import com.rutamercaderistas.ui.theme.StoreColorYellow
+import com.rutamercaderistas.ui.theme.StoreColorYellowSoft
+
+@Composable
+fun ManualScreen(
+    onClose: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "←",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .clickable(onClick = onClose)
+                    .padding(end = 8.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = "Manual de usuario",
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 20.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // ── Qué es Mercaderistas ──
+            SectionCard(
+                title = "¿Qué es Mercaderistas?",
+                icon = Icons.Outlined.Info,
+                color = AccentBlue
+            ) {
+                Text(
+                    text = "Mercaderistas es una aplicación que te permite gestionar tus rutas de " +
+                            "visita a locales comerciales. Descarga automáticamente un Excel desde " +
+                            "Google Drive con la información de cada ruta, organiza los locales por " +
+                            "día y te permite abrir el PDF del catalogador en la página exacta de " +
+                            "cada marca.",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    lineHeight = 20.sp
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Funciona sin conexión después de la primera sincronización.",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AccentBlue,
+                    lineHeight = 20.sp
+                )
+            }
+
+            // ── Sincronizar datos ──
+            SectionCard(
+                title = "Sincronizar datos",
+                icon = Icons.Outlined.Refresh,
+                color = AccentGreen
+            ) {
+                NumberedStep("Toca el botón ⋮ (tres puntos) en la esquina superior derecha.")
+                NumberedStep("Selecciona \"Forzar sincronización\".")
+                NumberedStep("Una barra de progreso indica que los datos se están descargando.")
+                NumberedStep("Al terminar, la lista de rutas se actualiza automáticamente.")
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "La app verifica automáticamente si hay nuevos datos cada vez que " +
+                            "abres la aplicación.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 18.sp
+                )
+            }
+
+            // ── Seleccionar una ruta ──
+            SectionCard(
+                title = "Seleccionar una ruta",
+                icon = Icons.Outlined.Store,
+                color = AccentOrange
+            ) {
+                NumberedStep("Toca el campo \"Buscar ruta…\" en la parte superior.")
+                NumberedStep("Escribe el nombre de la ruta (ej. \"RUTA 1\").")
+                NumberedStep("Selecciona la ruta de la lista desplegable.")
+                NumberedStep("También puedes elegir una ruta reciente del historial.")
+            }
+
+            // ── Navegar entre días ──
+            SectionCard(
+                title = "Navegar entre días",
+                icon = Icons.Outlined.Info,
+                color = StoreColorPurple
+            ) {
+                Text(
+                    text = "Usa el selector de días (LUN, MAR, MIÉ, etc.) para cambiar de día. " +
+                            "También puedes deslizar horizontalmente sobre la pantalla.",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    lineHeight = 20.sp
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Los días sin visitas no aparecen en el selector.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 18.sp
+                )
+            }
+
+            // ── Colores de cadena ──
+            SectionCard(
+                title = "Colores de cada cadena",
+                icon = Icons.Outlined.Store,
+                color = AccentBlue
+            ) {
+                ChainColorRow("Jumbo", AccentGreen, AccentGreenSoft)
+                ChainColorRow("Lider", AccentBlue, AccentBlueSoft)
+                ChainColorRow("Santa Isabel / SISA", StoreColorFuchsia, StoreColorFuchsiaSoft)
+                ChainColorRow("Unimarc", StoreColorRed, StoreColorRedSoft)
+                ChainColorRow("Tottus", StoreColorYellow, StoreColorYellowSoft)
+                ChainColorRow("Alvi", StoreColorPurple, StoreColorPurpleSoft)
+            }
+
+            // ── La tarjeta de local ──
+            SectionCard(
+                title = "La tarjeta de local",
+                icon = Icons.Outlined.Store,
+                color = AccentBlue
+            ) {
+                Text(
+                    text = "Cada local se muestra como una tarjeta blanca con bordes redondeados " +
+                            "y sombra sutil. Contiene:",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    lineHeight = 20.sp
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                BulletPoint("Icono con el color de la cadena (ver tabla arriba)")
+                BulletPoint("Nombre del local en formato natural")
+                BulletPoint("Código interno del local")
+                BulletPoint("Dirección en azul (toca para abrir en Google Maps)")
+                BulletPoint("Contador circular con el número de marcas a visitar")
+            }
+
+            // ── Marcas ──
+            SectionCard(
+                title = "Marcas prioritarias y normales",
+                icon = Icons.Outlined.Description,
+                color = AccentOrange
+            ) {
+                Text(
+                    text = "Marcas prioritarias:",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                BulletPoint("Tarjeta blanca independiente con barra naranja a la izquierda")
+                BulletPoint("Ícono de estrella dentro de un círculo naranja")
+                BulletPoint("Chip verde que indica la frecuencia de visita (ej. \"3×\" semanal)")
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Marcas normales:",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                BulletPoint("Fila compacta sin tarjeta independiente")
+                BulletPoint("Círculo con iniciales de la marca en un color generado automáticamente")
+                BulletPoint("Badge de frecuencia cuando corresponde")
+            }
+
+            // ── Abrir PDF ──
+            SectionCard(
+                title = "Abrir PDF de una marca",
+                icon = Icons.Outlined.Description,
+                color = StoreColorFuchsia
+            ) {
+                NumberedStep("Toca cualquier marca dentro de un local.")
+                NumberedStep("La aplicación abre el PDF del catalogador en la página exacta de esa marca.")
+                NumberedStep("Si la marca no se encuentra en el PDF, aparece un mensaje: \"Marca no encontrada\".")
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "La navegación a la página exacta funciona gracias a un mapa interno " +
+                            "de marcas con sus números de página correspondientes.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 18.sp
+                )
+            }
+
+            // ── Ver todos los locales ──
+            SectionCard(
+                title = "Ver todos los locales",
+                icon = Icons.Outlined.LocationOn,
+                color = AccentBlue
+            ) {
+                NumberedStep("Toca la tarjeta \"Locales\" en la sección de estadísticas (arriba, junto a Marcas y Visitas).")
+                NumberedStep("Se abre una pantalla completa con todos los locales de la ruta.")
+                NumberedStep("Cada local muestra su nombre, dirección y código de colores por cadena.")
+                NumberedStep("Toca la dirección para abrirla en Google Maps.")
+                NumberedStep("Presiona ← para volver.")
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+// ── Componentes internos ──────────────────────────────────
+
+@Composable
+private fun SectionCard(
+    title: String,
+    icon: ImageVector,
+    color: Color,
+    content: @Composable () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(color.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = color,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = title,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            content()
+        }
+    }
+}
+
+@Composable
+private fun NumberedStep(text: String) {
+    Row(modifier = Modifier.padding(vertical = 2.dp)) {
+        Text(
+            text = "•",
+            fontWeight = FontWeight.Bold,
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.width(18.dp)
+        )
+        Text(
+            text = text,
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurface,
+            lineHeight = 20.sp
+        )
+    }
+}
+
+@Composable
+private fun BulletPoint(text: String) {
+    Row(modifier = Modifier.padding(vertical = 1.dp)) {
+        Text(
+            text = "–",
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(16.dp)
+        )
+        Text(
+            text = text,
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurface,
+            lineHeight = 18.sp
+        )
+    }
+}
+
+@Composable
+private fun ChainColorRow(name: String, color: Color, softColor: Color) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(20.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(softColor),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(color)
+            )
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = name,
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}

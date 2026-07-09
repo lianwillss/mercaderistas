@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ruta Mercaderistas</string>
+    <string name="cargar_archivo">Cargar archivo Excel</string>
+    <string name="sin_visitas">Sin visitas este día</string>
+    <string name="cargando">Leyendo ruta…</string>
+    <string name="title_ruta">Ruta Mercaderistas</string>
+    <string name="aviso_busqueda">Ruta sincronizada. Busca tu ruta aquí:</string>
+    <string name="recientes">Recientes</string>
+    <string name="sin_conexion">Sin conexión — mostrando datos cacheados</string>
+    <string name="preparando_ruta">Preparando ruta…</string>
+    <string name="espera_momento">Espera un momento</string>
+    <string name="sincronizando">Sincronizando…</string>
+    <string name="iniciando">Iniciando…</string>
+    <string name="sin_visitas_el">Sin visitas el %s</string>
+    <string name="dia_actualizado">Día actualizado</string>
+    <string name="sin_resultados">Sin resultados</string>
+    <string name="buscar_local">Buscar local o dirección…</string>
+    <string name="todas">Todas</string>
+    <string name="sin_direccion">Sin dirección</string>
+    <string name="sin_comuna">Sin comuna</string>
+    <string name="buscando_marca">Buscando \"%s\" en el manual…</string>
+    <string name="marca_no_encontrada">\"%s\" no encontrada, mostrando todo el manual</string>
+    <string name="error_marca">Error al buscar \"%s\"</string>
+    <string name="error_abrir_pdf">Error al abrir el manual</string>
+    <string name="descargando_manual">Descargando manual… presiona de nuevo</string>
+    <string name="manual_descargado">Manual descargado, tócala de nuevo</string>
+    <string name="error_descarga_manual">Error al descargar el manual</string>
+    <string name="copiar_link">Copia primero el link de Google Drive</string>
+    <string name="reiniciar_carga">Reintentar carga</string>
+    <string name="error_carga_mensaje">Error: %s</string>
+    <string name="contador_paginas">%d de %d</string>
+    <string name="cerrar">Cerrar</string>
+    <string name="stats_locales">%d locales</string>
+    <string name="stats_marcas">%d marcas</string>
+    <string name="stats_visitas">%d visitas</string>
+    <string name="compartir">Compartir</string>
+    <string name="actualizar">Actualizar</string>
+    <string name="pegar_link">Pegar link</string>
+    <string name="cargar">Cargar</string>
+    <string name="cerrar_busqueda">Cerrar búsqueda</string>
+    <string name="buscar_locales">Buscar locales</string>
+</resources>

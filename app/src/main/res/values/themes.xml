@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.RutaMercaderistas" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/acento_azul</item>
+        <item name="colorOnPrimary">@color/texto_blanco</item>
+        <item name="colorPrimaryContainer">@color/container_azul</item>
+        <item name="colorOnPrimaryContainer">@color/acento_azul</item>
+        <item name="colorSecondary">@color/acento_verde</item>
+        <item name="colorOnSecondary">@color/texto_blanco</item>
+        <item name="colorSecondaryContainer">@color/secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/acento_verde</item>
+        <item name="colorTertiary">@color/tertiary</item>
+        <item name="colorOnTertiary">@color/texto_blanco</item>
+        <item name="colorError">@color/error_color</item>
+        <item name="colorOnError">@color/texto_blanco</item>
+        <item name="colorSurface">@color/gradiente_inicio</item>
+        <item name="colorOnSurface">@color/texto_primario</item>
+        <item name="colorOnSurfaceVariant">@color/texto_secundario</item>
+        <item name="colorOutline">@color/outline_variant</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>

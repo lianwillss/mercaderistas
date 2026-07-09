@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="gradiente_inicio">#F7FAFC</color>
+    <color name="gradiente_medio">#EBEEF0</color>
+    <color name="gradiente_fin">#D7DADD</color>
+    <color name="acento_verde">#006D41</color>
+    <color name="acento_azul">#004CCD</color>
+    <color name="tertiary">#745B00</color>
+    <color name="tertiary_container">#D0A600</color>
+    <color name="secondary_container">#90F4B7</color>
+    <color name="error_color">#BA1A1A</color>
+    <color name="outline_variant">#C3C6D8</color>
+    <color name="blanco_glass">#CCFFFFFF</color>
+    <color name="blanco_glass_borde">#80E5E9F0</color>
+    <color name="texto_primario">#181C1E</color>
+    <color name="texto_secundario">#424656</color>
+    <color name="texto_blanco">#FFFFFF</color>
+    <color name="texto_blanco_suave">#E0E0E0</color>
+    <color name="card_glass">#F0FFFFFF</color>
+    <color name="sombra_suave">#1A000000</color>
+    <color name="container_azul">#D6E3FF</color>
+    <color name="ic_launcher_background">#F7FAFC</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Sombra -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/sombra_suave"/>
+            <corners android:radius="16dp"/>
+            <padding android:bottom="2dp"/>
+        </shape>
+    </item>
+    <!-- Card blanco tipo iOS -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#F8FFFFFF"/>
+            <corners android:radius="16dp"/>
+            <stroke android:width="0.5dp" android:color="#30E5E9F0"/>
+        </shape>
+    </item>
+</layer-list>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Spacing grid (multiples of 4dp) -->
+    <dimen name="spacing_xs">4dp</dimen>
+    <dimen name="spacing_sm">8dp</dimen>
+    <dimen name="spacing_md">12dp</dimen>
+    <dimen name="spacing_lg">16dp</dimen>
+    <dimen name="spacing_xl">24dp</dimen>
+    <dimen name="spacing_xxl">48dp</dimen>
+
+    <!-- Touch targets (WCAG minimum 48dp) -->
+    <dimen name="touch_target_min">48dp</dimen>
+    <dimen name="touch_target_small">40dp</dimen>
+
+    <!-- Corner radii -->
+    <dimen name="corner_card">16dp</dimen>
+    <dimen name="corner_button">12dp</dimen>
+    <dimen name="corner_chip">8dp</dimen>
+    <dimen name="corner_badge">50dp</dimen>
+    <dimen name="corner_page_indicator">20dp</dimen>
+
+    <!-- Layout -->
+    <dimen name="recycler_bottom_padding">80dp</dimen>
+
+    <!-- Card -->
+    <dimen name="card_margin_horizontal">12dp</dimen>
+    <dimen name="card_margin_vertical">6dp</dimen>
+    <dimen name="card_padding">16dp</dimen>
+
+    <!-- Badge -->
+    <dimen name="badge_size">48dp</dimen>
+    <dimen name="badge_icon_size">18dp</dimen>
+
+    <!-- Toolbar -->
+    <dimen name="toolbar_height">56dp</dimen>
+
+    <!-- Pdf viewer -->
+    <dimen name="pdf_top_bar_height">56dp</dimen>
+</resources>
