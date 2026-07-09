@@ -17,13 +17,15 @@ android {
     }
 
     // ── Signing config for CI (GitHub Actions secrets) ──
-    signingConfigs {
-        create("release") {
-            val ksPath = System.getenv("KEYSTORE_PATH") ?: return@create
-            storeFile = file(ksPath)
-            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: return@create
-            keyAlias = System.getenv("KEY_ALIAS") ?: return@create
-            keyPassword = System.getenv("KEY_PASSWORD") ?: return@create
+    def keystorePath = System.getenv("KEYSTORE_PATH")
+    if (keystorePath != null) {
+        signingConfigs {
+            release {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
         }
     }
 
@@ -32,7 +34,9 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig = signingConfigs.findByName("release")
+            if (keystorePath != null) {
+                signingConfig = signingConfigs.release
+            }
         }
     }
 
