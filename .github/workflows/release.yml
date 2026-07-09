@@ -49,6 +49,13 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
+      - name: Find APK
+        id: find_apk
+        run: |
+          APK=$(find app/build/outputs/apk/release -name "*-universal-*.apk" | head -1)
+          echo "APK_PATH=$APK" >> $GITHUB_OUTPUT
+          echo "Found: $APK"
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -58,5 +65,5 @@ jobs:
             ## v${{ env.VERSION_NAME }}
 
             Descarga el APK e instálalo en tu dispositivo.
-          files: app/build/outputs/apk/release/app-release.apk
+          files: ${{ steps.find_apk.outputs.APK_PATH }}
           generate_release_notes: true
