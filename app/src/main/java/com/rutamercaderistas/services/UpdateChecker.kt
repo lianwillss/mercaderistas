@@ -5,48 +5,64 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
-import java.net.HttpURLConnection.HTTP_MOVED_PERM
-import java.net.HttpURLConnection.HTTP_MOVED_TEMP
 import java.net.URL
 
 data class UpdateInfo(
     val available: Boolean,
     val versionCode: Int,
     val versionName: String,
-    val apkFileId: String
+    val apkUrl: String
 )
 
 object UpdateChecker {
 
     private const val TAG = "UpdateChecker"
+    private const val API_URL = "https://api.github.com/repos/lianwillss/mercaderistas/releases/latest"
 
-    suspend fun check(
-        jsonDriveId: String,
-        currentVersionCode: Int
-    ): UpdateInfo = withContext(Dispatchers.IO) {
+    suspend fun check(currentVersionCode: Int): UpdateInfo = withContext(Dispatchers.IO) {
         try {
-            val url = buildDriveUrl(jsonDriveId)
-            val bytes = downloadBytes(url)
-            if (bytes == null) {
-                Log.w(TAG, "No se pudo descargar version.json")
+            val json = fetchLatestRelease()
+            if (json == null) {
+                Log.w(TAG, "No se pudo obtener el release")
                 return@withContext noUpdate()
             }
 
-            val json = JSONObject(String(bytes))
-            val latestVersionCode = json.optInt("versionCode", currentVersionCode)
-            val versionName = json.optString("versionName", "")
-            val apkFileId = json.optString("apkFileId", "")
+            val tagName = json.optString("tag_name", "") // "v9.0"
+            val versionName = tagName.removePrefix("v")
 
-            if (latestVersionCode > currentVersionCode && apkFileId.isNotBlank()) {
-                Log.i(TAG, "Actualización disponible: $latestVersionCode (actual: $currentVersionCode)")
+            val versionCode = extractVersionCode(versionName)
+            if (versionCode < 0) {
+                Log.w(TAG, "Tag inv\u00E1lido: $tagName")
+                return@withContext noUpdate()
+            }
+
+            val assets = json.optJSONArray("assets")
+            var apkUrl: String? = null
+            if (assets != null) {
+                for (i in 0 until assets.length()) {
+                    val asset = assets.optJSONObject(i)
+                    if (asset?.optString("name", "") == "app-release.apk") {
+                        apkUrl = asset.optString("browser_download_url", null)
+                        break
+                    }
+                }
+            }
+
+            if (apkUrl == null) {
+                Log.w(TAG, "No se encontr\u00F3 APK en el release")
+                return@withContext noUpdate()
+            }
+
+            if (versionCode > currentVersionCode) {
+                Log.i(TAG, "Actualizaci\u00F3n disponible: $versionName ($versionCode) > actual ($currentVersionCode)")
                 UpdateInfo(
                     available = true,
-                    versionCode = latestVersionCode,
+                    versionCode = versionCode,
                     versionName = versionName,
-                    apkFileId = apkFileId
+                    apkUrl = apkUrl
                 )
             } else {
-                Log.i(TAG, "Sin actualizaciones")
+                Log.i(TAG, "Sin actualizaciones: remote=$versionCode, local=$currentVersionCode")
                 noUpdate()
             }
         } catch (e: Exception) {
@@ -55,41 +71,38 @@ object UpdateChecker {
         }
     }
 
+    private fun fetchLatestRelease(): JSONObject? {
+        var conn: HttpURLConnection? = null
+        try {
+            conn = URL(API_URL).openConnection() as HttpURLConnection
+            conn.instanceFollowRedirects = true
+            conn.connectTimeout = 15000
+            conn.readTimeout = 30000
+            conn.setRequestProperty("Accept", "application/vnd.github+json")
+            conn.setRequestProperty("User-Agent", "Mercaderistas-Android")
+
+            if (conn.responseCode != 200) {
+                Log.w(TAG, "GitHub API status: ${conn.responseCode}")
+                return null
+            }
+
+            val bytes = conn.inputStream.use { it.readBytes() }
+            return JSONObject(String(bytes))
+        } catch (e: Exception) {
+            Log.w(TAG, "Error fetching release", e)
+            return null
+        } finally { conn?.disconnect() }
+    }
+
+    private fun extractVersionCode(versionName: String): Int {
+        val parts = versionName.split(".")
+        return parts.firstOrNull()?.toIntOrNull() ?: -1
+    }
+
     private fun noUpdate() = UpdateInfo(
         available = false,
         versionCode = 0,
         versionName = "",
-        apkFileId = ""
+        apkUrl = ""
     )
-
-    private fun buildDriveUrl(fileId: String): String {
-        return "https://drive.google.com/uc?export=download&id=$fileId&confirm=t"
-    }
-
-    private fun downloadBytes(url: String): ByteArray? {
-        var currentUrl = url
-        var limit = 5
-        var redirect = true
-        while (redirect && limit > 0) {
-            var conn: HttpURLConnection? = null
-            try {
-                conn = URL(currentUrl).openConnection() as HttpURLConnection
-                conn.instanceFollowRedirects = false
-                conn.connectTimeout = 15000
-                conn.readTimeout = 30000
-                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
-                val status = conn.responseCode
-                if (status == HTTP_MOVED_PERM || status == HTTP_MOVED_TEMP || status == 303 || status == 307 || status == 308) {
-                    currentUrl = conn.getHeaderField("Location") ?: return null
-                    limit--
-                    continue
-                }
-                return conn.inputStream.use { it.readBytes() }
-            } catch (e: Exception) {
-                Log.w(TAG, "Download error", e)
-                return null
-            } finally { conn?.disconnect() }
-        }
-        return null
-    }
 }

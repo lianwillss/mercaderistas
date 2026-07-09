@@ -68,8 +68,6 @@ class MainActivity : ComponentActivity() {
     private val DRIVE_FILE_ID = "18PejQq99XzNyTDf0fFku0hHwMs2sG1X5"
     private val DRIVE_EXPORT_URL = "https://docs.google.com/spreadsheets/d/$DRIVE_FILE_ID/export?format=xlsx"
 
-    private val VERSION_JSON_FILE_ID = "1om4hcqMKjVL0z4iukxIwSrbIStYobrja"
-
     private val PREFS_NAME = "mercaderistas_prefs"
     private val KEY_RUTERO = "selected_rutero"
     private val KEY_UPDATE_SUPPRESSED_UNTIL = "update_suppressed_until"
@@ -101,30 +99,26 @@ class MainActivity : ComponentActivity() {
             var showUpdateDialog by remember { mutableStateOf(false) }
             var updateVersionName by remember { mutableStateOf("") }
             var updateVersionCode by remember { mutableIntStateOf(0) }
-            var updateApkFileId by remember { mutableStateOf("") }
+            var updateApkUrl by remember { mutableStateOf("") }
             var downloading by remember { mutableStateOf(false) }
             var downloadProgress by remember { mutableIntStateOf(0) }
 
             LaunchedEffect(Unit) {
-                mostrarSnackbar("Verificando actualizaciones…")
+                mostrarSnackbar("Verificando actualizaciones\u2026")
                 val suprimidoHasta = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
                     .getLong(KEY_UPDATE_SUPPRESSED_UNTIL, 0L)
                 if (System.currentTimeMillis() < suprimidoHasta) {
-                    mostrarSnackbar("Verificación suprimida hasta mañana")
-                    return@LaunchedEffect
-                }
-                if (VERSION_JSON_FILE_ID == "CAMBIAME_por_id_real") {
-                    mostrarSnackbar("UpdateChecker no configurado")
+                    mostrarSnackbar("Verificaci\u00F3n suprimida hasta ma\u00F1ana")
                     return@LaunchedEffect
                 }
                 try {
-                    val info = UpdateChecker.check(VERSION_JSON_FILE_ID, BuildConfig.VERSION_CODE)
+                    val info = UpdateChecker.check(BuildConfig.VERSION_CODE)
                     if (info.available) {
                         updateVersionName = info.versionName
                         updateVersionCode = info.versionCode
-                        updateApkFileId = info.apkFileId
+                        updateApkUrl = info.apkUrl
                         showUpdateDialog = true
-                        mostrarSnackbar("Versión ${info.versionName} disponible!")
+                        mostrarSnackbar("Versi\u00F3n ${info.versionName} disponible!")
                     } else {
                         mostrarSnackbar("Sin actualizaciones (v${BuildConfig.VERSION_CODE})")
                     }
@@ -209,7 +203,7 @@ class MainActivity : ComponentActivity() {
                                         lifecycleScope.launch {
                                             val ok = ApkDownloader.downloadAndInstall(
                                                 this@MainActivity,
-                                                updateApkFileId
+                                                updateApkUrl
                                             ) { pct -> downloadProgress = pct }
                                             if (ok) {
                                                 showUpdateDialog = false

@@ -11,9 +11,20 @@ android {
         applicationId "com.rutamercaderistas"
         minSdk 26
         targetSdk 34
-        versionCode 8
-        versionName "8.0"
+        versionCode 9
+        versionName "9.0"
         resConfigs "es"
+    }
+
+    // ── Signing config for CI (GitHub Actions secrets) ──
+    signingConfigs {
+        create("release") {
+            val ksPath = System.getenv("KEYSTORE_PATH") ?: return@create
+            storeFile = file(ksPath)
+            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: return@create
+            keyAlias = System.getenv("KEY_ALIAS") ?: return@create
+            keyPassword = System.getenv("KEY_PASSWORD") ?: return@create
+        }
     }
 
     buildTypes {
@@ -21,6 +32,7 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 
