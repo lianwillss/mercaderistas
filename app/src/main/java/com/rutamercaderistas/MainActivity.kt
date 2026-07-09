@@ -210,7 +210,7 @@ class MainActivity : ComponentActivity() {
                                                 downloading = false
                                             } else {
                                                 downloading = false
-                                                mostrarSnackbar("Error al descargar actualización")
+                                                mostrarSnackbar("Error al instalar la actualización. Ve a Ajustes > Apps > Mercaderistas > Instalar apps desconocidas y actívalo.")
                                             }
                                         }
                                     },

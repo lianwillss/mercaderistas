@@ -7,6 +7,7 @@ import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -31,8 +32,22 @@ object ApkDownloader {
             }
 
             Log.i(TAG, "APK descargado: ${apkFile.length()} bytes")
-            withContext(Dispatchers.Main) { installApk(context, apkFile) }
-            return@withContext true
+
+            val installed = withContext(Dispatchers.Main) {
+                try {
+                    installApk(context, apkFile)
+                    true
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error instalando APK", e)
+                    false
+                }
+            }
+
+            if (!installed) {
+                apkFile.delete()
+            }
+
+            return@withContext installed
 
         } catch (e: Exception) {
             Log.e(TAG, "Error en downloadAndInstall", e)
@@ -57,7 +72,7 @@ object ApkDownloader {
             Log.i(TAG, "Content-Length: $contentLength")
 
             val inputStream = conn.inputStream
-            val outputStream = destination.outputStream()
+            val outputStream = FileOutputStream(destination)
             val buffer = ByteArray(65536)
             var reads: Int
             var total = 0L
@@ -70,10 +85,7 @@ object ApkDownloader {
                     val pct = ((total * 100) / contentLength).toInt().coerceIn(0, 100)
                     if (pct > lastPct) {
                         lastPct = pct
-                        val cb = onProgress
-                        kotlinx.coroutines.runBlocking {
-                            withContext(Dispatchers.Main) { cb(pct) }
-                        }
+                        onProgress(pct)
                     }
                 }
             }
@@ -89,35 +101,18 @@ object ApkDownloader {
         } finally { conn?.disconnect() }
     }
 
+    @Throws(Exception::class)
     private fun installApk(context: Context, apkFile: File) {
-        try {
-            val uri = FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.fileprovider",
-                apkFile
-            )
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "application/vnd.android.package-archive")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(intent)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error instalando APK v\u00EDa ACTION_VIEW", e)
-            try {
-                val fallback = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
-                    setData(FileProvider.getUriForFile(
-                        context,
-                        "${context.packageName}.fileprovider",
-                        apkFile
-                    ))
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(fallback)
-            } catch (e2: Exception) {
-                Log.e(TAG, "Error fallback instalaci\u00F3n", e2)
-            }
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            apkFile
+        )
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
+        context.startActivity(intent)
     }
 }
