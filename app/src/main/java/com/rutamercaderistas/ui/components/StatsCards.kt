@@ -66,7 +66,14 @@ fun StatsCards(
             onClick = onMarcasClick,
             modifier = Modifier.weight(1f),
             badge = if (marcasConPromo > 0) {
-                { PromotionBadge(count = marcasConPromo) }
+                {
+                    Text(
+                        text = "${marcasConPromo} con promo",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFFE53935),
+                    )
+                }
             } else null
         )
         StatCard(

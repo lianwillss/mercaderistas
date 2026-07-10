@@ -46,8 +46,6 @@ import androidx.compose.ui.unit.dp
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.ui.components.PromotionBadge
 import com.rutamercaderistas.ui.components.PromotionList
-import com.rutamercaderistas.ui.theme.storeColor
-import com.rutamercaderistas.ui.theme.storeSoftColor
 
 @Composable
 fun PromotionsOverviewScreen(
@@ -130,7 +128,21 @@ fun PromotionsOverviewScreen(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
         )
 
-        LazyColumn(
+        if (filteredEntries.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Sin resultados",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            LazyColumn(
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
@@ -156,13 +168,13 @@ fun PromotionsOverviewScreen(
                                 modifier = Modifier
                                     .size(28.dp)
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(storeSoftColor(brand)),
+                                    .background(MaterialTheme.colorScheme.secondaryContainer),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Outlined.ShoppingBag,
                                     contentDescription = "Marca",
-                                    tint = storeColor(brand),
+                                    tint = MaterialTheme.colorScheme.secondary,
                                     modifier = Modifier.size(14.dp)
                                 )
                             }
@@ -190,6 +202,7 @@ fun PromotionsOverviewScreen(
                     }
                 }
             }
+        }
         }
     }
 }

@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -21,6 +23,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.ui.theme.AccentBlue
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun PromotionBadge(count: Int) {
@@ -44,6 +49,16 @@ fun PromotionBadge(count: Int) {
     }
 }
 
+private val dateFormatter = DateTimeFormatter.ofPattern("d MMM", Locale("es"))
+
+private fun formatDate(iso: String): String {
+    return try {
+        LocalDate.parse(iso).format(dateFormatter)
+    } catch (_: Exception) {
+        iso
+    }
+}
+
 @Composable
 fun PromotionList(
     promotions: List<PromotionEntity>,
@@ -54,12 +69,15 @@ fun PromotionList(
             .padding(start = marginStart)
             .fillMaxWidth()
     ) {
-        promotions.forEach { promo ->
+        promotions.forEachIndexed { index, promo ->
+            if (index > 0) {
+                Spacer(modifier = Modifier.height(4.dp))
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(start = 22.dp, top = 3.dp, bottom = 1.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
                 Text(
                     text = "\u2022",
@@ -75,9 +93,8 @@ fun PromotionList(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                    Column(
+                        modifier = Modifier.padding(top = 1.dp),
                     ) {
                         if (promo.price.isNotBlank()) {
                             Text(
@@ -89,7 +106,7 @@ fun PromotionList(
                         }
                         if (promo.endDate.isNotBlank()) {
                             Text(
-                                text = "Hasta ${promo.endDate}",
+                                text = "Hasta ${formatDate(promo.endDate)}",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
