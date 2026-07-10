@@ -175,24 +175,17 @@ class RouteViewModel @Inject constructor(
 
     fun exportRoute() {
         val s = _uiState.value
-        val name = s.selectedRoute
-        if (name == null) {
+        val name = s.selectedRoute ?: run {
             _uiState.value = _uiState.value.copy(snackbarMessage = "Selecciona una ruta primero")
             return
         }
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             try {
-                routeExporter.exportAsImage(
-                    routeName = name,
-                    entries = s.entries,
-                ) { file ->
-                    withContext(Dispatchers.Main) {
-                        try {
-                            routeExporter.shareImage(file, name)
-                        } catch (e: Exception) {
-                            _uiState.value = _uiState.value.copy(snackbarMessage = "Error al compartir: ${e.message}")
-                        }
-                    }
+                val file = routeExporter.exportAsImage(name, s.entries)
+                try {
+                    routeExporter.shareImage(file, name)
+                } catch (e: Exception) {
+                    _uiState.value = _uiState.value.copy(snackbarMessage = "Error al compartir: ${e.message}")
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(snackbarMessage = "Error al exportar: ${e.message}")

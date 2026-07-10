@@ -18,6 +18,8 @@ import com.rutamercaderistas.models.LocalDelDia
 import com.rutamercaderistas.models.toNaturalCase
 import com.rutamercaderistas.services.RuteroRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Locale
 import javax.inject.Inject
@@ -57,12 +59,11 @@ class RouteExporter @Inject constructor(
         if (italic) typeface = Typeface.create(Typeface.DEFAULT, Typeface.ITALIC)
     }
 
-    fun exportAsImage(
+    suspend fun exportAsImage(
         routeName: String,
         entries: List<EntradaRuta>,
         stats: RuteroRepository.Stats = RuteroRepository.getStats(),
-        onComplete: (File) -> Unit,
-    ) {
+    ): File = withContext(Dispatchers.IO) {
         val w = dp(WIDTH_DP)
         val pad = dp(PAD_DP)
         val contentW = w - pad * 2
@@ -95,7 +96,7 @@ class RouteExporter @Inject constructor(
         file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         bitmap.recycle()
         Log.d(TAG, "Export done: ${file.absolutePath} (${w}x$totalH)")
-        onComplete(file)
+        file
     }
 
     fun shareImage(file: File, routeName: String) {

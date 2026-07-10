@@ -110,7 +110,13 @@ object RuteroRepository {
                     formato = first.formato,
                     region = first.region,
                     comuna = first.comuna,
-                    clientes = emptyList()
+                    clientes = entries.map { entry ->
+                        ClienteInfo(
+                            nombre = entry.cliente,
+                            esPrioritaria = entry.esPrioritaria,
+                            frecuencia = entry.frecuencia,
+                        )
+                    }.sortedByDescending { it.esPrioritaria },
                 )
             }
     }
