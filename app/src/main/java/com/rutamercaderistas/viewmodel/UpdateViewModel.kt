@@ -6,7 +6,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.Constants
-import com.rutamercaderistas.data.result.UpdateResult
 import com.rutamercaderistas.services.ApkDownloader
 import com.rutamercaderistas.services.UpdateChecker
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,7 +22,8 @@ data class UpdateUiState(
     val apkUrl: String = "",
     val downloading: Boolean = false,
     val downloadProgress: Int = 0,
-    val isChecked: Boolean = false,
+    val isChecking: Boolean = false,
+    val snackbarMessage: String? = null,
 )
 
 @HiltViewModel
@@ -34,33 +34,39 @@ class UpdateViewModel @Inject constructor(
     private val _state = MutableStateFlow(UpdateUiState())
     val state: StateFlow<UpdateUiState> = _state.asStateFlow()
 
-    private val _downloadProgress = MutableStateFlow(0)
-    val downloadProgress: StateFlow<Int> = _downloadProgress.asStateFlow()
-
     private val prefs = application.getSharedPreferences(Constants.PREFS_NAME, Context.MODE_PRIVATE)
 
-    fun checkForUpdate(force: Boolean = false) {
+    fun checkForUpdate(force: Boolean = false, showFeedback: Boolean = true) {
         if (!force) {
             val suprimidoHasta = prefs.getLong(Constants.KEY_UPDATE_SUPPRESSED_UNTIL, 0L)
             if (System.currentTimeMillis() < suprimidoHasta) return
         }
 
+        _state.value = _state.value.copy(isChecking = true)
         viewModelScope.launch {
             try {
                 val info = UpdateChecker.check(BuildConfig.VERSION_CODE)
                 if (info.available) {
                     _state.value = _state.value.copy(
+                        isChecking = false,
                         showDialog = true,
                         versionName = info.versionName,
                         versionCode = info.versionCode,
                         apkUrl = info.apkUrl,
-                        isChecked = true,
+                    )
+                } else if (showFeedback) {
+                    _state.value = _state.value.copy(
+                        isChecking = false,
+                        snackbarMessage = "Sin actualizaciones disponibles",
                     )
                 } else {
-                    _state.value = _state.value.copy(isChecked = true)
+                    _state.value = _state.value.copy(isChecking = false)
                 }
             } catch (_: Exception) {
-                _state.value = _state.value.copy(isChecked = true)
+                _state.value = _state.value.copy(
+                    isChecking = false,
+                    snackbarMessage = if (showFeedback) "Error al buscar actualización" else null,
+                )
             }
         }
     }
@@ -72,13 +78,20 @@ class UpdateViewModel @Inject constructor(
             val ok = ApkDownloader.downloadAndInstall(
                 context,
                 _state.value.apkUrl,
-            ) { pct -> _downloadProgress.value = pct; _state.value = _state.value.copy(downloadProgress = pct) }
+            ) { pct -> _state.value = _state.value.copy(downloadProgress = pct) }
             if (ok) {
                 _state.value = _state.value.copy(showDialog = false, downloading = false)
             } else {
-                _state.value = _state.value.copy(downloading = false)
+                _state.value = _state.value.copy(
+                    downloading = false,
+                    snackbarMessage = "Error al descargar la actualización",
+                )
             }
         }
+    }
+
+    fun clearSnackbar() {
+        _state.value = _state.value.copy(snackbarMessage = null)
     }
 
     fun suppressUntilTomorrow() {

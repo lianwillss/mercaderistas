@@ -1,5 +1,6 @@
 package com.rutamercaderistas.ui.components
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -44,8 +45,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.models.ClienteInfo
 import com.rutamercaderistas.models.LocalDelDia
 import com.rutamercaderistas.ui.theme.AccentBlue
@@ -57,7 +59,9 @@ import com.rutamercaderistas.ui.theme.AccentOrangeSoft
 import com.rutamercaderistas.ui.theme.Outline
 import com.rutamercaderistas.ui.theme.storeColor
 import com.rutamercaderistas.ui.theme.storeSoftColor
+import com.rutamercaderistas.utils.cleanBrand
 import kotlin.math.abs
+import timber.log.Timber
 
 @Composable
 fun StoreCard(
@@ -65,6 +69,7 @@ fun StoreCard(
     marcaResaltada: String?,
     onBrandClick: (String) -> Unit,
     onAddressClick: (String) -> Unit,
+    promotionsByBrand: Map<String, List<PromotionEntity>> = emptyMap(),
     index: Int = 0,
     modifier: Modifier = Modifier
 ) {
@@ -78,7 +83,7 @@ fun StoreCard(
         animationSpec = tween(250, delayMillis = index * 50)
     )
 
-    LaunchedEffect(Unit) { visible = true }
+    LaunchedEffect(local) { visible = true }
 
     Card(
         modifier = modifier
@@ -95,6 +100,7 @@ fun StoreCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
+                .animateContentSize(animationSpec = tween(250))
         ) {
             // ── Header row ──
             Row(
@@ -110,7 +116,7 @@ fun StoreCard(
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Store,
-                        contentDescription = null,
+                        contentDescription = "Local",
                         tint = storeColor(local.local),
                         modifier = Modifier.size(18.dp)
                     )
@@ -122,21 +128,18 @@ fun StoreCard(
                     Text(
                         text = local.local.ifBlank { "S/N" },
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 20.sp,
+                        style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        lineHeight = 24.sp
                     )
 
                     if (local.codigo.isNotBlank()) {
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = local.codigo,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
+                            style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            lineHeight = 14.sp
                         )
                     }
 
@@ -152,7 +155,7 @@ fun StoreCard(
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.LocationOn,
-                                contentDescription = null,
+                                contentDescription = "Dirección",
                                 tint = AccentBlue,
                                 modifier = Modifier.size(13.dp)
                             )
@@ -161,8 +164,7 @@ fun StoreCard(
                                 if (local.direccion.isNotBlank()) {
                                     Text(
                                         text = local.direccion,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        fontSize = 15.sp,
+                                        style = MaterialTheme.typography.bodyMedium,
                                         color = AccentBlue,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -171,8 +173,7 @@ fun StoreCard(
                                 if (local.comuna.isNotBlank()) {
                                     Text(
                                         text = local.comuna,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        fontSize = 15.sp,
+                                        style = MaterialTheme.typography.bodyMedium,
                                         color = AccentBlue,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -198,16 +199,14 @@ fun StoreCard(
                         Text(
                             text = "${local.totalClientes}",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
+                            style = MaterialTheme.typography.labelMedium,
                             color = AccentBlue,
-                            lineHeight = 14.sp
                         )
                         Text(
                             text = "marcas",
                             fontWeight = FontWeight.Medium,
-                            fontSize = 7.sp,
+                            style = MaterialTheme.typography.labelSmall,
                             color = AccentBlue,
-                            lineHeight = 8.sp
                         )
                     }
                 }
@@ -216,8 +215,6 @@ fun StoreCard(
 
                 Text(
                     text = "›",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Light,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                 )
             }
@@ -234,8 +231,17 @@ fun StoreCard(
 
             // ── Brands ──
             local.clientes.forEach { cliente ->
+                val cleanBrandName = cliente.nombre.cleanBrand()
+                val promos = promotionsByBrand[cleanBrandName]
+                    .orEmpty()
+                    .filter { local.cadena.isBlank() || it.chain.equals(local.cadena, ignoreCase = true) }
+                if (promos.isNotEmpty()) {
+                    Timber.d("STORE: \"%s\" (cadena=\"%s\") → marca=\"%s\" (clean=\"%s\") → %d promos",
+                        local.local, local.cadena, cliente.nombre, cleanBrandName, promos.size)
+                }
                 BrandItem(
                     cliente = cliente,
+                    promotions = promos,
                     isHighlighted = marcaResaltada != null &&
                         cliente.nombre.equals(marcaResaltada, ignoreCase = true),
                     onClick = { onBrandClick(cliente.nombre) }
@@ -251,19 +257,31 @@ fun StoreCard(
 @Composable
 private fun BrandItem(
     cliente: ClienteInfo,
+    promotions: List<PromotionEntity>,
     isHighlighted: Boolean,
     onClick: () -> Unit
 ) {
     if (cliente.esPrioritaria) {
-        PriorityBrandCard(cliente = cliente, isHighlighted = isHighlighted, onClick = onClick)
+        PriorityBrandCard(
+            cliente = cliente,
+            promotions = promotions,
+            isHighlighted = isHighlighted,
+            onClick = onClick,
+        )
     } else {
-        NormalBrandRow(cliente = cliente, isHighlighted = isHighlighted, onClick = onClick)
+        NormalBrandRow(
+            cliente = cliente,
+            promotions = promotions,
+            isHighlighted = isHighlighted,
+            onClick = onClick,
+        )
     }
 }
 
 @Composable
 private fun PriorityBrandCard(
     cliente: ClienteInfo,
+    promotions: List<PromotionEntity>,
     isHighlighted: Boolean,
     onClick: () -> Unit
 ) {
@@ -278,83 +296,146 @@ private fun PriorityBrandCard(
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Row(
-            modifier = Modifier.height(IntrinsicSize.Min),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .width(3.dp)
-                    .fillMaxHeight()
-                    .background(
-                        AccentOrange,
-                        RoundedCornerShape(topStart = 11.dp, bottomStart = 11.dp)
-                    )
-            )
-
+        Column {
             Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 5.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                modifier = Modifier.height(IntrinsicSize.Min),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
-                        .size(17.dp)
-                        .clip(CircleShape)
-                        .background(AccentOrangeSoft),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Star,
-                        contentDescription = "Prioritaria",
-                        tint = AccentOrange,
-                        modifier = Modifier.size(10.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(6.dp))
-
-                Text(
-                    text = cliente.nombre,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
+                        .width(3.dp)
+                        .fillMaxHeight()
+                        .background(
+                            AccentOrange,
+                            RoundedCornerShape(topStart = 11.dp, bottomStart = 11.dp)
+                        )
                 )
 
-                if (cliente.frecuencia > 0) {
-                    Spacer(modifier = Modifier.width(5.dp))
-
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 5.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(AccentGreenSoft)
-                            .padding(horizontal = 5.dp, vertical = 2.dp)
+                            .size(17.dp)
+                            .clip(CircleShape)
+                            .background(AccentOrangeSoft),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp)
-                        ) {
-                            Text(
-                                text = cliente.frecuenciaTexto,
-                                color = AccentGreen,
-                                fontWeight = FontWeight.Medium,
-                                fontSize = 10.sp
-                            )
-                            Icon(
-                                imageVector = Icons.Outlined.DateRange,
-                                contentDescription = null,
-                                tint = AccentGreen,
-                                modifier = Modifier.size(8.dp)
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Filled.Star,
+                            contentDescription = "Prioritaria",
+                            tint = AccentOrange,
+                            modifier = Modifier.size(10.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    Text(
+                        text = cliente.nombre,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    if (promotions.isNotEmpty()) {
+                        Spacer(modifier = Modifier.width(5.dp))
+                        PromotionBadge(count = promotions.size)
+                    }
+
+                    if (cliente.frecuencia > 0) {
+                        Spacer(modifier = Modifier.width(5.dp))
+                        FrequencyChip(text = cliente.frecuenciaTexto)
                     }
                 }
             }
+
+            if (promotions.isNotEmpty()) {
+                PromotionList(promotions = promotions, marginStart = 5.dp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun NormalBrandRow(
+    cliente: ClienteInfo,
+    promotions: List<PromotionEntity>,
+    isHighlighted: Boolean,
+    onClick: () -> Unit
+) {
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .then(
+                    if (isHighlighted) Modifier.background(
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                    ) else Modifier
+                )
+                .clickable(onClick = onClick)
+                .padding(vertical = 3.dp, horizontal = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(17.dp)
+                    .clip(CircleShape)
+                    .background(avatarSoftColor(cliente.nombre)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = initials(cliente.nombre),
+                    fontWeight = FontWeight.SemiBold,
+                    color = avatarColor(cliente.nombre),
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            Spacer(modifier = Modifier.width(6.dp))
+
+            Text(
+                text = cliente.nombre,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            if (promotions.isNotEmpty()) {
+                Spacer(modifier = Modifier.width(5.dp))
+                PromotionBadge(count = promotions.size)
+            }
+
+            if (cliente.frecuencia > 0) {
+                Spacer(modifier = Modifier.width(5.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                ) {
+                    Text(
+                        text = cliente.frecuenciaTexto,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+            }
+        }
+
+        if (promotions.isNotEmpty()) {
+            PromotionList(promotions = promotions, marginStart = 2.dp)
         }
     }
 }
@@ -387,69 +468,150 @@ private fun initials(text: String): String {
     }
 }
 
+// ── Promotion composables ─────────────────────────────────────
+
 @Composable
-private fun NormalBrandRow(
-    cliente: ClienteInfo,
-    isHighlighted: Boolean,
-    onClick: () -> Unit
-) {
-    Row(
+private fun PromotionBadge(count: Int) {
+    Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .then(
-                if (isHighlighted) Modifier.background(
-                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                ) else Modifier
-            )
-            .clickable(onClick = onClick)
-            .padding(vertical = 3.dp, horizontal = 2.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .clip(RoundedCornerShape(50))
+            .background(Color(0x22FF6B6B))
+            .padding(horizontal = 5.dp, vertical = 2.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(17.dp)
-                .clip(CircleShape)
-                .background(avatarSoftColor(cliente.nombre)),
-            contentAlignment = Alignment.Center
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(text = "\uD83D\uDD25", style = MaterialTheme.typography.labelSmall)
+            Text(
+                text = "${count} promo${if (count != 1) "nes" else ""}",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFFE53935),
+            )
+        }
+    }
+}
+
+@Composable
+private fun FrequencyChip(text: String) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(AccentGreenSoft)
+            .padding(horizontal = 5.dp, vertical = 2.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             Text(
-                text = initials(cliente.nombre),
-                fontSize = 8.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = avatarColor(cliente.nombre),
-                textAlign = TextAlign.Center
+                text = text,
+                style = MaterialTheme.typography.labelSmall,
+                color = AccentGreen,
+            )
+            Icon(
+                imageVector = Icons.Outlined.DateRange,
+                contentDescription = "Frecuencia",
+                tint = AccentGreen,
+                modifier = Modifier.size(8.dp)
             )
         }
+    }
+}
 
-        Spacer(modifier = Modifier.width(6.dp))
-
-        Text(
-            text = cliente.nombre,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-
-        if (cliente.frecuencia > 0) {
-            Spacer(modifier = Modifier.width(6.dp))
-
-            Box(
+@Composable
+private fun PromotionList(
+    promotions: List<PromotionEntity>,
+    marginStart: androidx.compose.ui.unit.Dp = 0.dp,
+) {
+    Column(
+        modifier = Modifier
+            .padding(start = marginStart)
+            .fillMaxWidth()
+    ) {
+        promotions.forEach { promo ->
+            Row(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(MaterialTheme.colorScheme.secondaryContainer)
-                    .padding(horizontal = 4.dp, vertical = 1.dp)
+                    .fillMaxWidth()
+                    .padding(start = 22.dp, top = 3.dp, bottom = 1.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = cliente.frecuenciaTexto,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.secondary
+                    text = "\u2022",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(end = 6.dp)
                 )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = promo.productName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (promo.price.isNotBlank()) {
+                            Text(
+                                text = promo.price,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = AccentBlue,
+                            )
+                        }
+                        if (promo.endDate.isNotBlank()) {
+                            Text(
+                                text = "Hasta ${promo.endDate}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
             }
         }
+    }
+}
+
+// ── Preview ────────────────────────────────────────────────────
+
+@Preview(showBackground = true)
+@Composable
+private fun StoreCardPreview() {
+    val testPromos = mapOf(
+        "marca a" to listOf(
+            PromotionEntity(
+                brand = "Marca A",
+                chain = "Jumbo",
+                productName = "Producto de prueba 1 kg",
+                price = "$1.990",
+                startDate = "2026-01-01",
+                endDate = "2026-12-31",
+            ),
+        ),
+    )
+    com.rutamercaderistas.ui.theme.MercaderistasTheme {
+        StoreCard(
+            local = LocalDelDia(
+                codigo = "001",
+                local = "Local de prueba",
+                direccion = "Av. Siempre Viva 123",
+                cadena = "Jumbo",
+                formato = "",
+                region = "",
+                comuna = "Santiago",
+                clientes = listOf(
+                    ClienteInfo("Marca A", true, 3),
+                    ClienteInfo("Marca B", false, 0),
+                ),
+            ),
+            promotionsByBrand = testPromos,
+            marcaResaltada = null,
+            onBrandClick = {},
+            onAddressClick = {},
+        )
     }
 }

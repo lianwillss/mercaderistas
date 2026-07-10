@@ -9,13 +9,14 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Database(
-    entities = [RouteEntryEntity::class],
-    version = 1,
+    entities = [RouteEntryEntity::class, PromotionEntity::class],
+    version = 3,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun routeEntryDao(): RouteEntryDao
+    abstract fun promotionDao(): PromotionDao
 
     companion object {
         private const val DB_NAME = "mercaderistas.db"

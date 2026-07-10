@@ -1,8 +1,6 @@
 package com.rutamercaderistas.fragments
 
 import android.graphics.Bitmap
-import android.graphics.pdf.PdfRenderer
-import android.os.ParcelFileDescriptor
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -16,7 +14,6 @@ import com.rutamercaderistas.views.ZoomableImageView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 
 class ZoomablePageFragment : Fragment() {
 
@@ -57,7 +54,7 @@ class ZoomablePageFragment : Fragment() {
 
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                val bitmap = withContext(Dispatchers.IO) {
+                val bitmap = withContext<Bitmap?>(Dispatchers.IO) {
                     renderPage(pageNum)
                 }
                 if (bitmap != null && isAdded) {
@@ -77,24 +74,6 @@ class ZoomablePageFragment : Fragment() {
     }
 
     private fun renderPage(pageNum: Int): Bitmap? {
-        val renderer = PdfRendererCache.get() ?: return null
-        synchronized(PdfRendererCache.lock) {
-            if (pageNum - 1 >= renderer.pageCount) return null
-            val page = renderer.openPage(pageNum - 1)
-            try {
-                val scale = minOf(
-                    MAX_RENDER_PX.toFloat() / page.width,
-                    MAX_RENDER_PX.toFloat() / page.height,
-                    1f
-                )
-                val w = (page.width * scale).toInt()
-                val h = (page.height * scale).toInt()
-                val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                return bitmap
-            } finally {
-                page.close()
-            }
-        }
+        return PdfRendererCache.renderBitmap(pageNum, MAX_RENDER_PX)
     }
 }

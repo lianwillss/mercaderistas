@@ -1,8 +1,6 @@
 package com.rutamercaderistas.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LocationOn
@@ -28,6 +27,7 @@ import androidx.compose.material.icons.outlined.Store
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,8 +37,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.rutamercaderistas.ui.theme.AccentBlue
 import com.rutamercaderistas.ui.theme.AccentBlueSoft
 import com.rutamercaderistas.ui.theme.AccentGreen
@@ -70,20 +70,16 @@ fun ManualScreen(
                 .padding(horizontal = 12.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "←",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier
-                    .clickable(onClick = onClose)
-                    .padding(end = 8.dp)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
+            IconButton(onClick = onClose) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Volver",
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
             Text(
                 text = "Manual de usuario",
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 20.sp,
+                style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface
             )
         }
@@ -101,24 +97,22 @@ fun ManualScreen(
                 icon = Icons.Outlined.Info,
                 color = AccentBlue
             ) {
-                Text(
-                    text = "Mercaderistas es una aplicación que te permite gestionar tus rutas de " +
-                            "visita a locales comerciales. Descarga automáticamente un Excel desde " +
-                            "Google Drive con la información de cada ruta, organiza los locales por " +
-                            "día y te permite abrir el PDF del catalogador en la página exacta de " +
-                            "cada marca.",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    lineHeight = 20.sp
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "Funciona sin conexión después de la primera sincronización.",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = AccentBlue,
-                    lineHeight = 20.sp
-                )
+                    Text(
+                        text = "Mercaderistas es una aplicación que te permite gestionar tus rutas de " +
+                                "visita a locales comerciales. Descarga automáticamente un Excel desde " +
+                                "Google Drive con la información de cada ruta, organiza los locales por " +
+                                "día y te permite abrir el PDF del catalogador en la página exacta de " +
+                                "cada marca.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Funciona sin conexión después de la primera sincronización.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AccentBlue,
+                    )
             }
 
             // ── Sincronizar datos ──
@@ -132,13 +126,12 @@ fun ManualScreen(
                 NumberedStep("Una barra de progreso indica que los datos se están descargando.")
                 NumberedStep("Al terminar, la lista de rutas se actualiza automáticamente.")
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "La app verifica automáticamente si hay nuevos datos cada vez que " +
-                            "abres la aplicación.",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    lineHeight = 18.sp
-                )
+                    Text(
+                        text = "La app verifica automáticamente si hay nuevos datos cada vez que " +
+                                "abres la aplicación.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
             }
 
             // ── Seleccionar una ruta ──
@@ -162,16 +155,14 @@ fun ManualScreen(
                 Text(
                     text = "Usa el selector de días (LUN, MAR, MIÉ, etc.) para cambiar de día. " +
                             "También puedes deslizar horizontalmente sobre la pantalla.",
-                    fontSize = 14.sp,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
-                    lineHeight = 20.sp
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = "Los días sin visitas no aparecen en el selector.",
-                    fontSize = 13.sp,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    lineHeight = 18.sp
                 )
             }
 
@@ -198,9 +189,8 @@ fun ManualScreen(
                 Text(
                     text = "Cada local se muestra como una tarjeta blanca con bordes redondeados " +
                             "y sombra sutil. Contiene:",
-                    fontSize = 14.sp,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
-                    lineHeight = 20.sp
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 BulletPoint("Icono con el color de la cadena (ver tabla arriba)")
@@ -219,7 +209,7 @@ fun ManualScreen(
                 Text(
                     text = "Marcas prioritarias:",
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 BulletPoint("Tarjeta blanca independiente con barra naranja a la izquierda")
@@ -229,7 +219,7 @@ fun ManualScreen(
                 Text(
                     text = "Marcas normales:",
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 BulletPoint("Fila compacta sin tarjeta independiente")
@@ -250,9 +240,8 @@ fun ManualScreen(
                 Text(
                     text = "La navegación a la página exacta funciona gracias a un mapa interno " +
                             "de marcas con sus números de página correspondientes.",
-                    fontSize = 13.sp,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    lineHeight = 18.sp
                 )
             }
 
@@ -300,7 +289,7 @@ private fun SectionCard(
                 ) {
                     Icon(
                         imageVector = icon,
-                        contentDescription = null,
+                        contentDescription = title,
                         tint = color,
                         modifier = Modifier.size(16.dp)
                     )
@@ -308,8 +297,7 @@ private fun SectionCard(
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
                     text = title,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 16.sp,
+                    style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }
@@ -325,15 +313,13 @@ private fun NumberedStep(text: String) {
         Text(
             text = "•",
             fontWeight = FontWeight.Bold,
-            fontSize = 14.sp,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.width(18.dp)
         )
         Text(
             text = text,
-            fontSize = 14.sp,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface,
-            lineHeight = 20.sp
         )
     }
 }
@@ -343,15 +329,13 @@ private fun BulletPoint(text: String) {
     Row(modifier = Modifier.padding(vertical = 1.dp)) {
         Text(
             text = "–",
-            fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(16.dp)
         )
         Text(
             text = text,
-            fontSize = 13.sp,
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurface,
-            lineHeight = 18.sp
         )
     }
 }
@@ -381,8 +365,16 @@ private fun ChainColorRow(name: String, color: Color, softColor: Color) {
         Spacer(modifier = Modifier.width(10.dp))
         Text(
             text = name,
-            fontSize = 14.sp,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface
         )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ManualScreenPreview() {
+    com.rutamercaderistas.ui.theme.MercaderistasTheme {
+        ManualScreen(onClose = {})
     }
 }

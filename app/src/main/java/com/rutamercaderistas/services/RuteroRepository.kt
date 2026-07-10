@@ -1,7 +1,7 @@
 package com.rutamercaderistas.services
 
-import android.util.Log
 import com.rutamercaderistas.models.ClienteInfo
+import timber.log.Timber
 import com.rutamercaderistas.models.DiaSemana
 import com.rutamercaderistas.models.EntradaRuta
 import com.rutamercaderistas.models.LocalDelDia
@@ -9,13 +9,14 @@ import com.rutamercaderistas.models.toNaturalCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
- * RuteroRepository Optimizado: Maneja únicamente los datos de la ruta ACTIVA.
+ * RuteroRepository: Maneja únicamente los datos de la ruta ACTIVA.
  */
-object RuteroRepository {
-    private const val TAG = "RuteroRepository"
-
+@Singleton
+class RuteroRepository @Inject constructor() {
     private val _entriesFlow = MutableStateFlow<List<EntradaRuta>>(emptyList())
     val entriesFlow: StateFlow<List<EntradaRuta>> = _entriesFlow.asStateFlow()
 
@@ -29,19 +30,16 @@ object RuteroRepository {
         activeRuteroName = ruteroName
         _entriesFlow.value = entries
         cachedStats = computeStats(entries)
-        Log.d(TAG, "ROUTE_LOADED: $ruteroName con ${entries.size} registros")
+        Timber.d("ROUTE_LOADED: %s con %d registros", ruteroName, entries.size)
     }
 
     fun getActiveRuteroName() = activeRuteroName
 
-    /**
-     * Limpia absolutamente todos los datos en memoria.
-     */
     fun clear() {
         activeRuteroName = null
         cachedStats = null
         _entriesFlow.value = emptyList()
-        Log.d(TAG, "REPOSITORY_CLEARED: Memoria del repositorio vaciada")
+        Timber.d("REPOSITORY_CLEARED: Memoria del repositorio vaciada")
     }
 
     /**

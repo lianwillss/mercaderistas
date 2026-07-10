@@ -1,8 +1,8 @@
 package com.rutamercaderistas.services
 
 import android.content.Context
-import android.util.Log
 import com.rutamercaderistas.data.local.RouteEntryDao
+import timber.log.Timber
 import com.rutamercaderistas.data.local.toDomain
 import com.rutamercaderistas.data.local.toEntities
 import com.rutamercaderistas.models.EntradaRuta
@@ -22,7 +22,6 @@ class RuteroManager(
     private val routeEntryDao: RouteEntryDao,
 ) {
 
-    private val TAG = "RuteroManager"
     companion object {
         const val EXCEL_FILE_NAME = "master_rutero.xlsx"
     }
@@ -39,20 +38,20 @@ class RuteroManager(
             val file = File(context.filesDir, EXCEL_FILE_NAME)
             if (file.exists()) {
                 file.delete()
-                Log.d(TAG, "OLD_FILE_REMOVED: Archivo anterior eliminado")
+                Timber.d("OLD_FILE_REMOVED: Archivo anterior eliminado")
             }
 
             file.writeBytes(bytes)
 
             if (file.exists() && file.length() > 0) {
-                Log.d(TAG, "NEW_FILE_SAVED: Archivo maestro guardado (${file.length()} bytes)")
+                Timber.d("NEW_FILE_SAVED: Archivo maestro guardado (%d bytes)", file.length())
                 true
             } else {
-                Log.e(TAG, "ONEDRIVE_DOWNLOAD_FAILED: Archivo guardado está vacío o no existe")
+                Timber.e("ONEDRIVE_DOWNLOAD_FAILED: Archivo guardado está vacío o no existe")
                 false
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error guardando Excel maestro", e)
+            Timber.e(e, "Error guardando Excel maestro")
             false
         }
     }
@@ -66,7 +65,7 @@ class RuteroManager(
             try {
                 val file = File(context.filesDir, EXCEL_FILE_NAME)
                 if (!file.exists()) {
-                    Log.e(TAG, "INDEX_FAILED: No existe el archivo maestro para indexar")
+                    Timber.e("INDEX_FAILED: No existe el archivo maestro para indexar")
                     return@measureTimeMillis
                 }
 
@@ -76,23 +75,21 @@ class RuteroManager(
                 if (result.isSuccess) {
                     val (ruteros, byRoute) = result.getOrThrow()
 
-                    // Save all entries to Room
                     val allEntities = byRoute.flatMap { (_, entries) ->
                         entries.toEntities()
                     }
-                    routeEntryDao.deleteAll()
-                    routeEntryDao.insertAll(allEntities)
+                    routeEntryDao.deleteAllAndInsert(allEntities)
 
-                    Log.d(TAG, "INDEX_CREATED: ${ruteros.size} rutas, ${allEntities.size} registros en Room")
+                    Timber.d("INDEX_CREATED: %d rutas, %d registros en Room", ruteros.size, allEntities.size)
                     success = true
                 } else {
-                    Log.e(TAG, "INDEX_FAILED: ${result.exceptionOrNull()?.message}")
+                    Timber.e("INDEX_FAILED: %s", result.exceptionOrNull()?.message)
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error creando índice", e)
+                Timber.e(e, "Error creando índice")
             }
         }
-        Log.d(TAG, "LOAD_TIME_MS (Indexación): $time ms")
+        Timber.d("LOAD_TIME_MS (Indexación): %d ms", time)
         success
     }
 
@@ -109,11 +106,11 @@ class RuteroManager(
     suspend fun loadRoute(ruteroName: String, listener: ExcelParser.ProgressListener? = null): List<EntradaRuta> = withContext(Dispatchers.IO) {
         val fromDb = routeEntryDao.getEntriesForRoute(ruteroName)
         if (fromDb.isNotEmpty()) {
-            Log.d(TAG, "ROOM_HIT: Ruta $ruteroName (${fromDb.size} registros)")
+            Timber.d("ROOM_HIT: Ruta %s (%d registros)", ruteroName, fromDb.size)
             return@withContext fromDb.toDomain()
         }
 
-        Log.d(TAG, "ROOM_MISS: Cargando ruta $ruteroName desde Excel")
+        Timber.d("ROOM_MISS: Cargando ruta %s desde Excel", ruteroName)
         val file = File(context.filesDir, EXCEL_FILE_NAME)
         if (!file.exists()) return@withContext emptyList()
 
@@ -122,18 +119,15 @@ class RuteroManager(
             val data = result.getOrThrow()
             // Cache to Room for next time
             routeEntryDao.insertAll(data.toEntities())
-            Log.d(TAG, "ROUTE_LOADED: $ruteroName (${data.size} registros)")
+            Timber.d("ROUTE_LOADED: %s (%d registros)", ruteroName, data.size)
             return@withContext data
         }
 
         emptyList()
     }
 
-    /**
-     * Elimina toda la caché de rutas en Room.
-     */
     suspend fun invalidateAllCaches() {
         routeEntryDao.deleteAll()
-        Log.d(TAG, "CACHE_CLEARED: Toda la data en Room ha sido eliminada")
+        Timber.d("CACHE_CLEARED: Toda la data en Room ha sido eliminada")
     }
 }

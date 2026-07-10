@@ -3,7 +3,7 @@ package com.rutamercaderistas
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -35,6 +35,7 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.rutamercaderistas.models.BrandReference
+import com.rutamercaderistas.services.PromotionRepository
 import com.rutamercaderistas.ui.screens.MainScreen
 import com.rutamercaderistas.ui.theme.MercaderistasTheme
 import com.rutamercaderistas.viewmodel.RouteViewModel
@@ -42,6 +43,7 @@ import com.rutamercaderistas.viewmodel.SyncViewModel
 import com.rutamercaderistas.viewmodel.UpdateViewModel
 import com.rutamercaderistas.worker.SyncWorker
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import java.util.concurrent.TimeUnit
 
 @AndroidEntryPoint
@@ -51,17 +53,15 @@ class MainActivity : ComponentActivity() {
     private val routeViewModel: RouteViewModel by viewModels()
     private val syncViewModel: SyncViewModel by viewModels()
 
-    private val filePicker = registerForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let { syncViewModel.loadLocalFile(it) }
-    }
+    @Inject
+    lateinit var promotionRepository: PromotionRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WindowCompat.setDecorFitsSystemWindows(window, false)
+        enableEdgeToEdge()
         BrandReference.init(this)
         schedulePeriodicSync()
+        promotionRepository.schedulePeriodicRefresh()
 
         setContent {
 
@@ -85,8 +85,15 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            LaunchedEffect(updateState.snackbarMessage) {
+                updateState.snackbarMessage?.let {
+                    snackbarHostState.showSnackbar(it)
+                    updateViewModel.clearSnackbar()
+                }
+            }
+
             LaunchedEffect(Unit) {
-                updateViewModel.checkForUpdate()
+                updateViewModel.checkForUpdate(showFeedback = false)
                 routeViewModel.loadInitialData()
             }
 
@@ -97,7 +104,6 @@ class MainActivity : ComponentActivity() {
                     MainScreen(
                         routeViewModel = routeViewModel,
                         syncViewModel = syncViewModel,
-                        onOpenFilePicker = { filePicker.launch("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") },
                         onCheckUpdate = { updateViewModel.checkForUpdate(force = true) },
                         modifier = Modifier,
                     )

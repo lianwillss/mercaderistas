@@ -72,7 +72,7 @@ class ExcelParser {
                 val sheetStream = reader.getSheet(rId)
                 val entries = mutableListOf<EntradaRuta>()
                 var idxRutero = -1; var idxLocal = -1; var idxCodigo = -1
-                var idxCliente = -1; var idxDireccion = -1
+                var idxCliente = -1; var idxDireccion = -1; var idxCadena = -1
                 var idxLun = -1; var idxMar = -1; var idxMie = -1
                 var idxJue = -1; var idxVie = -1; var idxSab = -1; var idxDom = -1
                 var headerParsed = false
@@ -84,6 +84,7 @@ class ExcelParser {
                         idxRutero = mapper.getIndex("RUTERO"); idxLocal = mapper.getIndex("LOCAL")
                         idxCodigo = mapper.getIndex("COD KPI ONE"); idxCliente = mapper.getIndex("CLIENTE")
                         idxDireccion = mapper.getIndex("DIRECCIÓN", "DIRECCION")
+                        idxCadena = mapper.getIndex("CADENA")
                         idxLun = mapper.getIndex("LUNES", "LUN"); idxMar = mapper.getIndex("MARTES", "MAR")
                         idxMie = mapper.getIndex("MIERCOLES", "MIÉRCOLES", "MIE")
                         idxJue = mapper.getIndex("JUEVES", "JUE"); idxVie = mapper.getIndex("VIERNES", "VIE")
@@ -101,6 +102,7 @@ class ExcelParser {
                             entries.add(EntradaRuta(
                                 reponedor = "", rutero = rutero, codigo = v(idxCodigo),
                                 local = v(idxLocal), direccion = v(idxDireccion), cliente = v(idxCliente),
+                                cadena = v(idxCadena),
                                 lunes = isDay(idxLun), martes = isDay(idxMar), miercoles = isDay(idxMie),
                                 jueves = isDay(idxJue), viernes = isDay(idxVie), sabado = isDay(idxSab),
                                 domingo = isDay(idxDom)
@@ -137,7 +139,7 @@ class ExcelParser {
                 val ruteros = mutableSetOf<String>()
                 val allEntries = mutableListOf<EntradaRuta>()
                 var idxRutero = -1; var idxLocal = -1; var idxCodigo = -1
-                var idxCliente = -1; var idxDireccion = -1
+                var idxCliente = -1; var idxDireccion = -1; var idxCadena = -1
                 var idxLun = -1; var idxMar = -1; var idxMie = -1
                 var idxJue = -1; var idxVie = -1; var idxSab = -1; var idxDom = -1
                 var headerParsed = false
@@ -149,6 +151,7 @@ class ExcelParser {
                         idxRutero = mapper.getIndex("RUTERO"); idxLocal = mapper.getIndex("LOCAL")
                         idxCodigo = mapper.getIndex("COD KPI ONE"); idxCliente = mapper.getIndex("CLIENTE")
                         idxDireccion = mapper.getIndex("DIRECCIÓN", "DIRECCION")
+                        idxCadena = mapper.getIndex("CADENA")
                         idxLun = mapper.getIndex("LUNES", "LUN"); idxMar = mapper.getIndex("MARTES", "MAR")
                         idxMie = mapper.getIndex("MIERCOLES", "MIÉRCOLES", "MIE")
                         idxJue = mapper.getIndex("JUEVES", "JUE"); idxVie = mapper.getIndex("VIERNES", "VIE")
@@ -167,6 +170,7 @@ class ExcelParser {
                             allEntries.add(EntradaRuta(
                                 reponedor = "", rutero = rutero, codigo = v(idxCodigo),
                                 local = v(idxLocal), direccion = v(idxDireccion), cliente = v(idxCliente),
+                                cadena = v(idxCadena),
                                 lunes = isDay(idxLun), martes = isDay(idxMar), miercoles = isDay(idxMie),
                                 jueves = isDay(idxJue), viernes = isDay(idxVie), sabado = isDay(idxSab),
                                 domingo = isDay(idxDom)

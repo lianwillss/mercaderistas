@@ -9,4 +9,10 @@ fun String.normalizeMarca(): String {
     return withoutDiacritics.uppercase().replace(Regex("[\\s-]"), "")
 }
 
+fun String.cleanBrand(): String {
+    return this.replace("⭐ ", "")
+        .trim()
+        .normalizeMarca()
+}
+
 fun dpToPx(dp: Int): Int = (dp * Resources.getSystem().displayMetrics.density).toInt()

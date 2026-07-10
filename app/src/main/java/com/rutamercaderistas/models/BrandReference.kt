@@ -3,8 +3,8 @@ package com.rutamercaderistas.models
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
-import android.util.Log
 import android.widget.Toast
+import timber.log.Timber
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.snackbar.Snackbar
 import com.rutamercaderistas.PdfViewerActivity
@@ -21,8 +21,6 @@ import java.util.concurrent.ConcurrentHashMap
 object BrandReference {
 
     val PDF_FILE_NAME get() = PdfDownloader.PDF_FILE_NAME
-
-    private val TAG = "BrandReference"
 
     const val PAGES_PER_BRAND = 6
 
@@ -80,7 +78,7 @@ object BrandReference {
         prefs?.all?.forEach { (key, value) ->
             if (value is Int) detectedPages[key] = value
         }
-        Log.d(TAG, "init: ${detectedPages.size} marcas detectadas cargadas")
+        Timber.d("init: %d marcas detectadas cargadas", detectedPages.size)
     }
 
     private val fallbackScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -146,14 +144,14 @@ object BrandReference {
                 val pdfFile = File(context.filesDir, PdfDownloader.PDF_FILE_NAME)
                 try {
                     PdfBrandScanner.prescan(pdfFile)
-                    Log.d(TAG, "Pre-escaneo completo: ${PdfBrandScanner.cachedPageCount} páginas")
+                    Timber.d("Pre-escaneo completo: %d páginas", PdfBrandScanner.cachedPageCount)
                 } catch (e: Exception) {
-                    Log.w(TAG, "Error en pre-escaneo del PDF", e)
+                    Timber.w(e, "Error en pre-escaneo del PDF")
                 }
 
                 withContext(Dispatchers.Main) { callback?.invoke(true) }
             } catch (e: Exception) {
-                Log.e(TAG, "Error descargando PDF", e)
+                Timber.e(e, "Error descargando PDF")
                 withContext(Dispatchers.Main) { callback?.invoke(false) }
             }
         }
@@ -163,7 +161,7 @@ object BrandReference {
         if (isDebounced(brandName)) return
 
         val pdfFile = File(context.filesDir, PDF_FILE_NAME)
-        if (!pdfFile.exists() || pdfFile.length() == 0L) {
+        if (!PdfDownloader.isPdfValid(pdfFile)) {
             context.snackbar("Descargando manual... presiona de nuevo")
             descargarPdf(context, callback = { success ->
                 if (success) {
@@ -196,7 +194,7 @@ object BrandReference {
             }
             context.startActivity(intent)
         } catch (e: Exception) {
-            Log.e(TAG, "Error abriendo PDF", e)
+            Timber.e(e, "Error abriendo PDF")
             context.snackbar("Error al abrir el manual")
         }
     }
@@ -206,15 +204,15 @@ object BrandReference {
             try {
                 val foundPage = PdfBrandScanner.findBrand(pdfFile, brandName)
                 if (foundPage != null) {
-                    Log.i(TAG, "Marca \"$brandName\" encontrada en página $foundPage")
+                    Timber.i("Marca \"%s\" encontrada en página %d", brandName, foundPage)
                     saveDetectedPage(brandName.normalizeMarca(), foundPage)
                     withContext(Dispatchers.Main) { abrirPdf(context, pdfFile, brandName, foundPage) }
                 } else {
-                    Log.w(TAG, "Marca \"$brandName\" no encontrada en el PDF")
+                    Timber.w("Marca \"%s\" no encontrada en el PDF", brandName)
                     withContext(Dispatchers.Main) { context.snackbar("Marca no encontrada") }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error escaneando PDF", e)
+                Timber.e(e, "Error escaneando PDF")
                 withContext(Dispatchers.Main) { context.snackbar("Error al buscar \"$brandName\"") }
             }
         }

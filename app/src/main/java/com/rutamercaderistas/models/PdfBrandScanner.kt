@@ -3,8 +3,8 @@ package com.rutamercaderistas.models
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
-import android.util.Log
 import com.google.mlkit.vision.common.InputImage
+import timber.log.Timber
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -15,7 +15,6 @@ import java.io.File
 
 object PdfBrandScanner {
 
-    private val TAG = "PdfBrandScanner"
     private var recognizer: TextRecognizer? = null
     private val pageTextCache = mutableMapOf<Int, String>()
     private var cachedPdfPath: String? = null
@@ -48,12 +47,12 @@ object PdfBrandScanner {
         for (pageIdx in 0 until pageTextCache.size) {
             val text = pageTextCache[pageIdx] ?: continue
             if (text.normalizeMarca().contains(brandNorm)) {
-                Log.i(TAG, "Encontrado en caché: \"$brandName\" en página ${pageIdx + 1}")
+                Timber.i("Encontrado en caché: \"%s\" en página %d", brandName, pageIdx + 1)
                 return pageIdx + 1
             }
         }
 
-        Log.i(TAG, "\"$brandName\" no está en caché. Re-escaneando...")
+        Timber.i("\"%s\" no está en caché. Re-escaneando...", brandName)
         return withContext(Dispatchers.Default) {
             ParcelFileDescriptor.open(pdfFile, ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
                 PdfRenderer(pfd).use { renderer ->
@@ -62,11 +61,11 @@ object PdfBrandScanner {
                         pageTextCache[pageIdx] = text
                         cachedPdfPath = pdfFile.absolutePath
                         if (text.normalizeMarca().contains(brandNorm)) {
-                            Log.i(TAG, "\"$brandName\" encontrado en página ${pageIdx + 1} (re-escaneo)")
+                            Timber.i("\"%s\" encontrado en página %d (re-escaneo)", brandName, pageIdx + 1)
                             return@use pageIdx + 1
                         }
                     }
-                    Log.w(TAG, "\"$brandName\" no encontrado en el PDF")
+                    Timber.w("\"%s\" no encontrado en el PDF", brandName)
                     null
                 }
             }
@@ -79,7 +78,7 @@ object PdfBrandScanner {
         pageTextCache.clear()
         pdfPageCount = 0
 
-        Log.i(TAG, "Pre-escaneo iniciado...")
+        Timber.i("Pre-escaneo iniciado...")
         ParcelFileDescriptor.open(pdfFile, ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
             PdfRenderer(pfd).use { renderer ->
                 pdfPageCount = renderer.pageCount
@@ -88,7 +87,7 @@ object PdfBrandScanner {
                 }
             }
         }
-        Log.i(TAG, "Pre-escaneo completado: $cachedPageCount páginas")
+        Timber.i("Pre-escaneo completado: %d páginas", cachedPageCount)
     }
 
     private fun getRecognizer(): TextRecognizer {

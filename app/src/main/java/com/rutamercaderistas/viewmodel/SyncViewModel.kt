@@ -8,14 +8,15 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.net.Uri
-import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.rutamercaderistas.Constants
+import com.rutamercaderistas.data.network.downloadBytes
+import com.rutamercaderistas.services.PromotionRepository
+import timber.log.Timber
 import com.rutamercaderistas.data.result.SyncResult
 import com.rutamercaderistas.data.result.messageOrNull
 import com.rutamercaderistas.models.BrandReference
-import com.rutamercaderistas.services.ExcelParser
 import com.rutamercaderistas.services.RuteroManager
 import com.rutamercaderistas.services.RuteroRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,13 +27,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
-import java.net.URL
 import javax.inject.Inject
 
 data class SyncUiState(
     val isOnline: Boolean = false,
     val isSyncing: Boolean = false,
+    val syncPhase: String? = null,
     val snackbarMessage: String? = null,
 )
 
@@ -41,6 +41,8 @@ class SyncViewModel @Inject constructor(
     application: Application,
     @ApplicationContext private val context: Context,
     private val ruteroManager: RuteroManager,
+    private val repository: RuteroRepository,
+    private val promotionRepository: PromotionRepository,
 ) : AndroidViewModel(application) {
 
     private val _state = MutableStateFlow(SyncUiState())
@@ -115,24 +117,39 @@ class SyncViewModel @Inject constructor(
     private suspend fun performDriveSync(): SyncResult<Boolean> {
         return withContext(Dispatchers.IO) {
             try {
+                _state.value = _state.value.copy(syncPhase = "Descargando Excel…")
                 val cacheBustedUrl = "${Constants.DRIVE_EXPORT_URL}&ts=${System.currentTimeMillis()}"
                 val bytes = downloadWithRetries(cacheBustedUrl)
-                    ?: return@withContext SyncResult.Error("Error de descarga desde Drive")
+                    ?: return@withContext SyncResult.Error(
+                        if (!_state.value.isOnline) "Sin conexión a Internet"
+                        else "Error de descarga desde Drive. Revisa tu conexión o inténtalo más tarde."
+                    ).also {
+                        _state.value = _state.value.copy(syncPhase = null)
+                    }
 
+                _state.value = _state.value.copy(syncPhase = "Procesando archivo…")
                 val changed = ruteroManager.saveMasterExcel(bytes)
                 if (changed) {
-                    ruteroManager.invalidateAllCaches()
-                    RuteroRepository.clear()
+                    _state.value = _state.value.copy(syncPhase = "Indexando rutas…")
                     val indexOk = ruteroManager.createIndex()
                     if (indexOk) {
+                        repository.clear()
+                        _state.value = _state.value.copy(syncPhase = "Actualizando promociones…")
+                        promotionRepository.refresh()
+                        _state.value = _state.value.copy(syncPhase = null)
                         SyncResult.Success(true)
                     } else {
+                        _state.value = _state.value.copy(syncPhase = null)
                         SyncResult.Error("No se pudo leer el Excel")
                     }
                 } else {
+                    _state.value = _state.value.copy(syncPhase = "Actualizando promociones…")
+                    promotionRepository.refresh()
+                    _state.value = _state.value.copy(syncPhase = null)
                     SyncResult.NoChange
                 }
             } catch (e: Exception) {
+                _state.value = _state.value.copy(syncPhase = null)
                 SyncResult.Error(e.message ?: "Error de sincronización")
             }
         }
@@ -154,7 +171,7 @@ class SyncViewModel @Inject constructor(
                     if (routeToLoad != null) {
                         val entries = ruteroManager.loadRoute(routeToLoad)
                         if (entries.isNotEmpty()) {
-                            RuteroRepository.setEntries(entries, routeToLoad)
+                            repository.setEntries(entries, routeToLoad)
                         }
                     }
                     _state.value = _state.value.copy(
@@ -191,21 +208,27 @@ class SyncViewModel @Inject constructor(
                     } ?: false
                 }
                 if (success) {
-                    ruteroManager.invalidateAllCaches()
-                    RuteroRepository.clear()
-                    ruteroManager.createIndex()
-                    val index = ruteroManager.loadIndex()
-                    val firstRoute = index.firstOrNull()
-                    if (firstRoute != null) {
-                        val entries = ruteroManager.loadRoute(firstRoute)
-                        if (entries.isNotEmpty()) {
-                            RuteroRepository.setEntries(entries, firstRoute)
+                    val indexOk = ruteroManager.createIndex()
+                    if (indexOk) {
+                        repository.clear()
+                        val index = ruteroManager.loadIndex()
+                        val firstRoute = index.firstOrNull()
+                        if (firstRoute != null) {
+                            val entries = ruteroManager.loadRoute(firstRoute)
+                            if (entries.isNotEmpty()) {
+                                repository.setEntries(entries, firstRoute)
+                            }
                         }
+                        _state.value = _state.value.copy(
+                            isSyncing = false,
+                            snackbarMessage = "Archivo cargado correctamente",
+                        )
+                    } else {
+                        _state.value = _state.value.copy(
+                            isSyncing = false,
+                            snackbarMessage = "No se pudo leer el archivo Excel",
+                        )
                     }
-                    _state.value = _state.value.copy(
-                        isSyncing = false,
-                        snackbarMessage = "Archivo cargado correctamente",
-                    )
                 } else {
                     _state.value = _state.value.copy(
                         isSyncing = false,
@@ -247,46 +270,27 @@ class SyncViewModel @Inject constructor(
         _state.value = _state.value.copy(snackbarMessage = null)
     }
 
-    private suspend fun downloadBytes(url: String): ByteArray? {
+    private suspend fun downloadWithRetries(url: String, retries: Int = Constants.MAX_RETRIES): ByteArray? {
         return withContext(Dispatchers.IO) {
-            var currentUrl = url
-            var limit = 5
-            while (limit > 0) {
-                var conn: HttpURLConnection? = null
-                try {
-                    conn = URL(currentUrl).openConnection() as HttpURLConnection
-                    conn.instanceFollowRedirects = false
-                    conn.connectTimeout = Constants.CONNECT_TIMEOUT_MS
-                    conn.readTimeout = Constants.READ_TIMEOUT_MS
-                    conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
-
-                    val status = conn.responseCode
-                    if (status == HttpURLConnection.HTTP_MOVED_PERM || status == HttpURLConnection.HTTP_MOVED_TEMP || status == 307 || status == 308) {
-                        currentUrl = conn.getHeaderField("Location") ?: return@withContext null
-                        limit--
-                        continue
-                    }
-                    return@withContext conn.inputStream.use { it.readBytes() }
-                } catch (e: Exception) {
+            var attempt = 0
+            var lastError: Exception? = null
+            while (attempt < retries) {
+                val result = downloadBytes(
+                    url = url,
+                    connectTimeout = Constants.CONNECT_TIMEOUT_MS,
+                    readTimeout = Constants.READ_TIMEOUT_MS,
+                )
+                result.onSuccess { return@withContext it }
+                result.onFailure { lastError = it as? Exception ?: Exception(it) }
+                attempt++
+                if (attempt >= retries) {
+                    Timber.w(lastError, "downloadBytes agotó %d intentos", retries)
                     return@withContext null
-                } finally { conn?.disconnect() }
+                }
+                kotlinx.coroutines.delay(Constants.RETRY_BACKOFF_MS * (1 shl attempt))
             }
             null
         }
-    }
-
-    private suspend fun downloadWithRetries(url: String, retries: Int = 3): ByteArray? {
-        var attempt = 0
-        while (attempt < retries) {
-            try {
-                return downloadBytes(url)
-            } catch (_: Exception) {
-                attempt++
-                if (attempt >= retries) return null
-                kotlinx.coroutines.delay(1000L * (1 shl attempt))
-            }
-        }
-        return null
     }
 
     private fun convertDriveUrl(url: String): String {

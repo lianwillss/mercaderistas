@@ -1,11 +1,7 @@
 package com.rutamercaderistas.ui.components
 
-import android.content.Context
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Refresh
@@ -38,25 +35,24 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.tooling.preview.Preview
 
 @Composable
 fun HeaderSection(
+    isOnline: Boolean,
     lastSyncRelative: String,
     onRefresh: () -> Unit,
     onOpenManual: () -> Unit,
     onShare: () -> Unit = {},
     onCheckUpdate: () -> Unit = {},
+    onOpenPromoDiagnostic: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
-    val context = LocalContext.current
-    val isOnline = remember { isConnected(context) }
 
     Column(
         modifier = modifier
@@ -75,7 +71,6 @@ fun HeaderSection(
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Normal,
                         color = MaterialTheme.colorScheme.onBackground,
-                        letterSpacing = (-0.4).sp
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Box(
@@ -147,7 +142,7 @@ fun HeaderSection(
                         onRefresh()
                     },
                     leadingIcon = {
-                        Icon(Icons.Outlined.Refresh, contentDescription = null)
+                        Icon(Icons.Outlined.Refresh, contentDescription = "Sincronizar")
                     }
                 )
                 DropdownMenuItem(
@@ -157,7 +152,7 @@ fun HeaderSection(
                         onOpenManual()
                     },
                     leadingIcon = {
-                        Icon(Icons.Outlined.Description, contentDescription = null)
+                        Icon(Icons.Outlined.Description, contentDescription = "Manual de usuario")
                     }
                 )
     DropdownMenuItem(
@@ -167,7 +162,7 @@ fun HeaderSection(
             onShare()
         },
         leadingIcon = {
-            Icon(Icons.Outlined.Share, contentDescription = null)
+            Icon(Icons.Outlined.Share, contentDescription = "Compartir ruta")
         }
     )
     DropdownMenuItem(
@@ -177,7 +172,17 @@ fun HeaderSection(
             onCheckUpdate()
         },
         leadingIcon = {
-            Icon(Icons.Outlined.SystemUpdate, contentDescription = null)
+            Icon(Icons.Outlined.SystemUpdate, contentDescription = "Buscar actualización")
+        }
+    )
+    DropdownMenuItem(
+        text = { Text("Diagnóstico de Promociones") },
+        onClick = {
+            expanded = false
+            onOpenPromoDiagnostic()
+        },
+        leadingIcon = {
+            Icon(Icons.Outlined.BugReport, contentDescription = "Diagnóstico de Promociones")
         }
     )
             }
@@ -185,9 +190,15 @@ fun HeaderSection(
     }
 }
 
-private fun isConnected(context: Context): Boolean {
-    val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
-    val network = cm.activeNetwork ?: return false
-    val caps = cm.getNetworkCapabilities(network) ?: return false
-    return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+@Preview(showBackground = true)
+@Composable
+private fun HeaderSectionPreview() {
+    com.rutamercaderistas.ui.theme.MercaderistasTheme {
+        HeaderSection(
+            isOnline = true,
+            lastSyncRelative = "hace 2 min",
+            onRefresh = {},
+            onOpenManual = {},
+        )
+    }
 }

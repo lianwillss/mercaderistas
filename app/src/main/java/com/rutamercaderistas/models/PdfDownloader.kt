@@ -6,8 +6,8 @@ import android.graphics.pdf.PdfRenderer
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
-import android.util.Log
 import kotlinx.coroutines.Dispatchers
+import timber.log.Timber
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -19,8 +19,6 @@ object PdfDownloader {
     const val PDF_FILE_NAME = "manual_marcas.pdf"
     const val PDF_DRIVE_ID = "1AeWTubwXIRyQYng6dK0xa53L1vMJAudj"
     val PDF_DOWNLOAD_URL = "https://drive.google.com/uc?export=download&id=$PDF_DRIVE_ID&confirm=t"
-
-    private val TAG = "PdfDownloader"
 
     val httpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -37,18 +35,23 @@ object PdfDownloader {
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
 
     suspend fun downloadPdf(context: Context, onProgress: ((Int) -> Unit)? = null): Boolean {
+        val pdfFile = File(context.filesDir, PDF_FILE_NAME)
         return try {
-            val pdfFile = File(context.filesDir, PDF_FILE_NAME)
+            pdfFile.delete()
             val request = Request.Builder().url(PDF_DOWNLOAD_URL).build()
             httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    Log.e(TAG, "Error HTTP ${response.code} descargando PDF")
+                    Timber.e("Error HTTP %d descargando PDF", response.code)
+                    pdfFile.delete()
                     return false
                 }
 
-                val body = response.body ?: return false
+                val body = response.body ?: run {
+                    pdfFile.delete()
+                    return false
+                }
                 val contentType = response.header("Content-Type", "")
-                Log.d(TAG, "Content-Type: $contentType")
+                Timber.d("Content-Type: %s", contentType)
 
                 body.byteStream().use { input ->
                     // Validar firma %PDF con los primeros 4 bytes
@@ -56,12 +59,16 @@ object PdfDownloader {
                     var magicRead = 0
                     while (magicRead < 4) {
                         val n = input.read(magic, magicRead, 4 - magicRead)
-                        if (n == -1) return false
+                        if (n == -1) {
+                            pdfFile.delete()
+                            return false
+                        }
                         magicRead += n
                     }
                     if (magic[0] != 0x25.toByte() || magic[1] != 0x50.toByte() ||
                         magic[2] != 0x44.toByte() || magic[3] != 0x46.toByte()) {
-                        Log.e(TAG, "No es un PDF válido (sin firma %PDF): ${String(magic)}")
+                        Timber.e("No es un PDF válido (sin firma %PDF): " + String(magic))
+                        pdfFile.delete()
                         return false
                     }
 
@@ -89,12 +96,31 @@ object PdfDownloader {
                     }
                 }
             }
-            Log.d(TAG, "PDF descargado: ${pdfFile.length()} bytes")
+            if (pdfFile.length() == 0L) {
+                pdfFile.delete()
+                return false
+            }
+            Timber.d("PDF descargado: %d bytes", pdfFile.length())
             mainHandler.post { onProgress?.invoke(100) }
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Error descargando PDF", e)
+            Timber.e(e, "Error descargando PDF")
+            pdfFile.delete()
             false
+        }
+    }
+
+    fun isPdfValid(file: File): Boolean {
+        try {
+            if (!file.exists() || file.length() < 1024) return false
+            ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
+                PdfRenderer(pfd).use { renderer ->
+                    return renderer.pageCount > 0
+                }
+            }
+        } catch (e: Exception) {
+            file.delete()
+            return false
         }
     }
 
@@ -133,9 +159,9 @@ object PdfDownloader {
                     }
                 }
             }
-            Log.d(TAG, "Thumbnails generados para ${brandRanges.size} marcas")
+            Timber.d("Thumbnails generados para %d marcas", brandRanges.size)
         } catch (e: Exception) {
-            Log.e(TAG, "Error generando thumbnails", e)
+            Timber.e(e, "Error generando thumbnails")
         }
     }
 }

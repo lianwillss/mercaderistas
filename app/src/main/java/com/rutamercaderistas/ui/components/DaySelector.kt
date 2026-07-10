@@ -1,15 +1,12 @@
 package com.rutamercaderistas.ui.components
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -27,6 +24,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.tooling.preview.Preview
 import com.rutamercaderistas.models.DiaSemana
 
 @Composable
@@ -35,7 +33,7 @@ fun DaySelector(
     dayNumbers: List<Int>,
     selectedIndex: Int,
     onDaySelected: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     LazyRow(
         modifier = modifier.fillMaxWidth(),
@@ -86,5 +84,18 @@ fun DaySelector(
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun DaySelectorPreview() {
+    com.rutamercaderistas.ui.theme.MercaderistasTheme {
+        DaySelector(
+            days = listOf(DiaSemana.LUNES, DiaSemana.MARTES, DiaSemana.MIERCOLES),
+            dayNumbers = listOf(15, 16, 17),
+            selectedIndex = 0,
+            onDaySelected = {},
+        )
     }
 }

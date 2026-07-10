@@ -2,6 +2,7 @@ package com.rutamercaderistas.di
 
 import android.content.Context
 import com.rutamercaderistas.data.local.AppDatabase
+import com.rutamercaderistas.data.local.PromotionDao
 import com.rutamercaderistas.data.local.RouteEntryDao
 import com.rutamercaderistas.services.RecentRoutesStore
 import com.rutamercaderistas.services.RuteroManager
@@ -26,6 +27,12 @@ object AppModule {
     @Singleton
     fun provideRouteEntryDao(db: AppDatabase): RouteEntryDao {
         return db.routeEntryDao()
+    }
+
+    @Provides
+    @Singleton
+    fun providePromotionDao(db: AppDatabase): PromotionDao {
+        return db.promotionDao()
     }
 
     @Provides

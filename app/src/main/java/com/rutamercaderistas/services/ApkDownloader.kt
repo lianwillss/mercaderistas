@@ -2,9 +2,9 @@ package com.rutamercaderistas.services
 
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
+import timber.log.Timber
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -13,7 +13,6 @@ import java.net.URL
 
 object ApkDownloader {
 
-    private const val TAG = "ApkDownloader"
     private const val APK_FILE_NAME = "update.apk"
 
     suspend fun downloadAndInstall(
@@ -27,18 +26,18 @@ object ApkDownloader {
 
             val ok = downloadToFile(apkUrl, apkFile, onProgress)
             if (!ok || !apkFile.exists() || apkFile.length() < 1024) {
-                Log.e(TAG, "Descarga fallida o archivo muy peque\u00F1o: ${apkFile.length()}")
+                Timber.e("Descarga fallida o archivo muy pequeño: %d", apkFile.length())
                 return@withContext false
             }
 
-            Log.i(TAG, "APK descargado: ${apkFile.length()} bytes")
+            Timber.i("APK descargado: %d bytes", apkFile.length())
 
             val installed = withContext(Dispatchers.Main) {
                 try {
                     installApk(context, apkFile)
                     true
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error instalando APK", e)
+                    Timber.e(e, "Error instalando APK")
                     false
                 }
             }
@@ -50,7 +49,7 @@ object ApkDownloader {
             return@withContext installed
 
         } catch (e: Exception) {
-            Log.e(TAG, "Error en downloadAndInstall", e)
+            Timber.e(e, "Error en downloadAndInstall")
             false
         }
     }
@@ -69,33 +68,32 @@ object ApkDownloader {
             conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
 
             val contentLength = conn.contentLength
-            Log.i(TAG, "Content-Length: $contentLength")
+            Timber.i("Content-Length: %d", contentLength)
 
-            val inputStream = conn.inputStream
-            val outputStream = FileOutputStream(destination)
-            val buffer = ByteArray(65536)
-            var reads: Int
-            var total = 0L
-            var lastPct = -1
+            conn.inputStream.use { input ->
+                FileOutputStream(destination).use { output ->
+                    val buffer = ByteArray(65536)
+                    var reads: Int
+                    var total = 0L
+                    var lastPct = -1
 
-            while (inputStream.read(buffer).also { reads = it } != -1) {
-                outputStream.write(buffer, 0, reads)
-                total += reads
-                if (contentLength > 0) {
-                    val pct = ((total * 100) / contentLength).toInt().coerceIn(0, 100)
-                    if (pct > lastPct) {
-                        lastPct = pct
-                        onProgress(pct)
+                    while (input.read(buffer).also { reads = it } != -1) {
+                        output.write(buffer, 0, reads)
+                        total += reads
+                        if (contentLength > 0) {
+                            val pct = ((total * 100) / contentLength).toInt().coerceIn(0, 100)
+                            if (pct > lastPct) {
+                                lastPct = pct
+                                onProgress(pct)
+                            }
+                        }
                     }
                 }
             }
-
-            outputStream.close()
-            inputStream.close()
             return destination.exists() && destination.length() > 0
 
         } catch (e: Exception) {
-            Log.e(TAG, "Error en downloadToFile", e)
+            Timber.e(e, "Error en downloadToFile")
             destination.delete()
             return false
         } finally { conn?.disconnect() }

@@ -12,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.viewpager2.widget.ViewPager2
 import com.rutamercaderistas.adapters.PagePagerAdapter
 import com.rutamercaderistas.models.PageBitmapCache
+import com.rutamercaderistas.models.PdfBrandScanner
 import com.rutamercaderistas.models.PdfRendererCache
 import kotlin.math.abs
 
@@ -38,9 +39,13 @@ class PdfViewerActivity : AppCompatActivity() {
         val pdfPath = intent.getStringExtra("pdf_path")
         if (pdfPath == null) { finish(); return }
 
-        PdfRendererCache.init(pdfPath)
+        val pdfOk = PdfRendererCache.init(pdfPath)
         val pdfTotal = PdfRendererCache.getPageCount()
-        if (pdfTotal == 0) { finish(); return }
+        if (!pdfOk || pdfTotal == 0) {
+            android.widget.Toast.makeText(this, "Manual corrupto. Vuelve a descargar desde ⋮ → PDF", android.widget.Toast.LENGTH_LONG).show()
+            finish()
+            return
+        }
 
         setContentView(R.layout.activity_pdf_viewer)
 
@@ -113,7 +118,10 @@ class PdfViewerActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
+        pageChangeCallback?.let { viewPager.unregisterOnPageChangeCallback(it) }
+        pageChangeCallback = null
         PdfRendererCache.close()
+        PdfBrandScanner.release()
+        super.onDestroy()
     }
 }

@@ -1,6 +1,12 @@
 package com.rutamercaderistas
 
 object Constants {
+    // Promotions CSV
+    const val PROMOTIONS_DRIVE_FILE_ID = "1Xyy0XcsX0MyWdRGU9441Qhu7mAxDkaHG"
+    const val PROMOTIONS_CSV_URL = "https://drive.usercontent.google.com/download?id=$PROMOTIONS_DRIVE_FILE_ID&export=download"
+    const val PROMOTION_REFRESH_INTERVAL_HOURS = 12L
+    const val PROMOTION_REFRESH_INTERVAL_MS = PROMOTION_REFRESH_INTERVAL_HOURS * 60 * 60 * 1000L
+
     // Prefs
     const val PREFS_NAME = "mercaderistas_prefs"
     const val KEY_RUTERO = "selected_rutero"
@@ -16,7 +22,6 @@ object Constants {
 
     // PDF
     const val PDF_FILE_ID = "1AeWTubwXIRyQYng6dK0xa53L1vMJAudj"
-    const val PDF_FILE_NAME = "manual_marcas.pdf"
 
     // Network
     const val CONNECT_TIMEOUT_MS = 30_000

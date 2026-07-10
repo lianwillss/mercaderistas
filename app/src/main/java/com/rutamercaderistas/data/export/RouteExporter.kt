@@ -8,8 +8,8 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.net.Uri
-import android.util.Log
 import android.util.TypedValue
+import timber.log.Timber
 import androidx.core.content.FileProvider
 import com.rutamercaderistas.models.ClienteInfo
 import com.rutamercaderistas.models.DiaSemana
@@ -30,7 +30,6 @@ class RouteExporter @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
     companion object {
-        private const val TAG = "RouteExporter"
         private const val WIDTH_DP = 420
         private const val PAD_DP = 20
         private const val GREEN = -16738336  // 0xFF1B5E20
@@ -62,7 +61,7 @@ class RouteExporter @Inject constructor(
     suspend fun exportAsImage(
         routeName: String,
         entries: List<EntradaRuta>,
-        stats: RuteroRepository.Stats = RuteroRepository.getStats(),
+        stats: RuteroRepository.Stats,
     ): File = withContext(Dispatchers.IO) {
         val w = dp(WIDTH_DP)
         val pad = dp(PAD_DP)
@@ -71,46 +70,48 @@ class RouteExporter @Inject constructor(
 
         val totalH = measureHeight(contentW, routeName, stats, byDay)
         val bitmap = Bitmap.createBitmap(w, totalH, Bitmap.Config.ARGB_8888)
-        val c = Canvas(bitmap)
-        c.drawColor(WHITE)
+        try {
+            val c = Canvas(bitmap)
+            c.drawColor(WHITE)
 
-        var y = pad
-        y = drawHeader(c, routeName, y, pad)
-        y += dp(8)
-        y = drawStats(c, stats, y, contentW)
-        y += dp(12)
-        for ((day, locales) in byDay) {
-            y = drawDaySection(c, day, locales, y, contentW)
+            var y = pad
+            y = drawHeader(c, routeName, y, pad)
+            y += dp(8)
+            y = drawStats(c, stats, y, contentW)
+            y += dp(12)
+            for ((day, locales) in byDay) {
+                y = drawDaySection(c, day, locales, y, contentW)
+            }
+            y += dp(8)
+            c.drawRoundRect(
+                pad.toFloat(), y.toFloat(),
+                (w - pad).toFloat(), (y + 1).toFloat(),
+                0f, 0f, paint(DIVIDER),
+            )
+            y += dp(12)
+            c.drawText("Generado por Mercaderistas app", pad.toFloat(), y.toFloat(), paint(TEXT_LIGHT, 11))
+            y += dp(20)
+
+            val file = File(context.cacheDir, "ruta_${sanitize(routeName)}.png")
+            file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            Timber.d("Export done: %s (%dx%d)", file.absolutePath, w, totalH)
+            file
+        } finally {
+            bitmap.recycle()
         }
-        y += dp(8)
-        c.drawRoundRect(
-            pad.toFloat(), y.toFloat(),
-            (w - pad).toFloat(), (y + 1).toFloat(),
-            0f, 0f, paint(DIVIDER),
-        )
-        y += dp(12)
-        c.drawText("Generado por Mercaderistas app", pad.toFloat(), y.toFloat(), paint(TEXT_LIGHT, 11))
-        y += dp(20)
-
-        val file = File(context.cacheDir, "ruta_${sanitize(routeName)}.png")
-        file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        bitmap.recycle()
-        Log.d(TAG, "Export done: ${file.absolutePath} (${w}x$totalH)")
-        file
     }
 
     fun shareImage(file: File, routeName: String) {
         val uri: Uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        context.startActivity(Intent.createChooser(
-            Intent(Intent.ACTION_SEND).apply {
-                type = "image/png"
-                putExtra(Intent.EXTRA_STREAM, uri)
-                putExtra(Intent.EXTRA_SUBJECT, "Ruta: $routeName")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            },
-            "Compartir ruta",
-        ))
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "image/png"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, "Ruta: $routeName")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        val chooser = Intent.createChooser(shareIntent, "Compartir ruta")
+        chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(chooser)
     }
 
     private fun sanitize(name: String) = name.replace(Regex("[^a-zA-Z0-9_\\-]"), "_").trim('_')

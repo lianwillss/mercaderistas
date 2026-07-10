@@ -1,9 +1,9 @@
 package com.rutamercaderistas.services
 
-import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import timber.log.Timber
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -16,23 +16,22 @@ data class UpdateInfo(
 
 object UpdateChecker {
 
-    private const val TAG = "UpdateChecker"
     private const val API_URL = "https://api.github.com/repos/lianwillss/mercaderistas/releases/latest"
 
     suspend fun check(currentVersionCode: Int): UpdateInfo = withContext(Dispatchers.IO) {
         try {
             val json = fetchLatestRelease()
             if (json == null) {
-                Log.w(TAG, "No se pudo obtener el release")
+                Timber.w("No se pudo obtener el release")
                 return@withContext noUpdate()
             }
 
-            val tagName = json.optString("tag_name", "") // "v9.0"
+            val tagName = json.optString("tag_name", "")
             val versionName = tagName.removePrefix("v")
 
             val versionCode = extractVersionCode(versionName)
             if (versionCode < 0) {
-                Log.w(TAG, "Tag inv\u00E1lido: $tagName")
+                Timber.w("Tag inválido: %s", tagName)
                 return@withContext noUpdate()
             }
 
@@ -49,12 +48,12 @@ object UpdateChecker {
             }
 
             if (apkUrl == null) {
-                Log.w(TAG, "No se encontr\u00F3 APK en el release")
+                Timber.w("No se encontró APK en el release")
                 return@withContext noUpdate()
             }
 
             if (versionCode > currentVersionCode) {
-                Log.i(TAG, "Actualizaci\u00F3n disponible: $versionName ($versionCode) > actual ($currentVersionCode)")
+                Timber.i("Actualización disponible: %s (%d) > actual (%d)", versionName, versionCode, currentVersionCode)
                 UpdateInfo(
                     available = true,
                     versionCode = versionCode,
@@ -62,11 +61,11 @@ object UpdateChecker {
                     apkUrl = apkUrl
                 )
             } else {
-                Log.i(TAG, "Sin actualizaciones: remote=$versionCode, local=$currentVersionCode")
+                Timber.i("Sin actualizaciones: remote=%d, local=%d", versionCode, currentVersionCode)
                 noUpdate()
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error checking update", e)
+            Timber.e(e, "Error checking update")
             noUpdate()
         }
     }
@@ -82,14 +81,14 @@ object UpdateChecker {
             conn.setRequestProperty("User-Agent", "Mercaderistas-Android")
 
             if (conn.responseCode != 200) {
-                Log.w(TAG, "GitHub API status: ${conn.responseCode}")
+                Timber.w("GitHub API status: %d", conn.responseCode)
                 return null
             }
 
             val bytes = conn.inputStream.use { it.readBytes() }
             return JSONObject(String(bytes))
         } catch (e: Exception) {
-            Log.w(TAG, "Error fetching release", e)
+            Timber.w(e, "Error fetching release")
             return null
         } finally { conn?.disconnect() }
     }
