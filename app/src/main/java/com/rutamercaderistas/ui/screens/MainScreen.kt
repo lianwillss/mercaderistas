@@ -84,6 +84,7 @@ fun MainScreen(
     routeViewModel: RouteViewModel,
     syncViewModel: SyncViewModel,
     onOpenFilePicker: () -> Unit,
+    onCheckUpdate: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val routeState by routeViewModel.uiState.collectAsState()
@@ -134,6 +135,7 @@ fun MainScreen(
                     onRefresh = {
                         routeViewModel.updateSyncLabel()
                         syncViewModel.syncFromDriveWithRouteReload(selectedRoute)
+                        onCheckUpdate()
                     },
                     onOpenManual = { showManual = true },
                     onShare = { routeViewModel.exportRoute() },
@@ -197,6 +199,7 @@ fun MainScreen(
                         isRefreshing = isSyncing,
                         onRefresh = {
                             syncViewModel.syncFromDriveWithRouteReload(selectedRoute)
+                            onCheckUpdate()
                         },
                         modifier = Modifier.fillMaxSize(),
                     ) {
