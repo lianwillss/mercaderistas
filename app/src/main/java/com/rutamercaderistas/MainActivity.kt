@@ -91,7 +91,7 @@ class MainActivity : ComponentActivity() {
                         routeViewModel = routeViewModel,
                         syncViewModel = syncViewModel,
                         onOpenFilePicker = { filePicker.launch("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") },
-                        onCheckUpdate = updateViewModel::checkForUpdate,
+                        onCheckUpdate = { updateViewModel.checkForUpdate(force = true) },
                         modifier = Modifier,
                     )
                 }

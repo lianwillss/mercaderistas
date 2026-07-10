@@ -21,6 +21,7 @@ import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -49,6 +50,7 @@ fun HeaderSection(
     onRefresh: () -> Unit,
     onOpenManual: () -> Unit,
     onShare: () -> Unit = {},
+    onCheckUpdate: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -158,16 +160,26 @@ fun HeaderSection(
                         Icon(Icons.Outlined.Description, contentDescription = null)
                     }
                 )
-                DropdownMenuItem(
-                    text = { Text("Compartir ruta") },
-                    onClick = {
-                        expanded = false
-                        onShare()
-                    },
-                    leadingIcon = {
-                        Icon(Icons.Outlined.Share, contentDescription = null)
-                    }
-                )
+    DropdownMenuItem(
+        text = { Text("Compartir ruta") },
+        onClick = {
+            expanded = false
+            onShare()
+        },
+        leadingIcon = {
+            Icon(Icons.Outlined.Share, contentDescription = null)
+        }
+    )
+    DropdownMenuItem(
+        text = { Text("Buscar actualización") },
+        onClick = {
+            expanded = false
+            onCheckUpdate()
+        },
+        leadingIcon = {
+            Icon(Icons.Outlined.SystemUpdate, contentDescription = null)
+        }
+    )
             }
         }
     }

@@ -39,9 +39,11 @@ class UpdateViewModel @Inject constructor(
 
     private val prefs = application.getSharedPreferences(Constants.PREFS_NAME, Context.MODE_PRIVATE)
 
-    fun checkForUpdate() {
-        val suprimidoHasta = prefs.getLong(Constants.KEY_UPDATE_SUPPRESSED_UNTIL, 0L)
-        if (System.currentTimeMillis() < suprimidoHasta) return
+    fun checkForUpdate(force: Boolean = false) {
+        if (!force) {
+            val suprimidoHasta = prefs.getLong(Constants.KEY_UPDATE_SUPPRESSED_UNTIL, 0L)
+            if (System.currentTimeMillis() < suprimidoHasta) return
+        }
 
         viewModelScope.launch {
             try {

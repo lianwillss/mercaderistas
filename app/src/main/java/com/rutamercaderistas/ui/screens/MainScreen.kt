@@ -139,6 +139,7 @@ fun MainScreen(
                     },
                     onOpenManual = { showManual = true },
                     onShare = { routeViewModel.exportRoute() },
+                    onCheckUpdate = onCheckUpdate,
                 )
 
                 AnimatedVisibility(visible = isSyncing) {
