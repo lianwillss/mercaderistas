@@ -96,7 +96,9 @@ object UpdateChecker {
 
     private fun extractVersionCode(versionName: String): Int {
         val parts = versionName.split(".")
-        return parts.firstOrNull()?.toIntOrNull() ?: -1
+        val major = parts.getOrNull(0)?.toIntOrNull() ?: return -1
+        val minor = parts.getOrNull(1)?.toIntOrNull() ?: 0
+        return major * 1000 + minor
     }
 
     private fun noUpdate() = UpdateInfo(

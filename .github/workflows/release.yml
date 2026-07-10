@@ -26,7 +26,8 @@ jobs:
         run: |
           TAG=${GITHUB_REF_NAME#v}
           MAJOR=$(echo "$TAG" | cut -d. -f1)
-          echo "VERSION_CODE=${MAJOR}" >> $GITHUB_ENV
+          MINOR=$(echo "$TAG" | cut -d. -f2)
+          echo "VERSION_CODE=$(( MAJOR * 1000 + MINOR ))" >> $GITHUB_ENV
           echo "VERSION_NAME=${TAG}" >> $GITHUB_ENV
 
       - name: Inject versionCode and versionName
