@@ -1,6 +1,8 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -11,8 +13,8 @@ android {
         applicationId "com.rutamercaderistas"
         minSdk 26
         targetSdk 34
-        versionCode 11
-        versionName "10.1"
+        versionCode 12
+        versionName "11.0"
         resConfigs "es"
     }
 
@@ -125,6 +127,7 @@ dependencies {
     implementation 'androidx.compose.animation:animation'
     implementation 'androidx.activity:activity-compose:1.9.3'
     implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.8.7'
+    implementation libs.lifecycle.viewmodel.compose
     debugImplementation 'androidx.compose.ui:ui-tooling'
 
     // ── Apache POI para leer archivos Excel (.xlsx) ──────────────────
@@ -143,6 +146,23 @@ dependencies {
 
     // ── DataStore Preferences para rutas recientes ────────────────────
     implementation 'androidx.datastore:datastore-preferences:1.2.1'
+
+    // ── Hilt ────────────────────────────────────────────────
+    implementation libs.hilt.android
+    ksp libs.hilt.compiler
+    implementation libs.hilt.navigation.compose
+    implementation libs.hilt.work
+
+    // ── Navigation Compose ─────────────────────────────────
+    implementation libs.navigation.compose
+
+    // ── Room ────────────────────────────────────────────────
+    implementation libs.room.runtime
+    implementation libs.room.ktx
+    ksp libs.room.compiler
+
+    // ── WorkManager ────────────────────────────────────────
+    implementation libs.work.runtime.ktx
 
     // ── Shimmer para efecto de carga skeleton ─────────────────
     implementation 'com.facebook.shimmer:shimmer:0.5.0'

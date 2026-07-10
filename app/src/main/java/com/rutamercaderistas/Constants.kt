@@ -11,6 +11,7 @@ object Constants {
 
     // Drive
     const val DRIVE_FILE_ID = "18PejQq99XzNyTDf0fFku0hHwMs2sG1X5"
+    const val DRIVE_EXPORT_URL = "https://docs.google.com/spreadsheets/d/$DRIVE_FILE_ID/export?format=xlsx"
     const val DRIVE_EXPORT_FORMAT = "format=xlsx"
 
     // PDF

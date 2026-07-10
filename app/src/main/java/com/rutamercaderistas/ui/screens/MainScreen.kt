@@ -51,6 +51,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -61,9 +62,6 @@ import androidx.compose.ui.unit.sp
 import com.rutamercaderistas.models.BrandReference
 import com.rutamercaderistas.models.DiaSemana
 import com.rutamercaderistas.models.LocalDelDia
-import com.rutamercaderistas.services.RecentRoutesStore
-import com.rutamercaderistas.services.RuteroManager
-import com.rutamercaderistas.services.RuteroRepository
 import com.rutamercaderistas.ui.components.DaySelector
 import com.rutamercaderistas.ui.components.HeaderSection
 import com.rutamercaderistas.ui.components.RouteSearchBar
@@ -75,10 +73,276 @@ import com.rutamercaderistas.ui.components.StoreCard
 import com.rutamercaderistas.ui.theme.AccentBlue
 import com.rutamercaderistas.ui.theme.storeColor
 import com.rutamercaderistas.ui.theme.storeSoftColor
+import com.rutamercaderistas.viewmodel.RouteViewModel
+import com.rutamercaderistas.viewmodel.SyncViewModel
 import kotlinx.coroutines.launch
-import java.io.File
-import java.time.Instant
-import java.time.temporal.ChronoUnit
+import java.time.LocalDate
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MainScreen(
+    routeViewModel: RouteViewModel,
+    syncViewModel: SyncViewModel,
+    onOpenFilePicker: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val routeState by routeViewModel.uiState.collectAsState()
+    val syncState by syncViewModel.state.collectAsState()
+
+    val entries = routeState.entries
+    val selectedRoute = routeState.selectedRoute
+    val routes = routeState.routes
+    val stats = routeState.stats
+    val activeDays = routeState.activeDays
+    val recentRoutes = routeState.recentRoutes
+    val isDataLoaded = routeState.isDataLoaded
+    val isSyncing = syncState.isSyncing
+    val ctx = LocalContext.current
+
+    val activeDayNumbers by remember(activeDays) {
+        derivedStateOf { activeDays.map { day -> diaDelMes(day) } }
+    }
+
+    val pagerState = rememberPagerState(pageCount = { activeDays.size.coerceAtLeast(1) })
+    val currentDay = activeDays.getOrNull(pagerState.currentPage) ?: activeDays.firstOrNull()
+    val scope = rememberCoroutineScope()
+
+    var showAllLocalesScreen by remember { mutableStateOf(false) }
+    var showManual by remember { mutableStateOf(false) }
+
+    LaunchedEffect(currentDay) {
+        routeViewModel.setCurrentDay(currentDay)
+    }
+
+    LaunchedEffect(entries) {
+        if (entries.isNotEmpty() && routeState.selectedRoute == null) {
+            val lastRoute = routeState.routes.firstOrNull()
+            if (lastRoute != null) routeViewModel.selectRoute(lastRoute)
+        }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .statusBarsPadding()
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                HeaderSection(
+                    lastSyncRelative = routeState.lastSyncRelative,
+                    onRefresh = {
+                        routeViewModel.updateSyncLabel()
+                        syncViewModel.syncFromDriveWithRouteReload(selectedRoute)
+                    },
+                    onOpenManual = { showManual = true },
+                    onShare = { routeViewModel.exportRoute() },
+                )
+
+                AnimatedVisibility(visible = isSyncing) {
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                RouteSearchBar(
+                    routes = routes,
+                    recentRoutes = recentRoutes,
+                    selectedRoute = selectedRoute,
+                    onRouteSelected = { route -> routeViewModel.selectRoute(route) },
+                )
+
+                if (isDataLoaded && recentRoutes.isNotEmpty()) {
+                    RecentRoutesRow(
+                        routes = recentRoutes.take(5),
+                        selectedRoute = selectedRoute,
+                        onRouteSelected = { route -> routeViewModel.selectRoute(route) },
+                    )
+                }
+
+                if (isDataLoaded) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    StatsCards(
+                        stats = stats,
+                        onLocalesClick = { showAllLocalesScreen = true },
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+                    if (activeDays.isNotEmpty()) {
+                        DaySelector(
+                            days = activeDays,
+                            dayNumbers = activeDayNumbers,
+                            selectedIndex = pagerState.currentPage,
+                            onDaySelected = { scope.launch { pagerState.animateScrollToPage(it) } },
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                } else {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    ShimmerStatsCards()
+                    Spacer(modifier = Modifier.height(20.dp))
+                    ShimmerDaySelector()
+                }
+            }
+
+            if (isDataLoaded && activeDays.isNotEmpty()) {
+                HorizontalPager(
+                    state = pagerState,
+                    beyondViewportPageCount = 1,
+                    modifier = Modifier.fillMaxSize().weight(1f),
+                ) {
+                    PullToRefreshBox(
+                        isRefreshing = isSyncing,
+                        onRefresh = {
+                            syncViewModel.syncFromDriveWithRouteReload(selectedRoute)
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        LazyColumn(
+                            contentPadding = PaddingValues(bottom = 96.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            modifier = Modifier.fillMaxSize(),
+                        ) {
+                            val locales = routeState.currentDayLocales
+                            if (locales.isEmpty()) {
+                                item {
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth().padding(32.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text(
+                                            text = "Sin visitas este día",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            } else {
+                                itemsIndexed(
+                                    items = locales,
+                                    key = { _, local -> local.codigo + local.local },
+                                ) { index, local ->
+                                    StoreCard(
+                                        local = local,
+                                        index = index,
+                                        marcaResaltada = null,
+                                        onBrandClick = { brandName ->
+                                            BrandReference.openPdfForBrand(ctx, brandName)
+                                        },
+                                        onAddressClick = { address -> openMaps(ctx, address) },
+                                        modifier = Modifier.padding(horizontal = 20.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if (!isDataLoaded) {
+                Box(modifier = Modifier.fillMaxSize().weight(1f)) {
+                    LazyColumn(
+                        contentPadding = PaddingValues(bottom = 96.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        item { ShimmerLoadingContent() }
+                    }
+                }
+            }
+        }
+
+        AnimatedVisibility(
+            visible = showAllLocalesScreen,
+            enter = slideInVertically { it },
+            exit = slideOutVertically { it },
+        ) {
+            AllLocalesScreen(
+                locales = routeState.allLocales,
+                onClose = { showAllLocalesScreen = false },
+                onAddressClick = { address -> openMaps(ctx, address) },
+            )
+        }
+
+        AnimatedVisibility(
+            visible = showManual,
+            enter = slideInVertically { it },
+            exit = slideOutVertically { it },
+        ) {
+            ManualScreen(onClose = { showManual = false })
+        }
+    }
+}
+
+@Composable
+private fun RecentRoutesRow(
+    routes: List<String>,
+    selectedRoute: String?,
+    onRouteSelected: (String) -> Unit,
+) {
+    val activeBg = Color(0xFFFCE4EC)
+    val activeText = Color(0xFFC62828)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        routes.forEach { route ->
+            val isSelected = route == selectedRoute
+            val bg = if (isSelected) activeBg else Color(0x1A000000)
+            val textColor = if (isSelected) activeText else Color(0xFF8E8E93)
+            val borderColor = if (isSelected) activeText.copy(alpha = 0.3f) else Color(0xFFE5E5EA)
+
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(bg)
+                    .border(1.dp, borderColor, RoundedCornerShape(20.dp))
+                    .clickable { onRouteSelected(route) }
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+            ) {
+                Text(
+                    text = route,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = textColor,
+                )
+            }
+        }
+    }
+}
+
+private fun diaDelMes(dia: DiaSemana): Int {
+    val today = LocalDate.now()
+    val target = when (dia) {
+        DiaSemana.LUNES -> java.time.DayOfWeek.MONDAY
+        DiaSemana.MARTES -> java.time.DayOfWeek.TUESDAY
+        DiaSemana.MIERCOLES -> java.time.DayOfWeek.WEDNESDAY
+        DiaSemana.JUEVES -> java.time.DayOfWeek.THURSDAY
+        DiaSemana.VIERNES -> java.time.DayOfWeek.FRIDAY
+        DiaSemana.SABADO -> java.time.DayOfWeek.SATURDAY
+        DiaSemana.DOMINGO -> java.time.DayOfWeek.SUNDAY
+    }
+    val diff = target.value - today.dayOfWeek.value
+    return today.plusDays(diff.toLong()).dayOfMonth
+}
+
+private fun openMaps(context: android.content.Context, address: String) {
+    val encoded = android.net.Uri.encode(address)
+    val mode = context.getSharedPreferences("mercaderistas_prefs", android.content.Context.MODE_PRIVATE)
+        .getString("transport_mode", "transit") ?: "transit"
+    val mapsUrl = "https://www.google.com/maps/dir/?api=1&destination=$encoded&travelmode=$mode"
+    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(mapsUrl))
+    intent.setPackage("com.google.android.apps.maps")
+    if (intent.resolveActivity(context.packageManager) != null) {
+        context.startActivity(intent)
+    } else {
+        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(mapsUrl)))
+    }
+}
 
 @Composable
 private fun AllLocalesScreen(
@@ -143,6 +407,7 @@ private fun AllLocalesScreen(
             trailingIcon = {
                 if (searchQuery.isNotEmpty()) {
                     IconButton(onClick = { searchQuery = "" }) {
+                        Icon(Icons.Outlined.Close, contentDescription = "Limpiar", modifier = Modifier.size(18.dp))
                     }
                 }
             },
@@ -247,346 +512,5 @@ private fun AllLocalesScreen(
                 }
             }
         }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun MainScreen(
-    ruteroManager: RuteroManager,
-    recentRoutesStore: RecentRoutesStore,
-    context: android.content.Context,
-    onSelectRoute: (String) -> Unit,
-    onRefresh: () -> Unit,
-    onShowSnackbar: (String) -> Unit,
-    onShareRoute: (String) -> Unit = {},
-    modifier: Modifier = Modifier
-) {
-    val routes by ruteroManager.ruterosFlow.collectAsState(emptyList())
-    val entries by RuteroRepository.entriesFlow.collectAsState()
-    val selectedRoute by remember { derivedStateOf { RuteroRepository.getActiveRuteroName() } }
-    val stats by remember(entries) { derivedStateOf { RuteroRepository.getStats() } }
-
-    val activeDays by remember(entries) {
-        derivedStateOf {
-            if (entries.isNotEmpty()) {
-                DiaSemana.todos().filter { RuteroRepository.hasAnyVisitOnDay(it) }
-            } else emptyList()
-        }
-    }
-
-    val activeDayNumbers by remember(activeDays) {
-        derivedStateOf { activeDays.map { diaDelMes(it) } }
-    }
-
-    val pagerState = rememberPagerState(pageCount = { activeDays.size.coerceAtLeast(1) })
-    val recentRoutes by recentRoutesStore.recentRoutesFlow.collectAsState(initial = emptyList())
-    var lastSyncRelative by remember { mutableStateOf("") }
-    var isSyncing by remember { mutableStateOf(false) }
-    val isDataLoaded = entries.isNotEmpty()
-    val scope = rememberCoroutineScope()
-
-    val currentDay = activeDays.getOrNull(pagerState.currentPage) ?: activeDays.firstOrNull()
-    var showAllLocalesScreen by remember { mutableStateOf(false) }
-    var showManual by remember { mutableStateOf(false) }
-
-    var locales by remember(currentDay, entries) { mutableStateOf<List<LocalDelDia>>(emptyList()) }
-
-    val shareText by remember(selectedRoute, currentDay, locales) {
-        derivedStateOf {
-            val routeName = selectedRoute ?: "Ruta"
-            val dayName = currentDay?.nombreCompleto ?: ""
-            val lines = mutableListOf<String>()
-            lines.add("\uD83D\uDCCB Ruta: $routeName")
-            if (dayName.isNotBlank()) lines.add("\uD83D\uDCC5 D\u00EDa: $dayName")
-            lines.add("")
-            locales.forEach { local ->
-                val brands = local.clientes.take(3).joinToString(", ") { it.nombre }
-                lines.add("\uD83D\uDCCD ${local.codigo} - ${local.local}")
-                if (local.direccion.isNotBlank()) lines.add("   ${local.direccion}")
-                if (brands.isNotBlank()) lines.add("   \uD83C\uDFF7 $brands")
-                lines.add("")
-            }
-            lines.add("Mercaderistas app")
-            lines.joinToString("\n")
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        updateSyncLabel(context) { lastSyncRelative = it }
-    }
-
-    LaunchedEffect(routes) {
-        if (routes.isNotEmpty() && selectedRoute == null) {
-            val prefs = context.getSharedPreferences("mercaderistas_prefs", android.content.Context.MODE_PRIVATE)
-            val lastRoute = prefs.getString("selected_rutero", null)
-            if (lastRoute != null && routes.contains(lastRoute)) {
-                onSelectRoute(lastRoute)
-            }
-        }
-    }
-
-    LaunchedEffect(currentDay, entries) {
-        if (currentDay != null) {
-            locales = RuteroRepository.getLocalesForDay(currentDay)
-        }
-    }
-
-    LaunchedEffect(entries) {
-        if (entries.isNotEmpty()) {
-            isSyncing = false
-        }
-    }
-
-    Box(modifier = modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .statusBarsPadding()
-        ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                HeaderSection(
-                    lastSyncRelative = lastSyncRelative,
-                    onRefresh = {
-                        isSyncing = true
-                        onRefresh()
-                    },
-                    onOpenManual = { showManual = true },
-                    onShare = { onShareRoute(shareText) }
-                )
-
-                AnimatedVisibility(visible = isSyncing) {
-                    LinearProgressIndicator(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                RouteSearchBar(
-                    routes = routes,
-                    recentRoutes = recentRoutes,
-                    selectedRoute = selectedRoute,
-                    onRouteSelected = { route -> onSelectRoute(route) }
-                )
-
-                if (isDataLoaded && recentRoutes.isNotEmpty()) {
-                    RecentRoutesRow(
-                        routes = recentRoutes.take(5),
-                        selectedRoute = selectedRoute,
-                        onRouteSelected = { route -> onSelectRoute(route) }
-                    )
-                }
-
-                if (isDataLoaded) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    StatsCards(
-                        stats = stats,
-                        onLocalesClick = { showAllLocalesScreen = true }
-                    )
-                    Spacer(modifier = Modifier.height(20.dp))
-                    if (activeDays.isNotEmpty()) {
-                        DaySelector(
-                            days = activeDays,
-                            dayNumbers = activeDayNumbers,
-                            selectedIndex = pagerState.currentPage,
-                            onDaySelected = { scope.launch { pagerState.animateScrollToPage(it) } }
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                } else {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    ShimmerStatsCards()
-                    Spacer(modifier = Modifier.height(20.dp))
-                    ShimmerDaySelector()
-                }
-            }
-
-            // ── Swipeable day pager or shimmer ──
-            if (isDataLoaded && activeDays.isNotEmpty()) {
-                HorizontalPager(
-                    state = pagerState,
-                    beyondViewportPageCount = 1,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .weight(1f)
-                ) {
-                    PullToRefreshBox(
-                        isRefreshing = isSyncing,
-                        onRefresh = {
-                            isSyncing = true
-                            onRefresh()
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        LazyColumn(
-                            contentPadding = PaddingValues(bottom = 96.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp),
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            if (locales.isEmpty()) {
-                                item {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(32.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "Sin visitas este d\u00EDa",
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            } else {
-                                itemsIndexed(
-                                    items = locales,
-                                    key = { _, local -> local.codigo + local.local }
-                                ) { index, local ->
-                                    StoreCard(
-                                        local = local,
-                                        index = index,
-                                        marcaResaltada = null,
-                                        onBrandClick = { brandName ->
-                                            BrandReference.openPdfForBrand(context, brandName)
-                                        },
-                                        onAddressClick = { address -> openMaps(context, address) },
-                                        modifier = Modifier.padding(horizontal = 20.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            } else if (!isDataLoaded) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .weight(1f)
-                ) {
-                    LazyColumn(
-                        contentPadding = PaddingValues(bottom = 96.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        item { ShimmerLoadingContent() }
-                    }
-                }
-            }
-        }
-
-        AnimatedVisibility(
-            visible = showAllLocalesScreen,
-            enter = slideInVertically { it },
-            exit = slideOutVertically { it }
-        ) {
-            AllLocalesScreen(
-                locales = RuteroRepository.getAllLocales(),
-                onClose = { showAllLocalesScreen = false },
-                onAddressClick = { address -> openMaps(context, address) }
-            )
-        }
-
-        AnimatedVisibility(
-            visible = showManual,
-            enter = slideInVertically { it },
-            exit = slideOutVertically { it }
-        ) {
-            ManualScreen(onClose = { showManual = false })
-        }
-    }
-}
-
-@Composable
-private fun RecentRoutesRow(
-    routes: List<String>,
-    selectedRoute: String?,
-    onRouteSelected: (String) -> Unit
-) {
-    val activeBg = Color(0xFFFCE4EC)
-    val activeText = Color(0xFFC62828)
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        routes.forEach { route ->
-            val isSelected = route == selectedRoute
-            val bg = if (isSelected) activeBg else Color(0x1A000000)
-            val textColor = if (isSelected) activeText else Color(0xFF8E8E93)
-            val borderColor = if (isSelected) activeText.copy(alpha = 0.3f) else Color(0xFFE5E5EA)
-
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(bg)
-                    .border(1.dp, borderColor, RoundedCornerShape(20.dp))
-                    .clickable { onRouteSelected(route) }
-                    .padding(horizontal = 14.dp, vertical = 8.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = route,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = textColor
-                    )
-                }
-            }
-        }
-    }
-}
-
-private fun diaDelMes(dia: DiaSemana): Int {
-    val today = java.time.LocalDate.now()
-    val target = when (dia) {
-        DiaSemana.LUNES -> java.time.DayOfWeek.MONDAY
-        DiaSemana.MARTES -> java.time.DayOfWeek.TUESDAY
-        DiaSemana.MIERCOLES -> java.time.DayOfWeek.WEDNESDAY
-        DiaSemana.JUEVES -> java.time.DayOfWeek.THURSDAY
-        DiaSemana.VIERNES -> java.time.DayOfWeek.FRIDAY
-        DiaSemana.SABADO -> java.time.DayOfWeek.SATURDAY
-        DiaSemana.DOMINGO -> java.time.DayOfWeek.SUNDAY
-    }
-    val diff = target.value - today.dayOfWeek.value
-    return today.plusDays(diff.toLong()).dayOfMonth
-}
-
-private fun updateSyncLabel(context: android.content.Context, onResult: (String) -> Unit) {
-    val excelFile = File(context.filesDir, RuteroManager.EXCEL_FILE_NAME)
-    if (!excelFile.exists()) { onResult("hoy"); return }
-    val millis = excelFile.lastModified()
-    val now = Instant.now()
-    val modified = Instant.ofEpochMilli(millis)
-    val minutes = ChronoUnit.MINUTES.between(modified, now)
-    val hours = ChronoUnit.HOURS.between(modified, now)
-    val days = ChronoUnit.DAYS.between(modified, now)
-    onResult(
-        when {
-            minutes < 1 -> "ahora"
-            minutes < 60 -> "hace $minutes min"
-            hours < 24 -> "hace $hours h"
-            else -> "hace $days d"
-        }
-    )
-}
-
-private fun openMaps(context: android.content.Context, address: String) {
-    val encoded = android.net.Uri.encode(address)
-    val mode = context.getSharedPreferences("mercaderistas_prefs", android.content.Context.MODE_PRIVATE)
-        .getString("transport_mode", "transit") ?: "transit"
-    val mapsUrl = "https://www.google.com/maps/dir/?api=1&destination=$encoded&travelmode=$mode"
-    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(mapsUrl))
-    intent.setPackage("com.google.android.apps.maps")
-    if (intent.resolveActivity(context.packageManager) != null) {
-        context.startActivity(intent)
-    } else {
-        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(mapsUrl)))
     }
 }

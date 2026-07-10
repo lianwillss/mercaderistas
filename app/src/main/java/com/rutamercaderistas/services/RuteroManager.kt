@@ -2,31 +2,32 @@ package com.rutamercaderistas.services
 
 import android.content.Context
 import android.util.Log
+import com.rutamercaderistas.data.local.RouteEntryDao
+import com.rutamercaderistas.data.local.toDomain
+import com.rutamercaderistas.data.local.toEntities
 import com.rutamercaderistas.models.EntradaRuta
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 import java.io.File
 import kotlin.system.measureTimeMillis
 
 /**
  * Arquitecto: RuteroManager
- * Encargado de la orquestación de datos: Indexación, Lazy Loading y Caché por Ruta.
- * Optimizado para invalidación total de caché durante actualizaciones.
+ * Encargado de la orquestación de datos: Indexación, Lazy Loading.
+ * Cachea rutas en Room en vez de archivos JSON.
  */
-class RuteroManager(private val context: Context) {
+class RuteroManager(
+    private val context: Context,
+    private val routeEntryDao: RouteEntryDao,
+) {
 
     private val TAG = "RuteroManager"
     companion object {
         const val EXCEL_FILE_NAME = "master_rutero.xlsx"
     }
-    private val INDEX_FILE_NAME = "rutero_index.json"
-    
-    private val _ruterosFlow = MutableStateFlow<List<String>>(emptyList())
-    val ruterosFlow: StateFlow<List<String>> = _ruterosFlow.asStateFlow()
+
+    val ruterosFlow: Flow<List<String>> = routeEntryDao.observeRuteros()
 
     private val parser = ExcelParser()
 
@@ -40,9 +41,9 @@ class RuteroManager(private val context: Context) {
                 file.delete()
                 Log.d(TAG, "OLD_FILE_REMOVED: Archivo anterior eliminado")
             }
-            
+
             file.writeBytes(bytes)
-            
+
             if (file.exists() && file.length() > 0) {
                 Log.d(TAG, "NEW_FILE_SAVED: Archivo maestro guardado (${file.length()} bytes)")
                 true
@@ -57,7 +58,7 @@ class RuteroManager(private val context: Context) {
     }
 
     /**
-     * Indexación rápida: Recorre el Excel para extraer los nombres de las rutas.
+     * Indexación: Parsea el Excel y guarda todas las rutas en Room.
      */
     suspend fun createIndex(listener: ExcelParser.ProgressListener? = null): Boolean = withContext(Dispatchers.IO) {
         var success = false
@@ -74,15 +75,15 @@ class RuteroManager(private val context: Context) {
 
                 if (result.isSuccess) {
                     val (ruteros, byRoute) = result.getOrThrow()
-                    saveIndex(ruteros)
 
-                    // Pre-cache every route so loadRoute never needs to re-parse
-                    byRoute.forEach { (name, entries) ->
-                        saveToRouteCache(name, entries)
+                    // Save all entries to Room
+                    val allEntities = byRoute.flatMap { (_, entries) ->
+                        entries.toEntities()
                     }
+                    routeEntryDao.deleteAll()
+                    routeEntryDao.insertAll(allEntities)
 
-                    _ruterosFlow.value = ruteros
-                    Log.d(TAG, "INDEX_CREATED: ${ruteros.size} rutas, ${byRoute.values.sumOf { it.size }} registros")
+                    Log.d(TAG, "INDEX_CREATED: ${ruteros.size} rutas, ${allEntities.size} registros en Room")
                     success = true
                 } else {
                     Log.e(TAG, "INDEX_FAILED: ${result.exceptionOrNull()?.message}")
@@ -95,159 +96,44 @@ class RuteroManager(private val context: Context) {
         success
     }
 
-    private fun saveIndex(ruteros: List<String>) {
-        val json = JSONObject()
-        json.put("ruteros", org.json.JSONArray(ruteros))
-        json.put("updated_at", System.currentTimeMillis())
-        File(context.filesDir, INDEX_FILE_NAME).writeText(json.toString())
-    }
-
-    fun loadIndex(): List<String> {
-        val file = File(context.filesDir, INDEX_FILE_NAME)
-        if (!file.exists()) return emptyList()
-        
-        return try {
-            val json = JSONObject(file.readText())
-            val array = json.getJSONArray("ruteros")
-            val list = mutableListOf<String>()
-            for (i in 0 until array.length()) {
-                list.add(array.getString(i))
-            }
-            _ruterosFlow.value = list
-            list
-        } catch (e: Exception) {
-            emptyList()
-        }
+    /**
+     * Carga la lista de ruteros desde Room.
+     */
+    suspend fun loadIndex(): List<String> = withContext(Dispatchers.IO) {
+        routeEntryDao.getDistinctRuteros()
     }
 
     /**
-     * CARGA DIFERIDA: Solo carga los datos de una ruta específica.
+     * Carga diferida: Obtiene los datos de una ruta desde Room.
      */
     suspend fun loadRoute(ruteroName: String, listener: ExcelParser.ProgressListener? = null): List<EntradaRuta> = withContext(Dispatchers.IO) {
-        // 1. Intentar cargar desde Caché de Ruta
-        val cached = loadFromRouteCache(ruteroName)
-        if (cached != null) {
-            Log.d(TAG, "CACHE_HIT: Ruta $ruteroName cargada desde caché")
-            return@withContext cached
+        val fromDb = routeEntryDao.getEntriesForRoute(ruteroName)
+        if (fromDb.isNotEmpty()) {
+            Log.d(TAG, "ROOM_HIT: Ruta $ruteroName (${fromDb.size} registros)")
+            return@withContext fromDb.toDomain()
         }
 
-        Log.d(TAG, "CACHE_MISS: Cargando ruta $ruteroName desde Excel")
+        Log.d(TAG, "ROOM_MISS: Cargando ruta $ruteroName desde Excel")
         val file = File(context.filesDir, EXCEL_FILE_NAME)
         if (!file.exists()) return@withContext emptyList()
 
         val result = parser.parseSpecificRoute(file, ruteroName, listener)
         if (result.isSuccess) {
             val data = result.getOrThrow()
-            saveToRouteCache(ruteroName, data)
+            // Cache to Room for next time
+            routeEntryDao.insertAll(data.toEntities())
             Log.d(TAG, "ROUTE_LOADED: $ruteroName (${data.size} registros)")
             return@withContext data
         }
-        
+
         emptyList()
     }
 
-    private fun cacheFileName(ruteroName: String): String =
-        "cache_route_${ruteroName.replace(Regex("[^a-zA-Z0-9_-]"), "_")}.json"
-
-    private fun saveToRouteCache(ruteroName: String, data: List<EntradaRuta>) {
-        try {
-            val cacheFile = File(context.cacheDir, cacheFileName(ruteroName))
-            val json = JSONObject()
-            val array = org.json.JSONArray()
-            data.forEach { entry ->
-                val obj = JSONObject().apply {
-                    put("rutero", entry.rutero)
-                    put("codigo", entry.codigo)
-                    put("local", entry.local)
-                    put("direccion", entry.direccion)
-                    put("cliente", entry.cliente)
-                    put("reponedor", entry.reponedor)
-                    put("cadena", entry.cadena)
-                    put("formato", entry.formato)
-                    put("region", entry.region)
-                    put("comuna", entry.comuna)
-                    put("supervisor", entry.supervisor)
-                    put("gestores", entry.gestores)
-                    put("modalidad", entry.modalidad)
-                    put("equipo", entry.equipo)
-                    put("lunes", entry.lunes)
-                    put("martes", entry.martes)
-                    put("miercoles", entry.miercoles)
-                    put("jueves", entry.jueves)
-                    put("viernes", entry.viernes)
-                    put("sabado", entry.sabado)
-                    put("domingo", entry.domingo)
-                }
-                array.put(obj)
-            }
-            json.put("data", array)
-            cacheFile.writeText(json.toString())
-        } catch (e: Exception) {
-            Log.e(TAG, "Error guardando caché de ruta", e)
-        }
-    }
-
-    private fun loadFromRouteCache(ruteroName: String): List<EntradaRuta>? {
-        val cacheFile = File(context.cacheDir, cacheFileName(ruteroName))
-        if (!cacheFile.exists()) return null
-        
-        val masterFile = File(context.filesDir, EXCEL_FILE_NAME)
-        if (masterFile.exists() && cacheFile.lastModified() < masterFile.lastModified()) {
-            Log.d(TAG, "CACHE_INVALIDATED: Caché de $ruteroName expirado")
-            cacheFile.delete()
-            return null
-        }
-
-        return try {
-            val json = JSONObject(cacheFile.readText())
-            val array = json.getJSONArray("data")
-            val list = mutableListOf<EntradaRuta>()
-            for (i in 0 until array.length()) {
-                val obj = array.getJSONObject(i)
-                list.add(EntradaRuta(
-                    reponedor = obj.optString("reponedor", ""),
-                    rutero = obj.getString("rutero"),
-                    codigo = obj.getString("codigo"),
-                    local = obj.getString("local"),
-                    direccion = obj.getString("direccion"),
-                    cliente = obj.getString("cliente"),
-                    cadena = obj.optString("cadena", ""),
-                    formato = obj.optString("formato", ""),
-                    region = obj.optString("region", ""),
-                    comuna = obj.optString("comuna", ""),
-                    supervisor = obj.optString("supervisor", ""),
-                    gestores = obj.optString("gestores", ""),
-                    modalidad = obj.optString("modalidad", ""),
-                    equipo = obj.optString("equipo", ""),
-                    lunes = obj.getBoolean("lunes"),
-                    martes = obj.getBoolean("martes"),
-                    miercoles = obj.getBoolean("miercoles"),
-                    jueves = obj.getBoolean("jueves"),
-                    viernes = obj.getBoolean("viernes"),
-                    sabado = obj.getBoolean("sabado"),
-                    domingo = obj.optBoolean("domingo", false)
-                ))
-            }
-            list
-        } catch (e: Exception) {
-            null
-        }
-    }
-
     /**
-     * Elimina absolutamente toda la caché local de rutas.
+     * Elimina toda la caché de rutas en Room.
      */
-    fun invalidateAllCaches() {
-        // Eliminar archivos de caché de rutas
-        context.cacheDir.listFiles { _, name -> name.startsWith("cache_route_") }?.forEach { it.delete() }
-        
-        // Eliminar índice
-        val indexFile = File(context.filesDir, INDEX_FILE_NAME)
-        if (indexFile.exists()) indexFile.delete()
-        
-        // Limpiar flujo de ruteros
-        _ruterosFlow.value = emptyList()
-        
-        Log.d(TAG, "CACHE_CLEARED: Toda la caché y el índice han sido eliminados")
+    suspend fun invalidateAllCaches() {
+        routeEntryDao.deleteAll()
+        Log.d(TAG, "CACHE_CLEARED: Toda la data en Room ha sido eliminada")
     }
 }
