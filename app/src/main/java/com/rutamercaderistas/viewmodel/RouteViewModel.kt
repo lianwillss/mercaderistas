@@ -48,6 +48,8 @@ data class RouteUiState(
     val recentRoutes: List<String> = emptyList(),
     val lastSyncRelative: String = "",
     val promotionsByBrand: Map<String, List<PromotionEntity>> = emptyMap(),
+    val marcasConPromo: Int = 0,
+    val totalPromosActivas: Int = 0,
     val isSyncing: Boolean = false,
     val isDataLoaded: Boolean = false,
     val snackbarMessage: String? = null,
@@ -84,6 +86,8 @@ class RouteViewModel @Inject constructor(
             }
             _uiState.value = _uiState.value.copy(
                 promotionsByBrand = grouped,
+                marcasConPromo = grouped.count { it.value.isNotEmpty() },
+                totalPromosActivas = grouped.values.sumOf { it.size },
             )
         }
     }
@@ -144,6 +148,8 @@ class RouteViewModel @Inject constructor(
                     allLocales = allLocales,
                     selectedRoute = repository.getActiveRuteroName(),
                     promotionsByBrand = promotions,
+                    marcasConPromo = promotions.count { it.value.isNotEmpty() },
+                    totalPromosActivas = promotions.values.sumOf { it.size },
                     isDataLoaded = entries.isNotEmpty(),
                     needsInitialLoad = false,
                 )

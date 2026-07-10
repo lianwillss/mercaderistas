@@ -468,29 +468,7 @@ private fun initials(text: String): String {
     }
 }
 
-// ── Promotion composables ─────────────────────────────────────
-
-@Composable
-private fun PromotionBadge(count: Int) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .background(Color(0x22FF6B6B))
-            .padding(horizontal = 5.dp, vertical = 2.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Text(text = "\uD83D\uDD25", style = MaterialTheme.typography.labelSmall)
-            Text(
-                text = "${count} promo${if (count != 1) "nes" else ""}",
-                style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFFE53935),
-            )
-        }
-    }
-}
+// ── Frecuencia ────────────────────────────────────────────
 
 @Composable
 private fun FrequencyChip(text: String) {
@@ -515,63 +493,6 @@ private fun FrequencyChip(text: String) {
                 tint = AccentGreen,
                 modifier = Modifier.size(8.dp)
             )
-        }
-    }
-}
-
-@Composable
-private fun PromotionList(
-    promotions: List<PromotionEntity>,
-    marginStart: androidx.compose.ui.unit.Dp = 0.dp,
-) {
-    Column(
-        modifier = Modifier
-            .padding(start = marginStart)
-            .fillMaxWidth()
-    ) {
-        promotions.forEach { promo ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 22.dp, top = 3.dp, bottom = 1.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "\u2022",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(end = 6.dp)
-                )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = promo.productName,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (promo.price.isNotBlank()) {
-                            Text(
-                                text = promo.price,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = AccentBlue,
-                            )
-                        }
-                        if (promo.endDate.isNotBlank()) {
-                            Text(
-                                text = "Hasta ${promo.endDate}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            }
         }
     }
 }

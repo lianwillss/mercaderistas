@@ -98,6 +98,11 @@ fun MainScreen(
                         launchSingleTop = true
                     }
                 },
+                onNavigateToPromotions = {
+                    navController.navigate("promotions") {
+                        launchSingleTop = true
+                    }
+                },
                 onNavigateToManual = {
                     navController.navigate("manual") {
                         launchSingleTop = true
@@ -116,6 +121,18 @@ fun MainScreen(
                 locales = routeState.allLocales,
                 onClose = { navController.popBackStack() },
                 onAddressClick = { address -> openMaps(ctx, address) },
+            )
+        }
+        composable(
+            "promotions",
+            enterTransition = { slideInVertically { it } },
+            exitTransition = { slideOutVertically { it } },
+            popEnterTransition = { slideInVertically { -it } },
+            popExitTransition = { slideOutVertically { it } },
+        ) {
+            PromotionsOverviewScreen(
+                promotionsByBrand = routeState.promotionsByBrand,
+                onClose = { navController.popBackStack() },
             )
         }
         composable(
@@ -139,6 +156,7 @@ private fun MainRoute(
     syncViewModel: SyncViewModel,
     onCheckUpdate: () -> Unit,
     onNavigateToAllLocales: () -> Unit,
+    onNavigateToPromotions: () -> Unit,
     onNavigateToManual: () -> Unit,
 ) {
     val entries = routeState.entries
@@ -242,6 +260,8 @@ private fun MainRoute(
                 StatsCards(
                     stats = stats,
                     onLocalesClick = onNavigateToAllLocales,
+                    onMarcasClick = onNavigateToPromotions,
+                    marcasConPromo = routeState.marcasConPromo,
                 )
                 Spacer(modifier = Modifier.height(20.dp))
                 if (activeDays.isNotEmpty()) {

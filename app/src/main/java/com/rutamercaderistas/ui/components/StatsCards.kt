@@ -38,6 +38,8 @@ import com.rutamercaderistas.services.RuteroRepository
 fun StatsCards(
     stats: RuteroRepository.Stats,
     onLocalesClick: () -> Unit = {},
+    onMarcasClick: () -> Unit = {},
+    marcasConPromo: Int = 0,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -61,7 +63,11 @@ fun StatsCards(
             label = "Marcas",
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
             iconColor = MaterialTheme.colorScheme.secondary,
-            modifier = Modifier.weight(1f)
+            onClick = onMarcasClick,
+            modifier = Modifier.weight(1f),
+            badge = if (marcasConPromo > 0) {
+                { PromotionBadge(count = marcasConPromo) }
+            } else null
         )
         StatCard(
             icon = Icons.Rounded.Visibility,
@@ -82,7 +88,8 @@ private fun StatCard(
     containerColor: androidx.compose.ui.graphics.Color,
     iconColor: androidx.compose.ui.graphics.Color,
     onClick: () -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    badge: (@Composable () -> Unit)? = null,
 ) {
     Card(
         onClick = onClick,
@@ -119,6 +126,10 @@ private fun StatCard(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
             }
+            if (badge != null) {
+                Spacer(modifier = Modifier.height(2.dp))
+                badge()
+            }
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
@@ -135,6 +146,8 @@ private fun StatsCardsPreview() {
         StatsCards(
             stats = RuteroRepository.Stats(12, 45, 67),
             onLocalesClick = {},
+            onMarcasClick = {},
+            marcasConPromo = 3,
         )
     }
 }
