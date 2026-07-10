@@ -87,6 +87,7 @@ class RouteViewModel @Inject constructor(
                     activeDays = activeDays,
                     stats = stats,
                     allLocales = allLocales,
+                    selectedRoute = RuteroRepository.getActiveRuteroName(),
                     isDataLoaded = entries.isNotEmpty(),
                 )
             }

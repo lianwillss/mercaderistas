@@ -145,13 +145,16 @@ class SyncViewModel @Inject constructor(
             val result = performDriveSync()
             when (result) {
                 is SyncResult.Success -> {
-                    if (currentRoute != null) {
-                        val index = ruteroManager.loadIndex()
-                        if (index.contains(currentRoute)) {
-                            val entries = ruteroManager.loadRoute(currentRoute)
-                            if (entries.isNotEmpty()) {
-                                RuteroRepository.setEntries(entries, currentRoute)
-                            }
+                    val index = ruteroManager.loadIndex()
+                    val routeToLoad = if (currentRoute != null && index.contains(currentRoute)) {
+                        currentRoute
+                    } else {
+                        index.firstOrNull()
+                    }
+                    if (routeToLoad != null) {
+                        val entries = ruteroManager.loadRoute(routeToLoad)
+                        if (entries.isNotEmpty()) {
+                            RuteroRepository.setEntries(entries, routeToLoad)
                         }
                     }
                     _state.value = _state.value.copy(
@@ -191,6 +194,14 @@ class SyncViewModel @Inject constructor(
                     ruteroManager.invalidateAllCaches()
                     RuteroRepository.clear()
                     ruteroManager.createIndex()
+                    val index = ruteroManager.loadIndex()
+                    val firstRoute = index.firstOrNull()
+                    if (firstRoute != null) {
+                        val entries = ruteroManager.loadRoute(firstRoute)
+                        if (entries.isNotEmpty()) {
+                            RuteroRepository.setEntries(entries, firstRoute)
+                        }
+                    }
                     _state.value = _state.value.copy(
                         isSyncing = false,
                         snackbarMessage = "Archivo cargado correctamente",
