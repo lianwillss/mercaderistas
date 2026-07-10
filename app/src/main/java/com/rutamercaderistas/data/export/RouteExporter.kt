@@ -4,36 +4,12 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RectF
+import android.graphics.Typeface
 import android.net.Uri
 import android.util.Log
-import android.view.View
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.layout.RowScope
+import android.util.TypedValue
 import androidx.core.content.FileProvider
 import com.rutamercaderistas.models.ClienteInfo
 import com.rutamercaderistas.models.DiaSemana
@@ -41,18 +17,11 @@ import com.rutamercaderistas.models.EntradaRuta
 import com.rutamercaderistas.models.LocalDelDia
 import com.rutamercaderistas.models.toNaturalCase
 import com.rutamercaderistas.services.RuteroRepository
+import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.util.Locale
-import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
-
-private val Green = Color(0xFF1B5E20)
-private val GreenSoft = Color(0xFFE8F5E9)
-private val Orange = Color(0xFFE65100)
-private val OrangeSoft = Color(0xFFFFF3E0)
-private val Divider = Color(0xFFE0E0E0)
-private val CardBg = Color(0xFFF8F8F8)
 
 @Singleton
 class RouteExporter @Inject constructor(
@@ -60,7 +29,32 @@ class RouteExporter @Inject constructor(
 ) {
     companion object {
         private const val TAG = "RouteExporter"
-        private const val EXPORT_WIDTH_DP = 420
+        private const val WIDTH_DP = 420
+        private const val PAD_DP = 20
+        private const val GREEN = -16738336  // 0xFF1B5E20
+        private const val GREEN_SOFT = -0x170AE7  // 0xFFE8F5E9
+        private const val ORANGE = -0x19AFFF  // 0xFFE65100
+        private const val DIVIDER = -0x1F1F1F  // 0xFFE0E0E0
+        private const val CARD_BG = -0x70708  // 0xFFF8F8F8
+        private const val TEXT_PRIMARY = -0xE3E4E1  // 0xFF1C1B1F
+        private const val TEXT_SECONDARY = -0xB6BAC1  // 0xFF666666
+        private const val TEXT_LIGHT = -0x666667  // 0xFF999999
+        private const val WHITE = -0x1
+    }
+    private val density = context.resources.displayMetrics.density
+    private val dp: (Int) -> Int = { (it * density).toInt() }
+    private val sp: (Int) -> Float = { TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, it.toFloat(), context.resources.displayMetrics) }
+
+    private fun paint(
+        color: Int,
+        sizeSp: Int = 14,
+        bold: Boolean = false,
+        italic: Boolean = false,
+    ) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        this.color = color
+        this.textSize = sp(sizeSp)
+        if (bold) typeface = Typeface.DEFAULT_BOLD
+        if (italic) typeface = Typeface.create(Typeface.DEFAULT, Typeface.ITALIC)
     }
 
     fun exportAsImage(
@@ -69,34 +63,48 @@ class RouteExporter @Inject constructor(
         stats: RuteroRepository.Stats = RuteroRepository.getStats(),
         onComplete: (File) -> Unit,
     ) {
-        val density = context.resources.displayMetrics.density
-        val widthPx = (EXPORT_WIDTH_DP * density).toInt()
-
-        val composeView = ComposeView(context).apply {
-            id = View.generateViewId()
-            setContent {
-                MaterialTheme {
-                    RouteExportLayout(routeName, entries, stats)
-                }
-            }
-            measure(
-                View.MeasureSpec.makeMeasureSpec(widthPx, View.MeasureSpec.EXACTLY),
-                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
-            )
-            layout(0, 0, widthPx, measuredHeight)
-        }
-
         try {
-            val bitmap = Bitmap.createBitmap(widthPx, composeView.measuredHeight, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(bitmap)
-            canvas.drawColor(android.graphics.Color.WHITE)
-            composeView.draw(canvas)
+            val w = dp(WIDTH_DP)
+            val pad = dp(PAD_DP)
+            val contentW = w - pad * 2
+            val byDay = groupByDay(entries)
+
+            // Calculate total height first
+            val totalH = measureHeight(contentW, routeName, stats, byDay)
+            val bitmap = Bitmap.createBitmap(w, totalH, Bitmap.Config.ARGB_8888)
+            val c = Canvas(bitmap)
+            c.drawColor(WHITE)
+
+            var y = pad
+
+            // ── Header ───────────────────────────────────
+            y = drawHeader(c, routeName, y, pad)
+
+            // ── Stats ────────────────────────────────────
+            y += dp(8)
+            y = drawStats(c, stats, y, contentW)
+            y += dp(12)
+
+            // ── Days ─────────────────────────────────────
+            for ((day, locales) in byDay) {
+                y = drawDaySection(c, day, locales, y, contentW)
+            }
+
+            // ── Footer ───────────────────────────────────
+            y += dp(8)
+            c.drawRoundRect(
+                pad.toFloat(), y.toFloat(),
+                (w - pad).toFloat(), (y + 1).toFloat(),
+                0f, 0f, paint(DIVIDER),
+            )
+            y += dp(12)
+            c.drawText("Generado por Mercaderistas app", pad.toFloat(), y.toFloat(), paint(TEXT_LIGHT, 11))
+            y += dp(20)
 
             val file = File(context.cacheDir, "ruta_${sanitize(routeName)}.png")
             file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
             bitmap.recycle()
-
-            Log.d(TAG, "Export done: ${file.absolutePath} (${widthPx}x${composeView.measuredHeight})")
+            Log.d(TAG, "Export done: ${file.absolutePath} (${w}x$totalH)")
             onComplete(file)
         } catch (e: Exception) {
             Log.e(TAG, "Export failed", e)
@@ -104,315 +112,274 @@ class RouteExporter @Inject constructor(
     }
 
     fun shareImage(file: File, routeName: String) {
-        val uri: Uri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            file,
-        )
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "image/png"
-            putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, "Ruta: $routeName")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-        context.startActivity(Intent.createChooser(intent, "Compartir ruta"))
+        val uri: Uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        context.startActivity(Intent.createChooser(
+            Intent(Intent.ACTION_SEND).apply {
+                type = "image/png"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_SUBJECT, "Ruta: $routeName")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            },
+            "Compartir ruta",
+        ))
     }
 
     private fun sanitize(name: String) = name.replace(Regex("[^a-zA-Z0-9_\\-]"), "_").trim('_')
-}
 
-@Composable
-private fun RouteExportLayout(
-    routeName: String,
-    entries: List<EntradaRuta>,
-    stats: RuteroRepository.Stats,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.White)
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-    ) {
-        // ── Header ─────────────────────────────────────
-        HeaderSection(routeName)
+    // ── Measurement ──────────────────────────────────
 
-        Spacer(Modifier.height(16.dp))
+    private fun measureHeight(
+        w: Int,
+        routeName: String,
+        stats: RuteroRepository.Stats,
+        byDay: Map<DiaSemana, List<LocalDelDia>>,
+    ): Int {
+        val pad = dp(PAD_DP)
+        val contentW = w - pad * 2
+        var y = pad
 
-        // ── Stats ──────────────────────────────────────
-        StatsRow(stats)
+        // Header
+        y += dp(24) + dp(16)
 
-        Spacer(Modifier.height(20.dp))
+        // Stats
+        val statH = dp(50)
+        y += dp(8) + statH + dp(12)
 
-        // ── Entries by day ─────────────────────────────
-        val byDay = remember(entries) { groupByDay(entries) }
-        byDay.forEach { (day, locales) ->
-            DaySection(day, locales)
-            Spacer(Modifier.height(16.dp))
+        // Days
+        for ((_, locales) in byDay) {
+            y += dp(24)  // day header
+            for (local in locales) {
+                y += dp(10) + dp(12) // card header
+                if (local.direccion.isNotBlank()) y += dp(16)
+                if (local.cadena.isNotBlank() || local.comuna.isNotBlank()) y += dp(14)
+                if (local.clientes.isNotEmpty()) {
+                    y += dp(12) + local.clientes.size * dp(18)
+                }
+                y += dp(10)
+            }
+            y += dp(8)
         }
 
-        // ── Footer ─────────────────────────────────────
-        Spacer(Modifier.height(8.dp))
-        DividerLine()
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = "Generado por Mercaderistas app",
-            style = MaterialTheme.typography.bodySmall,
-            color = Color(0xFF9E9E9E),
+        // Footer
+        y += dp(8) + dp(4) + dp(20)
+        return y
+    }
+
+    // ── Header ───────────────────────────────────────
+
+    private fun drawHeader(c: Canvas, name: String, y: Int, pad: Int): Int {
+        val p = paint(GREEN, 20, bold = true)
+        var cy = y
+        // Green square bullet
+        c.drawRoundRect(
+            pad.toFloat(), cy.toFloat(),
+            (pad + dp(10)).toFloat(), (cy + dp(10)).toFloat(),
+            dp(2).toFloat(), dp(2).toFloat(), paint(GREEN),
         )
-    }
-}
+        c.drawText("Ruta Mercaderistas", (pad + dp(16)).toFloat(), (cy + dp(9)).toFloat(), p)
+        cy += dp(22)
 
-@Composable
-private fun HeaderSection(routeName: String) {
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(10.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(Green),
-            )
-            Spacer(Modifier.width(10.dp))
-            Text(
-                text = "Ruta Mercaderistas",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Green,
-            )
-        }
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = routeName.uppercase(Locale.ROOT),
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            color = Color(0xFF666666),
+        val p2 = paint(TEXT_SECONDARY, 14)
+        c.drawText(name.uppercase(Locale.ROOT), pad.toFloat(), (cy + dp(6)).toFloat(), p2)
+        cy += dp(16)
+        return cy
+    }
+
+    // ── Stats ────────────────────────────────────────
+
+    private fun drawStats(c: Canvas, s: RuteroRepository.Stats, y: Int, contentW: Int): Int {
+        val gap = dp(10)
+        val cardW = (contentW - gap * 2) / 3
+        val cardH = dp(50)
+        val radius = dp(12).toFloat()
+        val r = RectF()
+
+        val items = listOf(
+            s.totalLocales.toString() to "Locales",
+            s.totalMarcas.toString() to "Marcas",
+            s.visitasTotales.toString() to "Visitas",
         )
+
+        items.forEachIndexed { idx, (value, label) ->
+            val lx = dp(PAD_DP) + idx * (cardW + gap)
+            r.set(lx.toFloat(), y.toFloat(), (lx + cardW).toFloat(), (y + cardH).toFloat())
+            c.drawRoundRect(r, radius, radius, paint(GREEN_SOFT))
+
+            val vp = paint(GREEN, 26, bold = true)
+            val lp = paint(TEXT_LIGHT, 13)
+            val vx = r.centerX() - vp.measureText(value) / 2f
+            val vy = r.centerY() - 4f
+            val lx2 = r.centerX() - lp.measureText(label) / 2f
+            c.drawText(value, vx, vy, vp)
+            c.drawText(label, lx2, vy + dp(20).toFloat(), lp)
+        }
+        return y + cardH
     }
-}
 
-@Composable
-private fun StatsRow(stats: RuteroRepository.Stats) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        StatCard("Locales", stats.totalLocales, GreenSoft, Green)
-        StatCard("Marcas", stats.totalMarcas, GreenSoft, Green)
-        StatCard("Visitas", stats.visitasTotales, GreenSoft, Green)
+    // ── Day Section ──────────────────────────────────
+
+    private fun drawDaySection(
+        c: Canvas,
+        day: DiaSemana,
+        locales: List<LocalDelDia>,
+        y: Int,
+        contentW: Int,
+    ): Int {
+        var cy = y + dp(8)
+        val pad = dp(PAD_DP)
+        val x0 = pad.toFloat()
+
+        // Day header
+        val dayP = paint(GREEN, 14, bold = true)
+        c.drawText(day.nombreCompleto.uppercase(Locale.ROOT), x0, cy + dp(6).toFloat(), dayP)
+        val dayEnd = pad + dayP.measureText(day.nombreCompleto.uppercase(Locale.ROOT)).toInt() + dp(8)
+        // Divider line
+        c.drawRoundRect(
+            dayEnd.toFloat(), (cy + dp(6) - 0.5f).toFloat(),
+            (pad + contentW).toFloat(), (cy + dp(6) + 0.5f).toFloat(),
+            0f, 0f, paint(DIVIDER),
+        )
+        // Count
+        val countText = "${locales.size} local${if (locales.size != 1) "es" else ""}"
+        c.drawText(countText, (pad + contentW - paint(TEXT_LIGHT, 11).measureText(countText)).toFloat(), (cy + dp(6)).toFloat(), paint(TEXT_LIGHT, 11))
+        cy += dp(24)
+
+        for (local in locales) {
+            cy = drawStoreCard(c, local, cy, contentW)
+            cy += dp(6)
+        }
+        return cy
     }
-}
 
-@Composable
-private fun RowScope.StatCard(
-    label: String,
-    value: Int,
-    bg: Color,
-    fg: Color,
-) {
-    Box(
-        modifier = Modifier
-            .weight(1f)
-            .clip(RoundedCornerShape(12.dp))
-            .background(bg)
-            .padding(vertical = 12.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = value.toString(),
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold,
-                color = fg,
-            )
-            Text(
-                text = label,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color(0xFF666666),
-            )
-        }
-    }
-}
+    // ── Store Card ───────────────────────────────────
 
-@Composable
-private fun DaySection(day: DiaSemana, locales: List<LocalDelDia>) {
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = day.nombreCompleto.uppercase(Locale.ROOT),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = Green,
-            )
-            Spacer(Modifier.width(8.dp))
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(1.dp)
-                    .background(Divider),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = "${locales.size} local${if (locales.size != 1) "es" else ""}",
-                fontSize = 11.sp,
-                color = Color(0xFF999999),
-            )
-        }
-        Spacer(Modifier.height(8.dp))
+    private fun drawStoreCard(c: Canvas, local: LocalDelDia, y: Int, contentW: Int): Int {
+        var cy = y
+        val pad = dp(PAD_DP)
+        val radius = dp(10).toFloat()
+        val cardPad = dp(12)
+        val cardW = contentW - dp(0)
+        val r = RectF()
 
-        locales.forEachIndexed { idx, local ->
-            StoreExportCard(local)
-            if (idx < locales.lastIndex) Spacer(Modifier.height(6.dp))
-        }
-    }
-}
-
-@Composable
-private fun DividerLine() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(1.dp)
-            .background(Divider),
-    )
-}
-
-@Composable
-private fun StoreExportCard(local: LocalDelDia) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(CardBg)
-            .padding(12.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = local.codigo,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color(0xFF888888),
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(
-                text = local.local.ifBlank { "S/N" },
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF1C1B1F),
-            )
-        }
-
-        if (local.direccion.isNotBlank()) {
-            Text(
-                text = local.direccion.toNaturalCase(),
-                fontSize = 12.sp,
-                color = Color(0xFF666666),
-                modifier = Modifier.padding(top = 2.dp),
-            )
-        }
-
-        if (local.cadena.isNotBlank() || local.comuna.isNotBlank()) {
-            Text(
-                text = buildString {
-                    if (local.cadena.isNotBlank()) append(local.cadena)
-                    if (local.comuna.isNotBlank()) {
-                        if (isNotEmpty()) append(" · ")
-                        append(local.comuna)
-                    }
-                },
-                fontSize = 11.sp,
-                color = Color(0xFF888888),
-                modifier = Modifier.padding(top = 1.dp),
-            )
-        }
-
+        // Calculate card height
+        var h = dp(12) * 2  // padding top+bottom
+        h += dp(18)  // title row
+        if (local.direccion.isNotBlank()) h += dp(16)
+        if (local.cadena.isNotBlank() || local.comuna.isNotBlank()) h += dp(14)
         if (local.clientes.isNotEmpty()) {
-            Spacer(Modifier.height(6.dp))
-            DividerLine()
-            Spacer(Modifier.height(6.dp))
-            local.clientes.forEach { cliente ->
-                BrandExportRow(cliente)
-            }
+            h += dp(12) + local.clientes.size * dp(18)
         }
-    }
-}
 
-@Composable
-private fun BrandExportRow(cliente: ClienteInfo) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (cliente.esPrioritaria) {
-            Text(
-                text = "★",
-                fontSize = 12.sp,
-                color = Orange,
-            )
-            Spacer(Modifier.width(4.dp))
-        }
-        Text(
-            text = cliente.nombre,
-            fontSize = 12.sp,
-            fontWeight = if (cliente.esPrioritaria) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (cliente.esPrioritaria) Orange else Color(0xFF49454F),
-            modifier = Modifier.weight(1f),
+        // Card background
+        r.set(pad.toFloat(), cy.toFloat(), (pad + cardW).toFloat(), (cy + h).toFloat())
+        c.drawRoundRect(r, radius, radius, paint(CARD_BG))
+
+        cy += cardPad
+
+        // Code + name
+        val codeP = paint(TEXT_LIGHT, 11)
+        val nameP = paint(TEXT_PRIMARY, 14, bold = true)
+        val codeW = codeP.measureText(local.codigo)
+        c.drawText(local.codigo, (pad + dp(4)).toFloat(), (cy + dp(6)).toFloat(), codeP)
+        c.drawText(
+            local.local.ifBlank { "S/N" },
+            (pad + dp(4) + codeW + dp(8)).toFloat(),
+            (cy + dp(5)).toFloat(),
+            nameP,
         )
-        if (cliente.frecuenciaTexto.isNotBlank()) {
-            Text(
-                text = cliente.frecuenciaTexto,
-                fontSize = 10.sp,
-                color = Color(0xFF9E9E9E),
-            )
+        cy += dp(18)
+
+        // Address
+        if (local.direccion.isNotBlank()) {
+            c.drawText(local.direccion.toNaturalCase(), pad + dp(4).toFloat(), (cy + dp(4)).toFloat(), paint(TEXT_SECONDARY, 12))
+            cy += dp(16)
         }
-    }
-}
 
-private fun groupByDay(entries: List<EntradaRuta>): Map<DiaSemana, List<LocalDelDia>> {
-    val grouped = mutableMapOf<DiaSemana, MutableList<LocalDelDia>>()
-    val allDays = DiaSemana.todos()
-
-    for (day in allDays) {
-        val locales = entries
-            .filter { isAssignedForDay(it, day) }
-            .groupBy { it.codigo + it.local }
-            .map { (_, entries) ->
-                val first = entries.first()
-                LocalDelDia(
-                    codigo = first.codigo,
-                    local = first.local.toNaturalCase(),
-                    direccion = first.direccion.toNaturalCase(),
-                    cadena = first.cadena,
-                    formato = first.formato,
-                    region = first.region,
-                    comuna = first.comuna,
-                    clientes = entries.map { entry ->
-                        ClienteInfo(
-                            nombre = entry.cliente,
-                            esPrioritaria = entry.esPrioritaria,
-                            frecuencia = entry.frecuencia,
-                        )
-                    }.sortedByDescending { it.esPrioritaria },
-                )
+        // Chain / comuna
+        if (local.cadena.isNotBlank() || local.comuna.isNotBlank()) {
+            val meta = buildString {
+                if (local.cadena.isNotBlank()) append(local.cadena)
+                if (local.comuna.isNotBlank()) {
+                    if (isNotEmpty()) append(" · ")
+                    append(local.comuna)
+                }
             }
-            .sortedBy { it.codigo.padStart(6, '0') }
-
-        if (locales.isNotEmpty()) {
-            grouped[day] = locales.toMutableList()
+            c.drawText(meta, pad + dp(4).toFloat(), (cy + dp(4)).toFloat(), paint(TEXT_LIGHT, 11))
+            cy += dp(14)
         }
-    }
-    return grouped
-}
 
-private fun isAssignedForDay(entry: EntradaRuta, dia: DiaSemana): Boolean = when (dia) {
-    DiaSemana.LUNES -> entry.lunes
-    DiaSemana.MARTES -> entry.martes
-    DiaSemana.MIERCOLES -> entry.miercoles
-    DiaSemana.JUEVES -> entry.jueves
-    DiaSemana.VIERNES -> entry.viernes
-    DiaSemana.SABADO -> entry.sabado
-    DiaSemana.DOMINGO -> entry.domingo
+        // Brands
+        if (local.clientes.isNotEmpty()) {
+            cy += dp(4)
+            c.drawRoundRect(
+                (pad + dp(4)).toFloat(), cy.toFloat(),
+                (pad + cardW - dp(4)).toFloat(), (cy + 1).toFloat(),
+                0f, 0f, paint(DIVIDER),
+            )
+            cy += dp(8)
+
+            for (cliente in local.clientes) {
+                val starP = paint(ORANGE, 12)
+                val nameP2 = if (cliente.esPrioritaria) paint(ORANGE, 12, bold = true) else paint(TEXT_SECONDARY, 12)
+                val freqP = paint(TEXT_LIGHT, 10)
+                var bx = pad + dp(4).toFloat()
+
+                if (cliente.esPrioritaria) {
+                    c.drawText("★", bx, (cy + dp(5)).toFloat(), starP)
+                    bx += starP.measureText("★") + dp(4)
+                }
+                c.drawText(cliente.nombre, bx, (cy + dp(5)).toFloat(), nameP2)
+                if (cliente.frecuenciaTexto.isNotBlank()) {
+                    val ft = cliente.frecuenciaTexto
+                    c.drawText(ft, (pad + cardW - dp(4) - freqP.measureText(ft)).toFloat(), (cy + dp(5)).toFloat(), freqP)
+                }
+                cy += dp(18)
+            }
+        }
+
+        return cy - cardPad + dp(10)
+    }
+
+    // ── Data helpers (same as before) ────────────────
+
+    private fun groupByDay(entries: List<EntradaRuta>): Map<DiaSemana, List<LocalDelDia>> {
+        val grouped = mutableMapOf<DiaSemana, MutableList<LocalDelDia>>()
+        for (day in DiaSemana.todos()) {
+            val locales = entries
+                .filter { isAssignedForDay(it, day) }
+                .groupBy { it.codigo + it.local }
+                .map { (_, groupEntries) ->
+                    val first = groupEntries.first()
+                    LocalDelDia(
+                        codigo = first.codigo,
+                        local = first.local.toNaturalCase(),
+                        direccion = first.direccion.toNaturalCase(),
+                        cadena = first.cadena,
+                        formato = first.formato,
+                        region = first.region,
+                        comuna = first.comuna,
+                        clientes = groupEntries.map { entry ->
+                            ClienteInfo(
+                                nombre = entry.cliente,
+                                esPrioritaria = entry.esPrioritaria,
+                                frecuencia = entry.frecuencia,
+                            )
+                        }.sortedByDescending { it.esPrioritaria },
+                    )
+                }
+                .sortedBy { it.codigo.padStart(6, '0') }
+            if (locales.isNotEmpty()) grouped[day] = locales.toMutableList()
+        }
+        return grouped
+    }
+
+    private fun isAssignedForDay(entry: EntradaRuta, dia: DiaSemana): Boolean = when (dia) {
+        DiaSemana.LUNES -> entry.lunes
+        DiaSemana.MARTES -> entry.martes
+        DiaSemana.MIERCOLES -> entry.miercoles
+        DiaSemana.JUEVES -> entry.jueves
+        DiaSemana.VIERNES -> entry.viernes
+        DiaSemana.SABADO -> entry.sabado
+        DiaSemana.DOMINGO -> entry.domingo
+    }
 }
