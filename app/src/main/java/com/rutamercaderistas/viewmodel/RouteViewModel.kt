@@ -98,9 +98,9 @@ class RouteViewModel @Inject constructor(
             if (index.isNotEmpty()) {
                 val prefs = context.getSharedPreferences(Constants.PREFS_NAME, Context.MODE_PRIVATE)
                 val lastRoute = prefs.getString(Constants.KEY_RUTERO, null)
-                if (lastRoute != null && index.contains(lastRoute)) {
-                    selectRoute(lastRoute)
-                }
+                val route = if (lastRoute != null && index.contains(lastRoute)) lastRoute
+                else index.first()
+                selectRoute(route)
             }
             updateSyncLabel()
         }
