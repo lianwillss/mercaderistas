@@ -78,6 +78,13 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            LaunchedEffect(routeState.snackbarMessage) {
+                routeState.snackbarMessage?.let {
+                    snackbarHostState.showSnackbar(it)
+                    routeViewModel.clearSnackbar()
+                }
+            }
+
             LaunchedEffect(Unit) {
                 updateViewModel.checkForUpdate()
                 routeViewModel.loadInitialData()

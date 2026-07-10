@@ -63,52 +63,39 @@ class RouteExporter @Inject constructor(
         stats: RuteroRepository.Stats = RuteroRepository.getStats(),
         onComplete: (File) -> Unit,
     ) {
-        try {
-            val w = dp(WIDTH_DP)
-            val pad = dp(PAD_DP)
-            val contentW = w - pad * 2
-            val byDay = groupByDay(entries)
+        val w = dp(WIDTH_DP)
+        val pad = dp(PAD_DP)
+        val contentW = w - pad * 2
+        val byDay = groupByDay(entries)
 
-            // Calculate total height first
-            val totalH = measureHeight(contentW, routeName, stats, byDay)
-            val bitmap = Bitmap.createBitmap(w, totalH, Bitmap.Config.ARGB_8888)
-            val c = Canvas(bitmap)
-            c.drawColor(WHITE)
+        val totalH = measureHeight(contentW, routeName, stats, byDay)
+        val bitmap = Bitmap.createBitmap(w, totalH, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bitmap)
+        c.drawColor(WHITE)
 
-            var y = pad
-
-            // ── Header ───────────────────────────────────
-            y = drawHeader(c, routeName, y, pad)
-
-            // ── Stats ────────────────────────────────────
-            y += dp(8)
-            y = drawStats(c, stats, y, contentW)
-            y += dp(12)
-
-            // ── Days ─────────────────────────────────────
-            for ((day, locales) in byDay) {
-                y = drawDaySection(c, day, locales, y, contentW)
-            }
-
-            // ── Footer ───────────────────────────────────
-            y += dp(8)
-            c.drawRoundRect(
-                pad.toFloat(), y.toFloat(),
-                (w - pad).toFloat(), (y + 1).toFloat(),
-                0f, 0f, paint(DIVIDER),
-            )
-            y += dp(12)
-            c.drawText("Generado por Mercaderistas app", pad.toFloat(), y.toFloat(), paint(TEXT_LIGHT, 11))
-            y += dp(20)
-
-            val file = File(context.cacheDir, "ruta_${sanitize(routeName)}.png")
-            file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-            bitmap.recycle()
-            Log.d(TAG, "Export done: ${file.absolutePath} (${w}x$totalH)")
-            onComplete(file)
-        } catch (e: Exception) {
-            Log.e(TAG, "Export failed", e)
+        var y = pad
+        y = drawHeader(c, routeName, y, pad)
+        y += dp(8)
+        y = drawStats(c, stats, y, contentW)
+        y += dp(12)
+        for ((day, locales) in byDay) {
+            y = drawDaySection(c, day, locales, y, contentW)
         }
+        y += dp(8)
+        c.drawRoundRect(
+            pad.toFloat(), y.toFloat(),
+            (w - pad).toFloat(), (y + 1).toFloat(),
+            0f, 0f, paint(DIVIDER),
+        )
+        y += dp(12)
+        c.drawText("Generado por Mercaderistas app", pad.toFloat(), y.toFloat(), paint(TEXT_LIGHT, 11))
+        y += dp(20)
+
+        val file = File(context.cacheDir, "ruta_${sanitize(routeName)}.png")
+        file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        bitmap.recycle()
+        Log.d(TAG, "Export done: ${file.absolutePath} (${w}x$totalH)")
+        onComplete(file)
     }
 
     fun shareImage(file: File, routeName: String) {

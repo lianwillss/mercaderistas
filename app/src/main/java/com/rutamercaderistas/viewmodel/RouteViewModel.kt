@@ -36,6 +36,7 @@ data class RouteUiState(
     val lastSyncRelative: String = "",
     val isSyncing: Boolean = false,
     val isDataLoaded: Boolean = false,
+    val snackbarMessage: String? = null,
 )
 
 @HiltViewModel
@@ -174,12 +175,32 @@ class RouteViewModel @Inject constructor(
 
     fun exportRoute() {
         val s = _uiState.value
-        val name = s.selectedRoute ?: return
-        routeExporter.exportAsImage(
-            routeName = name,
-            entries = s.entries,
-        ) { file ->
-            routeExporter.shareImage(file, name)
+        val name = s.selectedRoute
+        if (name == null) {
+            _uiState.value = _uiState.value.copy(snackbarMessage = "Selecciona una ruta primero")
+            return
         }
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                routeExporter.exportAsImage(
+                    routeName = name,
+                    entries = s.entries,
+                ) { file ->
+                    withContext(Dispatchers.Main) {
+                        try {
+                            routeExporter.shareImage(file, name)
+                        } catch (e: Exception) {
+                            _uiState.value = _uiState.value.copy(snackbarMessage = "Error al compartir: ${e.message}")
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(snackbarMessage = "Error al exportar: ${e.message}")
+            }
+        }
+    }
+
+    fun clearSnackbar() {
+        _uiState.value = _uiState.value.copy(snackbarMessage = null)
     }
 }
