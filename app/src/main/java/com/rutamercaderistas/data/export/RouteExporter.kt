@@ -107,6 +107,7 @@ class RouteExporter @Inject constructor(
                 putExtra(Intent.EXTRA_STREAM, uri)
                 putExtra(Intent.EXTRA_SUBJECT, "Ruta: $routeName")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             },
             "Compartir ruta",
         ))
