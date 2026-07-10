@@ -97,7 +97,7 @@ fun RouteSearchBar(
 
     val hasResults = text.isBlank() || suggestions.isNotEmpty()
 
-    LaunchedEffect(isFocused, text) {
+    LaunchedEffect(isFocused, text, suggestions) {
         showDropdown = when {
             !isFocused -> false
             text.isNotBlank() && suggestions.isEmpty() -> true
@@ -159,10 +159,13 @@ fun RouteSearchBar(
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(
                     onSearch = {
-                        if (text.isNotBlank() && routes.contains(text)) {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onRouteSelected(text)
-                            focusManager.clearFocus()
+                        if (text.isNotBlank()) {
+                            val matched = routes.firstOrNull { normalizar(it) == normalizar(text) }
+                            if (matched != null) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onRouteSelected(matched)
+                                focusManager.clearFocus()
+                            }
                         }
                     }
                 ),
