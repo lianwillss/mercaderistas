@@ -1,5 +1,8 @@
 package com.rutamercaderistas.ui.components
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,6 +35,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -45,6 +52,9 @@ fun HeaderSection(
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
+    val isOnline = remember { isConnected(context) }
 
     Column(
         modifier = modifier
@@ -57,16 +67,26 @@ fun HeaderSection(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Ruta Mercaderistas",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Normal,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        letterSpacing = (-0.4).sp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(if (isOnline) Color(0xFF34C759) else Color(0xFFFF3B30))
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "Ruta Mercaderistas",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Normal,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    letterSpacing = (-0.4).sp
-                )
-                Spacer(modifier = Modifier.height(18.dp))
-                Text(
-                    text = "Actualizado $lastSyncRelative",
+                    text = if (isOnline) "En l\u00EDnea \u00B7 Actualizado $lastSyncRelative"
+                           else "Sin conexi\u00F3n",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -80,7 +100,10 @@ fun HeaderSection(
                     .shadow(2.dp, CircleShape)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surface)
-                    .clickable(onClick = onRefresh),
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onRefresh()
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -99,12 +122,12 @@ fun HeaderSection(
                     .shadow(2.dp, CircleShape)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surface)
-                    .clickable(onClick = { expanded = true }),
+                    .clickable { expanded = true },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Outlined.MoreVert,
-                    contentDescription = "Menú",
+                    contentDescription = "Men\u00FA",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(22.dp)
                 )
@@ -115,9 +138,10 @@ fun HeaderSection(
                 onDismissRequest = { expanded = false }
             ) {
                 DropdownMenuItem(
-                    text = { Text("Forzar sincronización") },
+                    text = { Text("Forzar sincronizaci\u00F3n") },
                     onClick = {
                         expanded = false
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onRefresh()
                     },
                     leadingIcon = {
@@ -147,4 +171,11 @@ fun HeaderSection(
             }
         }
     }
+}
+
+private fun isConnected(context: Context): Boolean {
+    val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
+    val network = cm.activeNetwork ?: return false
+    val caps = cm.getNetworkCapabilities(network) ?: return false
+    return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
 }

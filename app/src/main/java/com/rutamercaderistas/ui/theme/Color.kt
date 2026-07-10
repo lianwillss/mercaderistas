@@ -32,6 +32,16 @@ val StoreColorYellowSoft = Color(0xFFFFF8E1)
 val StoreColorPurple = Color(0xFF9C27B0)
 val StoreColorPurpleSoft = Color(0xFFF3E5F5)
 
+// Dark theme
+val DarkBackground = Color(0xFF121212)
+val DarkSurface = Color(0xFF1E1E1E)
+val DarkSurfaceVariant = Color(0xFF2C2C2C)
+val DarkTextPrimary = Color(0xFFE0E0E0)
+val DarkTextSecondary = Color(0xFF9E9E9E)
+val DarkTextTertiary = Color(0xFF6C757D)
+val DarkOutline = Color(0xFF3C3C3C)
+val DarkOutlineVariant = Color(0xFF2E2E2E)
+
 fun storeColor(name: String): Color {
     val n = name.trim().uppercase()
     return when {

@@ -43,7 +43,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -67,6 +69,7 @@ fun RouteSearchBar(
     var isFocused by remember { mutableStateOf(false) }
     var showDropdown by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
+    val haptic = LocalHapticFeedback.current
 
     val showRecent = isFocused && text.isBlank() && recentRoutes.isNotEmpty()
 
@@ -157,6 +160,7 @@ fun RouteSearchBar(
                 keyboardActions = KeyboardActions(
                     onSearch = {
                         if (text.isNotBlank() && routes.contains(text)) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             onRouteSelected(text)
                             focusManager.clearFocus()
                         }
@@ -208,6 +212,7 @@ fun RouteSearchBar(
                                     text = route,
                                     query = "",
                                     onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         text = route
                                         onRouteSelected(route)
                                         focusManager.clearFocus()
@@ -244,6 +249,7 @@ fun RouteSearchBar(
                                     text = route,
                                     query = text,
                                     onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         text = route
                                         onRouteSelected(route)
                                         focusManager.clearFocus()
