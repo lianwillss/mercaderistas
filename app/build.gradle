@@ -19,7 +19,7 @@ android {
     }
 
     // ── Signing config (local Untitled.jks OR CI env vars) ──
-    def localKs = file("Untitled.jks")
+    def localKs = rootProject.file("Untitled.jks")
     def ksPath = System.getenv("KEYSTORE_PATH") ?: (localKs.exists() ? localKs.absolutePath : null)
     def ksPassword = System.getenv("KEYSTORE_PASSWORD") ?: "123456"
     def ksAlias = System.getenv("KEY_ALIAS") ?: "will"
