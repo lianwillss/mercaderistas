@@ -23,7 +23,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.ShoppingBag
 import androidx.compose.material.icons.outlined.Store
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -33,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,7 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -55,9 +55,14 @@ import com.rutamercaderistas.ui.theme.storeSoftColor
 fun AllLocalesScreen(
     locales: List<LocalDelDia>,
     onClose: () -> Unit,
-    onAddressClick: (String) -> Unit
+    onAddressClick: (String) -> Unit,
+    initialSearch: String = "",
 ) {
-    var searchQuery by remember { mutableStateOf("") }
+    var searchQuery by remember { mutableStateOf(initialSearch) }
+
+    LaunchedEffect(initialSearch) {
+        if (initialSearch.isNotBlank()) searchQuery = initialSearch
+    }
 
     val filteredLocales by remember(locales, searchQuery) {
         derivedStateOf {
@@ -68,7 +73,8 @@ fun AllLocalesScreen(
                     local.local.lowercase().contains(q) ||
                     local.codigo.lowercase().contains(q) ||
                     local.direccion.lowercase().contains(q) ||
-                    local.comuna.lowercase().contains(q)
+                    local.comuna.lowercase().contains(q) ||
+                    local.clientes.any { it.nombre.lowercase().contains(q) }
                 }
             }
         }
@@ -139,7 +145,7 @@ fun AllLocalesScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
                     Row(
@@ -168,8 +174,7 @@ fun AllLocalesScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = local.local.ifBlank { "S/N" },
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.SemiBold,
+                                style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -208,27 +213,7 @@ fun AllLocalesScreen(
                                     )
                                 }
                             }
-                            if (local.clientes.isNotEmpty()) {
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.ShoppingBag,
-                                        contentDescription = "Marcas",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(3.dp))
-                                    Text(
-                                        text = "${local.clientes.size} marca${if (local.clientes.size != 1) "s" else ""}: ${
-                                            local.clientes.joinToString(", ") { it.nombre }
-                                        }",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            }
+
                         }
                     }
                 }

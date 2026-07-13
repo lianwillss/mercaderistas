@@ -111,7 +111,7 @@ fun String.toNaturalCase(): String {
         when {
             word.isBlank() -> word
             word == "S/N" || word == "S/C" -> word
-            word.uppercase() in PREPS.map { it.uppercase() } -> word.lowercase()
+            word.lowercase() in PREPS -> word.lowercase()
             else -> word.lowercase().replaceFirstChar { it.uppercase() }
         }
     }

@@ -1,9 +1,12 @@
 package com.rutamercaderistas.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Store
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -57,9 +61,11 @@ import com.rutamercaderistas.ui.theme.AccentGreenSoft
 import com.rutamercaderistas.ui.theme.AccentOrange
 import com.rutamercaderistas.ui.theme.AccentOrangeSoft
 import com.rutamercaderistas.ui.theme.Outline
+import com.rutamercaderistas.ui.components.normalizeChain
 import com.rutamercaderistas.ui.theme.storeColor
 import com.rutamercaderistas.ui.theme.storeSoftColor
 import com.rutamercaderistas.utils.cleanBrand
+import com.rutamercaderistas.utils.normalizeBrand
 import kotlin.math.abs
 import timber.log.Timber
 
@@ -69,6 +75,7 @@ fun StoreCard(
     marcaResaltada: String?,
     onBrandClick: (String) -> Unit,
     onAddressClick: (String) -> Unit,
+    onShareLocal: (String) -> Unit = {},
     promotionsByBrand: Map<String, List<PromotionEntity>> = emptyMap(),
     index: Int = 0,
     modifier: Modifier = Modifier
@@ -83,6 +90,19 @@ fun StoreCard(
         animationSpec = tween(250, delayMillis = index * 50)
     )
 
+    val brandCleanCache = remember(local) {
+        local.clientes.associate { it.nombre to normalizeBrand(it.nombre).cleanBrand() }
+    }
+
+    val hasPromos = remember(local, promotionsByBrand) {
+        local.clientes.any { cliente ->
+            val cleanName = brandCleanCache[cliente.nombre] ?: cliente.nombre.cleanBrand()
+            val promos = promotionsByBrand[cleanName].orEmpty()
+                .filter { local.cadena.isBlank() || normalizeChain(it.chain) == normalizeChain(local.cadena) }
+            promos.isNotEmpty()
+        }
+    }
+
     LaunchedEffect(local) { visible = true }
 
     Card(
@@ -92,7 +112,7 @@ fun StoreCard(
             .offset(y = animOffsetY),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color.White
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp)
     ) {
@@ -125,14 +145,22 @@ fun StoreCard(
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = local.local.ifBlank { "S/N" },
-                        fontWeight = FontWeight.SemiBold,
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = local.local.ifBlank { "S/N" },
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (hasPromos) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "\uD83D\uDD25",
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        }
+                    }
 
                     if (local.codigo.isNotBlank()) {
                         Spacer(modifier = Modifier.height(2.dp))
@@ -184,7 +212,25 @@ fun StoreCard(
                     }
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .clickable { onShareLocal(buildStoreShareText(local, promotionsByBrand, brandCleanCache)) }
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Share,
+                        contentDescription = "Compartir",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
 
                 Box(
                     modifier = Modifier
@@ -198,14 +244,12 @@ fun StoreCard(
                     ) {
                         Text(
                             text = "${local.totalClientes}",
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.bodyLarge,
                             color = AccentBlue,
                         )
                         Text(
                             text = "marcas",
-                            fontWeight = FontWeight.Medium,
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.bodySmall,
                             color = AccentBlue,
                         )
                     }
@@ -231,10 +275,10 @@ fun StoreCard(
 
             // ── Brands ──
             local.clientes.forEach { cliente ->
-                val cleanBrandName = cliente.nombre.cleanBrand()
+                val cleanBrandName = brandCleanCache[cliente.nombre] ?: normalizeBrand(cliente.nombre).cleanBrand()
                 val promos = promotionsByBrand[cleanBrandName]
                     .orEmpty()
-                    .filter { local.cadena.isBlank() || it.chain.equals(local.cadena, ignoreCase = true) }
+                    .filter { local.cadena.isBlank() || normalizeChain(it.chain) == normalizeChain(local.cadena) }
                 if (promos.isNotEmpty()) {
                     Timber.d("STORE: \"%s\" (cadena=\"%s\") → marca=\"%s\" (clean=\"%s\") → %d promos",
                         local.local, local.cadena, cliente.nombre, cleanBrandName, promos.size)
@@ -261,19 +305,24 @@ private fun BrandItem(
     isHighlighted: Boolean,
     onClick: () -> Unit
 ) {
+    var expanded by remember { mutableStateOf(false) }
     if (cliente.esPrioritaria) {
         PriorityBrandCard(
             cliente = cliente,
             promotions = promotions,
+            expanded = expanded,
             isHighlighted = isHighlighted,
             onClick = onClick,
+            onToggle = { expanded = !expanded },
         )
     } else {
         NormalBrandRow(
             cliente = cliente,
             promotions = promotions,
+            expanded = expanded,
             isHighlighted = isHighlighted,
             onClick = onClick,
+            onToggle = { expanded = !expanded },
         )
     }
 }
@@ -282,17 +331,21 @@ private fun BrandItem(
 private fun PriorityBrandCard(
     cliente: ClienteInfo,
     promotions: List<PromotionEntity>,
+    expanded: Boolean,
     isHighlighted: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onToggle: () -> Unit,
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(animationSpec = tween(250)),
         onClick = onClick,
         shape = RoundedCornerShape(11.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isHighlighted)
                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.18f)
-            else Color.White
+            else MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
@@ -336,8 +389,7 @@ private fun PriorityBrandCard(
 
                     Text(
                         text = cliente.nombre,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -346,7 +398,11 @@ private fun PriorityBrandCard(
 
                     if (promotions.isNotEmpty()) {
                         Spacer(modifier = Modifier.width(5.dp))
-                        PromotionBadge(count = promotions.size)
+                        PromotionBadge(
+                            count = promotions.size,
+                            expanded = expanded,
+                            onClick = onToggle,
+                        )
                     }
 
                     if (cliente.frecuencia > 0) {
@@ -356,8 +412,12 @@ private fun PriorityBrandCard(
                 }
             }
 
-            if (promotions.isNotEmpty()) {
-                PromotionList(promotions = promotions, marginStart = 5.dp)
+            AnimatedVisibility(
+                visible = expanded && promotions.isNotEmpty(),
+                enter = expandVertically(animationSpec = tween(250)),
+                exit = shrinkVertically(animationSpec = tween(250)),
+            ) {
+                PromotionList(promotions = promotions, marginStart = 5.dp, showChain = true)
             }
         }
     }
@@ -367,10 +427,14 @@ private fun PriorityBrandCard(
 private fun NormalBrandRow(
     cliente: ClienteInfo,
     promotions: List<PromotionEntity>,
+    expanded: Boolean,
     isHighlighted: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onToggle: () -> Unit,
 ) {
-    Column {
+    Column(
+        modifier = Modifier.animateContentSize(animationSpec = tween(250)),
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -393,7 +457,7 @@ private fun NormalBrandRow(
             ) {
                 Text(
                     text = initials(cliente.nombre),
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.labelSmall,
                     color = avatarColor(cliente.nombre),
                     textAlign = TextAlign.Center
                 )
@@ -403,8 +467,7 @@ private fun NormalBrandRow(
 
             Text(
                 text = cliente.nombre,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Medium,
+                style = if (isHighlighted) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f),
                 maxLines = 1,
@@ -413,7 +476,11 @@ private fun NormalBrandRow(
 
             if (promotions.isNotEmpty()) {
                 Spacer(modifier = Modifier.width(5.dp))
-                PromotionBadge(count = promotions.size)
+                PromotionBadge(
+                    count = promotions.size,
+                    expanded = expanded,
+                    onClick = onToggle,
+                )
             }
 
             if (cliente.frecuencia > 0) {
@@ -426,16 +493,19 @@ private fun NormalBrandRow(
                 ) {
                     Text(
                         text = cliente.frecuenciaTexto,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.secondary
                     )
                 }
             }
         }
 
-        if (promotions.isNotEmpty()) {
-            PromotionList(promotions = promotions, marginStart = 2.dp)
+        AnimatedVisibility(
+            visible = expanded && promotions.isNotEmpty(),
+            enter = expandVertically(animationSpec = tween(250)),
+            exit = shrinkVertically(animationSpec = tween(250)),
+        ) {
+            PromotionList(promotions = promotions, marginStart = 2.dp, showChain = true)
         }
     }
 }
@@ -465,6 +535,37 @@ private fun initials(text: String): String {
         parts.isEmpty() -> "?"
         parts.size == 1 -> parts.first().take(2).uppercase()
         else -> "${parts.first().first().uppercaseChar()}${parts.last().first().uppercaseChar()}"
+    }
+}
+
+// ── Compartir ──────────────────────────────────────────────────
+
+private fun buildStoreShareText(
+    local: LocalDelDia,
+    promotionsByBrand: Map<String, List<PromotionEntity>>,
+    brandCleanCache: Map<String, String>,
+): String {
+    return buildString {
+        appendLine("\uD83C\uDFEA ${local.local.ifBlank { "S/N" }}")
+        if (local.direccion.isNotBlank()) appendLine("\uD83D\uDCCD ${local.direccion}")
+        if (local.comuna.isNotBlank()) appendLine("\uD83C\uDFD9\uFE0F ${local.comuna}")
+        appendLine()
+        if (local.clientes.isNotEmpty()) {
+            appendLine("Marcas (${local.totalClientes}):")
+            local.clientes.forEach { c ->
+                val clean = brandCleanCache[c.nombre] ?: normalizeBrand(c.nombre).cleanBrand()
+                val promos = promotionsByBrand[clean].orEmpty()
+                    .filter { local.cadena.isBlank() || normalizeChain(it.chain) == normalizeChain(local.cadena) }
+                append("  \u2022 ${c.nombre}")
+                if (promos.isNotEmpty()) append(" \uD83D\uDD25 ${promos.size} promo${if (promos.size != 1) "s" else ""}")
+                appendLine()
+                promos.forEach { p ->
+                    append("    - ${p.productName}")
+                    if (p.price.isNotBlank()) append(" \uD83D\uDCB0 ${p.price}")
+                    appendLine()
+                }
+            }
+        }
     }
 }
 

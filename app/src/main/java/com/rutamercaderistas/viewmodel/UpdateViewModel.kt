@@ -1,18 +1,20 @@
 package com.rutamercaderistas.viewmodel
 
 import android.app.Application
-import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.Constants
+import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.services.ApkDownloader
 import com.rutamercaderistas.services.UpdateChecker
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 data class UpdateUiState(
@@ -29,23 +31,24 @@ data class UpdateUiState(
 @HiltViewModel
 class UpdateViewModel @Inject constructor(
     application: Application,
+    private val preferencesRepository: PreferencesRepository,
 ) : AndroidViewModel(application) {
 
     private val _state = MutableStateFlow(UpdateUiState())
     val state: StateFlow<UpdateUiState> = _state.asStateFlow()
 
-    private val prefs = application.getSharedPreferences(Constants.PREFS_NAME, Context.MODE_PRIVATE)
-
     fun checkForUpdate(force: Boolean = false, showFeedback: Boolean = true) {
-        if (!force) {
-            val suprimidoHasta = prefs.getLong(Constants.KEY_UPDATE_SUPPRESSED_UNTIL, 0L)
-            if (System.currentTimeMillis() < suprimidoHasta) return
-        }
-
-        _state.value = _state.value.copy(isChecking = true)
         viewModelScope.launch {
+            if (!force) {
+                val suprimidoHasta = withContext(Dispatchers.IO) {
+                    preferencesRepository.getUpdateSuppressedUntil()
+                }
+                if (System.currentTimeMillis() < suprimidoHasta) return@launch
+            }
+
+            _state.value = _state.value.copy(isChecking = true)
             try {
-                val info = UpdateChecker.check(BuildConfig.VERSION_CODE)
+                val info = withContext(Dispatchers.IO) { UpdateChecker.check(BuildConfig.VERSION_CODE) }
                 if (info.available) {
                     _state.value = _state.value.copy(
                         isChecking = false,
@@ -95,9 +98,11 @@ class UpdateViewModel @Inject constructor(
     }
 
     fun suppressUntilTomorrow() {
-        val manana = System.currentTimeMillis() + Constants.UPDATE_SUPPRESS_DAYS_MS
-        prefs.edit().putLong(Constants.KEY_UPDATE_SUPPRESSED_UNTIL, manana).apply()
-        _state.value = _state.value.copy(showDialog = false)
+        viewModelScope.launch(Dispatchers.IO) {
+            val manana = System.currentTimeMillis() + Constants.UPDATE_SUPPRESS_DAYS_MS
+            preferencesRepository.setUpdateSuppressedUntil(manana)
+            _state.value = _state.value.copy(showDialog = false)
+        }
     }
 
     fun dismissDialog() {

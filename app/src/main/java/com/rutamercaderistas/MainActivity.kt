@@ -34,6 +34,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.models.BrandReference
 import com.rutamercaderistas.services.PromotionRepository
 import com.rutamercaderistas.ui.screens.MainScreen
@@ -41,6 +42,7 @@ import com.rutamercaderistas.ui.theme.MercaderistasTheme
 import com.rutamercaderistas.viewmodel.RouteViewModel
 import com.rutamercaderistas.viewmodel.SyncViewModel
 import com.rutamercaderistas.viewmodel.UpdateViewModel
+import com.rutamercaderistas.worker.DailyPromotionNotificationWorker
 import com.rutamercaderistas.worker.SyncWorker
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -56,12 +58,20 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var promotionRepository: PromotionRepository
 
+    @Inject
+    lateinit var brandReference: BrandReference
+
+    @Inject
+    lateinit var preferencesRepository: PreferencesRepository
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        BrandReference.init(this)
-        schedulePeriodicSync()
-        promotionRepository.schedulePeriodicRefresh()
+        if (savedInstanceState == null) {
+            schedulePeriodicSync()
+            promotionRepository.schedulePeriodicRefresh()
+            scheduleDailyPromotionNotification()
+        }
 
         setContent {
 
@@ -104,6 +114,8 @@ class MainActivity : ComponentActivity() {
                     MainScreen(
                         routeViewModel = routeViewModel,
                         syncViewModel = syncViewModel,
+                        brandReference = brandReference,
+                        preferencesRepository = preferencesRepository,
                         onCheckUpdate = { updateViewModel.checkForUpdate(force = true) },
                         modifier = Modifier,
                     )
@@ -115,8 +127,7 @@ class MainActivity : ComponentActivity() {
                         title = {
                             Text(
                                 text = "Actualización disponible",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 20.sp,
+                                style = MaterialTheme.typography.headlineSmall,
                             )
                         },
                         text = {
@@ -124,7 +135,7 @@ class MainActivity : ComponentActivity() {
                                 Column {
                                     Text(
                                         text = "Descargando versión ${updateState.versionName}…",
-                                        fontSize = 15.sp,
+                                        style = MaterialTheme.typography.bodyLarge,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                     Spacer(modifier = Modifier.height(12.dp))
@@ -135,14 +146,14 @@ class MainActivity : ComponentActivity() {
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(
                                         text = "${updateState.downloadProgress}%",
-                                        fontSize = 13.sp,
+                                        style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
                             } else {
                                 Text(
                                     text = "Versión ${updateState.versionName} disponible. ¿Quieres actualizar ahora?",
-                                    fontSize = 15.sp,
+                                    style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
@@ -155,7 +166,7 @@ class MainActivity : ComponentActivity() {
                                         containerColor = MaterialTheme.colorScheme.primary,
                                     ),
                                 ) {
-                                    Text("Actualizar", fontWeight = FontWeight.SemiBold)
+                                    Text("Actualizar", style = MaterialTheme.typography.titleSmall)
                                 }
                             }
                         },
@@ -170,6 +181,23 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun scheduleDailyPromotionNotification() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
+            .build()
+
+        val request = PeriodicWorkRequestBuilder<DailyPromotionNotificationWorker>(1, TimeUnit.DAYS)
+            .setConstraints(constraints)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.SECONDS)
+            .build()
+
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "daily_promotion_notification",
+            ExistingPeriodicWorkPolicy.KEEP,
+            request,
+        )
     }
 
     private fun schedulePeriodicSync() {

@@ -109,8 +109,7 @@ fun ManualScreen(
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = "Funciona sin conexión después de la primera sincronización.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.titleSmall,
                         color = AccentBlue,
                     )
             }
@@ -208,8 +207,7 @@ fun ManualScreen(
             ) {
                 Text(
                     text = "Marcas prioritarias:",
-                    fontWeight = FontWeight.SemiBold,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 BulletPoint("Tarjeta blanca independiente con barra naranja a la izquierda")
@@ -218,8 +216,7 @@ fun ManualScreen(
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = "Marcas normales:",
-                    fontWeight = FontWeight.SemiBold,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 BulletPoint("Fila compacta sin tarjeta independiente")
@@ -275,7 +272,7 @@ private fun SectionCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -312,7 +309,7 @@ private fun NumberedStep(text: String) {
     Row(modifier = Modifier.padding(vertical = 2.dp)) {
         Text(
             text = "•",
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.width(18.dp)
         )

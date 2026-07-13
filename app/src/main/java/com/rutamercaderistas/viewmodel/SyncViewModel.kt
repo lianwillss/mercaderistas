@@ -20,7 +20,6 @@ import com.rutamercaderistas.models.BrandReference
 import com.rutamercaderistas.services.RuteroManager
 import com.rutamercaderistas.services.RuteroRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,20 +28,27 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
+sealed interface SyncState {
+    data object Idle : SyncState
+    data class Syncing(val phase: String? = null) : SyncState
+}
+
 data class SyncUiState(
     val isOnline: Boolean = false,
-    val isSyncing: Boolean = false,
-    val syncPhase: String? = null,
+    val state: SyncState = SyncState.Idle,
     val snackbarMessage: String? = null,
-)
+) {
+    val isSyncing: Boolean get() = state is SyncState.Syncing
+    val syncPhase: String? get() = (state as? SyncState.Syncing)?.phase
+}
 
 @HiltViewModel
 class SyncViewModel @Inject constructor(
     application: Application,
-    @ApplicationContext private val context: Context,
     private val ruteroManager: RuteroManager,
     private val repository: RuteroRepository,
     private val promotionRepository: PromotionRepository,
+    private val brandReference: BrandReference,
 ) : AndroidViewModel(application) {
 
     private val _state = MutableStateFlow(SyncUiState())
@@ -52,7 +58,7 @@ class SyncViewModel @Inject constructor(
     private var syncJob: kotlinx.coroutines.Job? = null
 
     private val connectivityManager =
-        context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        getApplication<Application>().getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
     init {
         checkConnectivity()
@@ -104,10 +110,10 @@ class SyncViewModel @Inject constructor(
 
     fun syncFromDrive() {
         syncJob?.cancel()
-        _state.value = _state.value.copy(isSyncing = true)
+        _state.value = _state.value.copy(state = SyncState.Syncing())
         syncJob = viewModelScope.launch {
             val result = performDriveSync()
-            _state.value = _state.value.copy(isSyncing = false)
+            _state.value = _state.value.copy(state = SyncState.Idle)
             result.messageOrNull()?.let { msg ->
                 _state.value = _state.value.copy(snackbarMessage = msg)
             }
@@ -117,39 +123,39 @@ class SyncViewModel @Inject constructor(
     private suspend fun performDriveSync(): SyncResult<Boolean> {
         return withContext(Dispatchers.IO) {
             try {
-                _state.value = _state.value.copy(syncPhase = "Descargando Excel…")
+                _state.value = _state.value.copy(state = SyncState.Syncing(phase = "Descargando Excel…"))
                 val cacheBustedUrl = "${Constants.DRIVE_EXPORT_URL}&ts=${System.currentTimeMillis()}"
                 val bytes = downloadWithRetries(cacheBustedUrl)
                     ?: return@withContext SyncResult.Error(
                         if (!_state.value.isOnline) "Sin conexión a Internet"
                         else "Error de descarga desde Drive. Revisa tu conexión o inténtalo más tarde."
                     ).also {
-                        _state.value = _state.value.copy(syncPhase = null)
+                        _state.value = _state.value.copy(state = SyncState.Idle)
                     }
 
-                _state.value = _state.value.copy(syncPhase = "Procesando archivo…")
+                _state.value = _state.value.copy(state = SyncState.Syncing(phase = "Procesando archivo…"))
                 val changed = ruteroManager.saveMasterExcel(bytes)
                 if (changed) {
-                    _state.value = _state.value.copy(syncPhase = "Indexando rutas…")
+                    _state.value = _state.value.copy(state = SyncState.Syncing(phase = "Indexando rutas…"))
                     val indexOk = ruteroManager.createIndex()
                     if (indexOk) {
                         repository.clear()
-                        _state.value = _state.value.copy(syncPhase = "Actualizando promociones…")
+                        _state.value = _state.value.copy(state = SyncState.Syncing(phase = "Actualizando promociones…"))
                         promotionRepository.refresh()
-                        _state.value = _state.value.copy(syncPhase = null)
+                        _state.value = _state.value.copy(state = SyncState.Idle)
                         SyncResult.Success(true)
                     } else {
-                        _state.value = _state.value.copy(syncPhase = null)
+                        _state.value = _state.value.copy(state = SyncState.Idle)
                         SyncResult.Error("No se pudo leer el Excel")
                     }
                 } else {
-                    _state.value = _state.value.copy(syncPhase = "Actualizando promociones…")
+                    _state.value = _state.value.copy(state = SyncState.Syncing(phase = "Actualizando promociones…"))
                     promotionRepository.refresh()
-                    _state.value = _state.value.copy(syncPhase = null)
+                    _state.value = _state.value.copy(state = SyncState.Idle)
                     SyncResult.NoChange
                 }
             } catch (e: Exception) {
-                _state.value = _state.value.copy(syncPhase = null)
+                _state.value = _state.value.copy(state = SyncState.Idle)
                 SyncResult.Error(e.message ?: "Error de sincronización")
             }
         }
@@ -157,7 +163,7 @@ class SyncViewModel @Inject constructor(
 
     fun syncFromDriveWithRouteReload(currentRoute: String?) {
         syncJob?.cancel()
-        _state.value = _state.value.copy(isSyncing = true)
+        _state.value = _state.value.copy(state = SyncState.Syncing())
         syncJob = viewModelScope.launch {
             val result = performDriveSync()
             when (result) {
@@ -175,22 +181,22 @@ class SyncViewModel @Inject constructor(
                         }
                     }
                     _state.value = _state.value.copy(
-                        isSyncing = false,
+                        state = SyncState.Idle,
                         snackbarMessage = "Datos actualizados",
                     )
                 }
                 is SyncResult.Error -> {
                     _state.value = _state.value.copy(
-                        isSyncing = false,
+                        state = SyncState.Idle,
                         snackbarMessage = result.message,
                     )
                 }
                 is SyncResult.NoChange -> {
-                    _state.value = _state.value.copy(isSyncing = false)
+                    _state.value = _state.value.copy(state = SyncState.Idle)
                 }
                 is SyncResult.Offline -> {
                     _state.value = _state.value.copy(
-                        isSyncing = false,
+                        state = SyncState.Idle,
                         snackbarMessage = "Sin conexión",
                     )
                 }
@@ -201,9 +207,9 @@ class SyncViewModel @Inject constructor(
     fun loadLocalFile(uri: Uri) {
         viewModelScope.launch {
             try {
-                _state.value = _state.value.copy(isSyncing = true)
+                _state.value = _state.value.copy(state = SyncState.Syncing())
                 val success = withContext(Dispatchers.IO) {
-                    context.contentResolver.openInputStream(uri)?.use { stream ->
+                    getApplication<Application>().contentResolver.openInputStream(uri)?.use { stream ->
                         ruteroManager.saveMasterExcel(stream.readBytes())
                     } ?: false
                 }
@@ -220,24 +226,24 @@ class SyncViewModel @Inject constructor(
                             }
                         }
                         _state.value = _state.value.copy(
-                            isSyncing = false,
+                            state = SyncState.Idle,
                             snackbarMessage = "Archivo cargado correctamente",
                         )
                     } else {
                         _state.value = _state.value.copy(
-                            isSyncing = false,
+                            state = SyncState.Idle,
                             snackbarMessage = "No se pudo leer el archivo Excel",
                         )
                     }
                 } else {
                     _state.value = _state.value.copy(
-                        isSyncing = false,
+                        state = SyncState.Idle,
                         snackbarMessage = "No se pudo guardar el archivo",
                     )
                 }
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
-                    isSyncing = false,
+                    state = SyncState.Idle,
                     snackbarMessage = "Error: ${e.message}",
                 )
             }
@@ -245,7 +251,7 @@ class SyncViewModel @Inject constructor(
     }
 
     fun pasteLink() {
-        val clipboard = context.getSystemService(ClipboardManager::class.java)
+        val clipboard = getApplication<Application>().getSystemService(ClipboardManager::class.java)
         val clip = clipboard?.primaryClip
         if (clip != null && clip.itemCount > 0) {
             val text = clip.getItemAt(0).text?.toString() ?: ""
@@ -262,7 +268,7 @@ class SyncViewModel @Inject constructor(
 
     fun downloadPdf() {
         viewModelScope.launch {
-            BrandReference.descargarPdf(context)
+            brandReference.descargarPdf(getApplication<Application>())
         }
     }
 

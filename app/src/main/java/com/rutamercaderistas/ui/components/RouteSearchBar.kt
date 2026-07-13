@@ -46,8 +46,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 
 private fun normalizar(s: String): String {
@@ -63,6 +66,7 @@ fun RouteSearchBar(
     recentRoutes: List<String>,
     selectedRoute: String?,
     onRouteSelected: (String) -> Unit,
+    onSearchActiveChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var text by remember(selectedRoute) { mutableStateOf(selectedRoute ?: "") }
@@ -95,15 +99,17 @@ fun RouteSearchBar(
         }
     }
 
-    val hasResults = text.isBlank() || suggestions.isNotEmpty()
-
     LaunchedEffect(isFocused, text, suggestions) {
-        showDropdown = when {
+        val next = when {
             !isFocused -> false
             text.isNotBlank() && suggestions.isEmpty() -> true
             text.isNotBlank() -> suggestions.isNotEmpty()
             else -> recentRoutes.isNotEmpty()
         }
+        if (next != showDropdown) {
+            onSearchActiveChanged(next)
+        }
+        showDropdown = next
     }
 
     Box(modifier = modifier.fillMaxWidth()) {
@@ -154,7 +160,7 @@ fun RouteSearchBar(
                     cursorColor = MaterialTheme.colorScheme.primary,
                     focusedTextColor = MaterialTheme.colorScheme.onSurface,
                     unfocusedTextColor = if (selectedRoute != null && text == selectedRoute)
-                        Color(0xFFC62828) else MaterialTheme.colorScheme.onSurface
+                        MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                 ),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(
@@ -202,13 +208,12 @@ fun RouteSearchBar(
                     ) {
                         if (showRecent) {
                             item(key = "recent_header") {
-                                Text(
-                                    text = "Recientes",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = FontWeight.Medium,
-                                    modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp)
-                                )
+                                    Text(
+                                        text = "Recientes",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp)
+                                    )
                             }
                             items(items = recentRoutes, key = { it }) { route ->
                                 SuggestionItem(
@@ -288,10 +293,43 @@ private fun SuggestionItem(
         )
         Spacer(modifier = Modifier.width(12.dp))
         Text(
-            text = text,
+            text = highlightQuery(text, query),
             style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface
         )
     }
+}
+
+@Composable
+private fun highlightQuery(text: String, query: String): androidx.compose.ui.text.AnnotatedString {
+    if (query.isBlank()) return buildAnnotatedString { append(text) }
+    val range = findMatchRange(text, query) ?: return buildAnnotatedString { append(text) }
+    val highlightColor = MaterialTheme.colorScheme.primary
+    return buildAnnotatedString {
+        append(text.substring(0, range.first))
+        withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = highlightColor)) {
+            append(text.substring(range.first, range.last))
+        }
+        append(text.substring(range.last))
+    }
+}
+
+private fun findMatchRange(original: String, query: String): IntRange? {
+    val normOriginal = normalizar(original)
+    val normQuery = normalizar(query)
+    val normStart = normOriginal.indexOf(normQuery)
+    if (normStart < 0) return null
+
+    var origIdx = 0
+    var normIdx = 0
+    while (normIdx < normStart && origIdx < original.length) {
+        if (Character.isLetterOrDigit(original[origIdx])) normIdx++
+        origIdx++
+    }
+    val matchStart = origIdx
+
+    while (normIdx < normStart + normQuery.length && origIdx < original.length) {
+        if (Character.isLetterOrDigit(original[origIdx])) normIdx++
+        origIdx++
+    }
+    return matchStart until origIdx
 }

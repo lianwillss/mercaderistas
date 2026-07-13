@@ -1,6 +1,7 @@
 package com.rutamercaderistas.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import com.rutamercaderistas.ui.components.normalizeChain
 
 val Background = Color(0xFFF8F9FA)
 val Surface = Color(0xFFFFFFFF)
@@ -33,27 +34,25 @@ val StoreColorPurple = Color(0xFF9C27B0)
 val StoreColorPurpleSoft = Color(0xFFF3E5F5)
 
 fun storeColor(name: String): Color {
-    val n = name.trim().uppercase()
-    return when {
-        n.startsWith("JUMBO") -> AccentGreen
-        n.startsWith("LIDER") -> AccentBlue
-        n.startsWith("SISA") || n.startsWith("SANTA ISABEL") || n.startsWith("STA ISABEL") -> StoreColorFuchsia
-        n.startsWith("UNIMARC") -> StoreColorRed
-        n.startsWith("TOTTUS") -> StoreColorYellow
-        n.startsWith("ALVI") -> StoreColorPurple
+    return when (normalizeChain(name)) {
+        "JUMBO" -> AccentGreen
+        "LIDER" -> AccentBlue
+        "SANTA ISABEL" -> StoreColorFuchsia
+        "UNIMARC" -> StoreColorRed
+        "TOTTUS" -> StoreColorYellow
+        "ALVI" -> StoreColorPurple
         else -> AccentBlue
     }
 }
 
 fun storeSoftColor(name: String): Color {
-    val n = name.trim().uppercase()
-    return when {
-        n.startsWith("JUMBO") -> AccentGreenSoft
-        n.startsWith("LIDER") -> AccentBlueSoft
-        n.startsWith("SISA") || n.startsWith("SANTA ISABEL") || n.startsWith("STA ISABEL") -> StoreColorFuchsiaSoft
-        n.startsWith("UNIMARC") -> StoreColorRedSoft
-        n.startsWith("TOTTUS") -> StoreColorYellowSoft
-        n.startsWith("ALVI") -> StoreColorPurpleSoft
+    return when (normalizeChain(name)) {
+        "JUMBO" -> AccentGreenSoft
+        "LIDER" -> AccentBlueSoft
+        "SANTA ISABEL" -> StoreColorFuchsiaSoft
+        "UNIMARC" -> StoreColorRedSoft
+        "TOTTUS" -> StoreColorYellowSoft
+        "ALVI" -> StoreColorPurpleSoft
         else -> AccentBlueSoft
     }
 }

@@ -1,11 +1,14 @@
 package com.rutamercaderistas.viewmodel
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.rutamercaderistas.Constants
-import com.rutamercaderistas.data.export.RouteExporter
 import com.rutamercaderistas.data.local.PromotionEntity
+import com.rutamercaderistas.data.preferences.FileRepository
+import com.rutamercaderistas.data.preferences.PreferencesRepository
+import com.rutamercaderistas.domain.usecase.ComputeChainToLocalesUseCase
+import com.rutamercaderistas.domain.usecase.ComputeRouteBrandsUseCase
+import com.rutamercaderistas.domain.usecase.GroupPromotionsUseCase
+import com.rutamercaderistas.domain.usecase.GroupedPromotions
 import com.rutamercaderistas.models.DiaSemana
 import com.rutamercaderistas.models.EntradaRuta
 import com.rutamercaderistas.models.LocalDelDia
@@ -13,9 +16,10 @@ import com.rutamercaderistas.services.PromotionRepository
 import com.rutamercaderistas.services.RecentRoutesStore
 import com.rutamercaderistas.services.RuteroManager
 import com.rutamercaderistas.services.RuteroRepository
+import com.rutamercaderistas.ui.components.normalizeChain
+import com.rutamercaderistas.utils.normalizeBrand
 import com.rutamercaderistas.utils.cleanBrand
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,7 +28,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
-import java.io.File
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
@@ -34,37 +37,75 @@ data class PromotionDiagnostic(
     val totalPromos: Int = 0,
     val distinctBrands: Int = 0,
     val first20: String = "",
+    val chainCatalog: String = "",
     val currentLocaleResult: String = "",
 )
 
+sealed interface RouteDataState {
+    data object Initial : RouteDataState
+    data class Loaded(
+        val selectedRoute: String?,
+        val entries: List<EntradaRuta>,
+        val activeDays: List<DiaSemana>,
+        val currentDayLocales: List<LocalDelDia>,
+        val allLocales: List<LocalDelDia>,
+        val stats: RuteroRepository.Stats,
+    ) : RouteDataState
+}
+
+sealed interface PromotionsState {
+    data object Idle : PromotionsState
+    data object Loading : PromotionsState
+    data class Loaded(
+        val byBrand: Map<String, List<PromotionEntity>> = emptyMap(),
+        val marcasConPromo: Int = 0,
+        val totalPromosActivas: Int = 0,
+        val promosExpiringToday: Int = 0,
+        val promosExpiringTomorrow: Int = 0,
+        val error: String? = null,
+    ) : PromotionsState
+}
+
 data class RouteUiState(
     val routes: List<String> = emptyList(),
-    val selectedRoute: String? = null,
-    val entries: List<EntradaRuta> = emptyList(),
-    val activeDays: List<DiaSemana> = emptyList(),
-    val currentDayLocales: List<LocalDelDia> = emptyList(),
-    val allLocales: List<LocalDelDia> = emptyList(),
-    val stats: RuteroRepository.Stats = RuteroRepository.Stats(0, 0, 0),
     val recentRoutes: List<String> = emptyList(),
+    val route: RouteDataState = RouteDataState.Initial,
+    val promotions: PromotionsState = PromotionsState.Idle,
+    val chainToLocales: Map<String, String> = emptyMap(),
+    val routeBrands: Set<String> = emptySet(),
     val lastSyncRelative: String = "",
-    val promotionsByBrand: Map<String, List<PromotionEntity>> = emptyMap(),
-    val marcasConPromo: Int = 0,
-    val totalPromosActivas: Int = 0,
-    val isSyncing: Boolean = false,
-    val isDataLoaded: Boolean = false,
     val snackbarMessage: String? = null,
     val needsInitialLoad: Boolean = false,
     val promotionDiagnostic: PromotionDiagnostic? = null,
-)
+) {
+    val isDataLoaded: Boolean get() = route is RouteDataState.Loaded
+    val selectedRoute: String? get() = (route as? RouteDataState.Loaded)?.selectedRoute
+    val entries: List<EntradaRuta> get() = (route as? RouteDataState.Loaded)?.entries ?: emptyList()
+    val activeDays: List<DiaSemana> get() = (route as? RouteDataState.Loaded)?.activeDays ?: emptyList()
+    val currentDayLocales: List<LocalDelDia> get() = (route as? RouteDataState.Loaded)?.currentDayLocales ?: emptyList()
+    val allLocales: List<LocalDelDia> get() = (route as? RouteDataState.Loaded)?.allLocales ?: emptyList()
+    val stats: RuteroRepository.Stats get() = (route as? RouteDataState.Loaded)?.stats ?: RuteroRepository.Stats(0, 0, 0)
+    val isPromotionsLoading: Boolean get() = promotions is PromotionsState.Loading
+    val promotionsByBrand: Map<String, List<PromotionEntity>> get() = (promotions as? PromotionsState.Loaded)?.byBrand ?: emptyMap()
+    val marcasConPromo: Int get() = (promotions as? PromotionsState.Loaded)?.marcasConPromo ?: 0
+    val totalPromosActivas: Int get() = (promotions as? PromotionsState.Loaded)?.totalPromosActivas ?: 0
+    val promosExpiringToday: Int get() = (promotions as? PromotionsState.Loaded)?.promosExpiringToday ?: 0
+    val promosExpiringTomorrow: Int get() = (promotions as? PromotionsState.Loaded)?.promosExpiringTomorrow ?: 0
+    val promotionErrorMessage: String? get() = (promotions as? PromotionsState.Loaded)?.error
+}
 
 @HiltViewModel
 class RouteViewModel @Inject constructor(
-    @ApplicationContext private val context: Context,
+    private val fileRepository: FileRepository,
+    private val preferencesRepository: PreferencesRepository,
     private val ruteroManager: RuteroManager,
     private val recentRoutesStore: RecentRoutesStore,
-    private val routeExporter: RouteExporter,
+    private val routeExporter: com.rutamercaderistas.data.export.RouteExporter,
     private val repository: RuteroRepository,
     private val promotionRepository: PromotionRepository,
+    private val groupPromotions: GroupPromotionsUseCase,
+    private val computeChainToLocales: ComputeChainToLocalesUseCase,
+    private val computeRouteBrands: ComputeRouteBrandsUseCase,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RouteUiState())
@@ -74,28 +115,12 @@ class RouteViewModel @Inject constructor(
         observeRoutes()
         observeRecentRoutes()
         observeEntries()
-        viewModelScope.launch(Dispatchers.IO) {
-            Timber.d("=== DIAG: Cargando promociones en init ===")
-            val ok = promotionRepository.refresh()
-            val allPromos = promotionRepository.getAllPromotions()
-            Timber.d("DIAG: refresh() = %b, promos en Room = %d", ok, allPromos.size)
-            val grouped = allPromos.groupBy { it.brand.cleanBrand() }
-            Timber.d("DIAG: marcas distintas agrupadas = %d", grouped.size)
-            grouped.forEach { (brand, list) ->
-                Timber.d("DIAG:   %s → %d promos", brand, list.size)
-            }
-            _uiState.value = _uiState.value.copy(
-                promotionsByBrand = grouped,
-                marcasConPromo = grouped.count { it.value.isNotEmpty() },
-                totalPromosActivas = grouped.values.sumOf { it.size },
-            )
-        }
     }
 
     private fun observeRoutes() {
         viewModelScope.launch {
             ruteroManager.ruterosFlow.collect { routes ->
-                _uiState.value = _uiState.value.copy(routes = routes)
+                _uiState.update { it.copy(routes = routes) }
             }
         }
     }
@@ -103,7 +128,7 @@ class RouteViewModel @Inject constructor(
     private fun observeRecentRoutes() {
         viewModelScope.launch {
             recentRoutesStore.recentRoutesFlow.collect { recent ->
-                _uiState.value = _uiState.value.copy(recentRoutes = recent)
+                _uiState.update { it.copy(recentRoutes = recent) }
             }
         }
     }
@@ -117,43 +142,46 @@ class RouteViewModel @Inject constructor(
 
                 val stats = repository.getStats()
                 val allLocales = repository.getAllLocales()
+                val selectedRoute = repository.getActiveRuteroName()
+                val routeBrands = computeRouteBrands(allLocales)
+                val chainToLocales = computeChainToLocales(allLocales)
 
-                val promotions = withContext(Dispatchers.IO) {
-                    Timber.d("=== DIAG: observeEntries — recargando promos ===")
-                    promotionRepository.refresh()
-                    val allPromos = promotionRepository.getAllPromotions()
-                    Timber.d("DIAG: promos en Room = %d", allPromos.size)
-                    val grouped = allPromos.groupBy { it.brand.cleanBrand() }
-                    Timber.d("DIAG: marcas agrupadas = %d", grouped.size)
-                    grouped
+                _uiState.update { state ->
+                    val previousCurrentDayLocales = (state.route as? RouteDataState.Loaded)?.currentDayLocales ?: emptyList()
+                    state.copy(
+                        route = RouteDataState.Loaded(
+                            selectedRoute = selectedRoute,
+                            entries = entries,
+                            activeDays = activeDays,
+                            currentDayLocales = previousCurrentDayLocales,
+                            allLocales = allLocales,
+                            stats = stats,
+                        ),
+                        chainToLocales = chainToLocales,
+                        routeBrands = routeBrands,
+                        needsInitialLoad = false,
+                    )
                 }
 
-                Timber.d("=== DIAG: Cruce con locales ===")
-                allLocales.forEach { local ->
-                    val cadena = local.cadena
-                    Timber.d("DIAG: Local=\"%s\" cadena=\"%s\"", local.local, cadena)
-                    local.clientes.forEach { cliente ->
-                        val cleanName = cliente.nombre.cleanBrand()
-                        val matched = promotions[cleanName].orEmpty()
-                            .filter { cadena.isBlank() || it.chain.equals(cadena, ignoreCase = true) }
-                        Timber.d("DIAG:   Marca=\"%s\" (clean=\"%s\") → %d promos",
-                            cliente.nombre, cleanName, matched.size)
-                    }
-                }
-
-                _uiState.value = _uiState.value.copy(
-                    entries = entries,
-                    activeDays = activeDays,
-                    stats = stats,
-                    allLocales = allLocales,
-                    selectedRoute = repository.getActiveRuteroName(),
-                    promotionsByBrand = promotions,
-                    marcasConPromo = promotions.count { it.value.isNotEmpty() },
-                    totalPromosActivas = promotions.values.sumOf { it.size },
-                    isDataLoaded = entries.isNotEmpty(),
-                    needsInitialLoad = false,
-                )
+                loadCachedPromotions()
             }
+        }
+    }
+
+    private fun loadCachedPromotions() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val cached = promotionRepository.getAllPromotions()
+            if (cached.isEmpty()) return@launch
+            val result = groupPromotions(cached)
+            _uiState.update { it.copy(
+                promotions = PromotionsState.Loaded(
+                    byBrand = result.promotionsByBrand,
+                    marcasConPromo = result.marcasConPromo,
+                    totalPromosActivas = result.totalPromosActivas,
+                    promosExpiringToday = result.promosExpiringToday,
+                    promosExpiringTomorrow = result.promosExpiringTomorrow,
+                ),
+            )}
         }
     }
 
@@ -161,41 +189,91 @@ class RouteViewModel @Inject constructor(
         viewModelScope.launch {
             val index = withContext(Dispatchers.IO) { ruteroManager.loadIndex() }
             if (index.isNotEmpty()) {
-                val prefs = context.getSharedPreferences(Constants.PREFS_NAME, Context.MODE_PRIVATE)
-                val lastRoute = prefs.getString(Constants.KEY_RUTERO, null)
+                val lastRoute = preferencesRepository.getSelectedRoute()
                 val route = if (lastRoute != null && index.contains(lastRoute)) lastRoute
                 else index.first()
                 selectRoute(route)
             } else {
-                val excelFile = File(context.filesDir, RuteroManager.EXCEL_FILE_NAME)
-                if (!excelFile.exists()) {
-                    _uiState.value = _uiState.value.copy(needsInitialLoad = true)
+                if (!fileRepository.excelExists()) {
+                    _uiState.update { it.copy(needsInitialLoad = true) }
                 }
             }
             updateSyncLabel()
+            loadPromotions()
+        }
+    }
+
+    private fun updatePromotionState(grouped: GroupedPromotions) {
+        _uiState.update { it.copy(
+            promotions = PromotionsState.Loaded(
+                byBrand = grouped.promotionsByBrand,
+                marcasConPromo = grouped.marcasConPromo,
+                totalPromosActivas = grouped.totalPromosActivas,
+                promosExpiringToday = grouped.promosExpiringToday,
+                promosExpiringTomorrow = grouped.promosExpiringTomorrow,
+            ),
+        )}
+    }
+
+    private fun loadPromotions() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val cached = promotionRepository.getAllPromotions()
+                if (cached.isNotEmpty()) {
+                    updatePromotionState(groupPromotions(cached))
+                } else {
+                    _uiState.update { it.copy(promotions = PromotionsState.Loading) }
+                }
+                val ok = promotionRepository.refresh()
+                val all = promotionRepository.getAllPromotions()
+                updatePromotionState(groupPromotions(all))
+                _uiState.update { it.copy(
+                    promotions = when (val p = _uiState.value.promotions) {
+                        is PromotionsState.Loaded -> p.copy(error = if (ok) null else "No se pudieron descargar las promociones")
+                        else -> PromotionsState.Loaded(error = if (ok) null else "No se pudieron descargar las promociones")
+                    },
+                )}
+            } catch (e: Exception) {
+                Timber.w(e, "Error cargando promociones")
+                _uiState.update { state ->
+                    state.copy(
+                        promotions = when (state.promotions) {
+                            is PromotionsState.Loading -> PromotionsState.Idle
+                            else -> state.promotions
+                        },
+                    )
+                }
+            }
         }
     }
 
     fun selectRoute(rutero: String) {
         viewModelScope.launch {
             try {
-                _uiState.value = _uiState.value.copy(isSyncing = true)
                 val entries = ruteroManager.loadRoute(rutero)
                 if (entries.isNotEmpty()) {
-                    prefs.edit().putString(Constants.KEY_RUTERO, rutero).apply()
+                    preferencesRepository.setSelectedRoute(rutero)
                     repository.setEntries(entries, rutero)
                     recentRoutesStore.addRoute(rutero)
+                    val activeDays = DiaSemana.todos().filter { repository.hasAnyVisitOnDay(it) }
                     val stats = repository.getStats()
                     val allLocales = repository.getAllLocales()
-                    _uiState.value = _uiState.value.copy(
-                        selectedRoute = rutero,
-                        stats = stats,
-                        allLocales = allLocales,
-                        isSyncing = false,
-                    )
+                    val currentDay = activeDays.firstOrNull()
+                    val currentDayLocales = if (currentDay != null)
+                        repository.getLocalesForDay(currentDay) else emptyList()
+                    _uiState.update { it.copy(
+                        route = RouteDataState.Loaded(
+                            selectedRoute = rutero,
+                            entries = entries,
+                            activeDays = activeDays,
+                            currentDayLocales = currentDayLocales,
+                            allLocales = allLocales,
+                            stats = stats,
+                        ),
+                    )}
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(isSyncing = false)
+                Timber.w(e, "Error selecting route")
             }
         }
     }
@@ -203,14 +281,18 @@ class RouteViewModel @Inject constructor(
     fun setCurrentDay(dia: DiaSemana?) {
         if (dia == null) return
         val locales = repository.getLocalesForDay(dia)
-        _uiState.value = _uiState.value.copy(currentDayLocales = locales)
+        _uiState.update { state ->
+            val currentRoute = state.route
+            if (currentRoute is RouteDataState.Loaded) {
+                state.copy(route = currentRoute.copy(currentDayLocales = locales))
+            } else state
+        }
     }
 
     fun updateSyncLabel() {
-        val excelFile = File(context.filesDir, RuteroManager.EXCEL_FILE_NAME)
-        val label = if (!excelFile.exists()) "hoy"
+        val label = if (!fileRepository.excelExists()) "hoy"
         else {
-            val modified = Instant.ofEpochMilli(excelFile.lastModified())
+            val modified = Instant.ofEpochMilli(fileRepository.excelLastModified())
             val now = Instant.now()
             val minutes = ChronoUnit.MINUTES.between(modified, now)
             val hours = ChronoUnit.HOURS.between(modified, now)
@@ -222,11 +304,7 @@ class RouteViewModel @Inject constructor(
                 else -> "hace $days d"
             }
         }
-        _uiState.value = _uiState.value.copy(lastSyncRelative = label)
-    }
-
-    private val prefs by lazy {
-        context.getSharedPreferences(Constants.PREFS_NAME, Context.MODE_PRIVATE)
+        _uiState.update { it.copy(lastSyncRelative = label) }
     }
 
     fun getShareText(): String {
@@ -249,7 +327,7 @@ class RouteViewModel @Inject constructor(
     fun exportRoute() {
         val s = _uiState.value
         val name = s.selectedRoute ?: run {
-            _uiState.value = _uiState.value.copy(snackbarMessage = "Selecciona una ruta primero")
+            _uiState.update { it.copy(snackbarMessage = "Selecciona una ruta primero") }
             return
         }
         viewModelScope.launch {
@@ -258,16 +336,16 @@ class RouteViewModel @Inject constructor(
                 try {
                     routeExporter.shareImage(file, name)
                 } catch (e: Exception) {
-                    _uiState.value = _uiState.value.copy(snackbarMessage = "Error al compartir: ${e.message}")
+                    _uiState.update { it.copy(snackbarMessage = "Error al compartir: ${e.message}") }
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(snackbarMessage = "Error al exportar: ${e.message}")
+                _uiState.update { it.copy(snackbarMessage = "Error al exportar: ${e.message}") }
             }
         }
     }
 
     fun clearSnackbar() {
-        _uiState.value = _uiState.value.copy(snackbarMessage = null)
+        _uiState.update { it.copy(snackbarMessage = null) }
     }
 
     fun loadPromotionDiagnostic() {
@@ -280,25 +358,47 @@ class RouteViewModel @Inject constructor(
                 "  [${p.brand}] ${p.productName} — ${p.price} (${p.startDate} → ${p.endDate})"
             }
 
+            val chainCatalog = allPromos
+                .groupBy { normalizeChain(it.chain) }
+                .map { (chain, promos) ->
+                    val byBrand = promos.groupBy { it.brand.cleanBrand() }
+                    buildString {
+                        appendLine("═══ $chain (${promos.size} promo${if (promos.size != 1) "nes" else ""}) ═══")
+                        byBrand.forEach { (brand, bp) ->
+                            appendLine("    $brand → ${bp.size} promo${if (bp.size != 1) "nes" else ""}:")
+                            bp.forEach { p -> appendLine("      - ${p.productName} (${p.price})") }
+                        }
+                    }
+                }.joinToString("\n")
+
             val s = _uiState.value
-            val cadena = if (s.currentDayLocales.isNotEmpty()) s.currentDayLocales.first().cadena else ""
-            val currentLocaleResult = s.currentDayLocales.take(3).joinToString("\n\n") { local ->
-                val lines = mutableListOf("• ${local.local} (cadena: \"${local.cadena}\")")
+            val currentLocaleResult = s.currentDayLocales.joinToString("\n\n") { local ->
+                val norm = normalizeChain(local.cadena)
+                val lines = mutableListOf("• ${local.local} (cadena: \"${local.cadena}\" → \"$norm\")")
                 local.clientes.forEach { cliente ->
-                    val clean = cliente.nombre.cleanBrand()
+                    val clean = normalizeBrand(cliente.nombre).cleanBrand()
                     val promos = s.promotionsByBrand[clean].orEmpty()
-                        .filter { local.cadena.isBlank() || it.chain.equals(local.cadena, ignoreCase = true) }
-                    lines.add("    ${cliente.nombre} → ${promos.size} promos")
+                        .filter { local.cadena.isBlank() || normalizeChain(it.chain) == norm }
+                    lines.add("    ${cliente.nombre} → ${promos.size} promo${if (promos.size != 1) "nes" else ""}")
                     promos.forEach { p ->
-                        lines.add("      - ${p.productName}")
+                        lines.add("      - ${p.productName} (${p.price})")
                     }
                 }
                 lines.joinToString("\n")
             }
 
             val lastUpdatedStr = if (lastUpdated > 0) {
-                val f = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
-                f.format(java.util.Date(lastUpdated))
+                val modified = Instant.ofEpochMilli(lastUpdated)
+                val now = Instant.now()
+                val minutes = ChronoUnit.MINUTES.between(modified, now)
+                val hours = ChronoUnit.HOURS.between(modified, now)
+                val days = ChronoUnit.DAYS.between(modified, now)
+                when {
+                    minutes < 1 -> "ahora"
+                    minutes < 60 -> "hace $minutes min"
+                    hours < 24 -> "hace $hours h"
+                    else -> "hace $days d"
+                }
             } else "Nunca"
 
             _uiState.update {
@@ -307,13 +407,58 @@ class RouteViewModel @Inject constructor(
                     totalPromos = allPromos.size,
                     distinctBrands = distinctBrands,
                     first20 = first20,
+                    chainCatalog = chainCatalog,
                     currentLocaleResult = currentLocaleResult,
                 ))
             }
         }
     }
 
+    fun refreshPromotions() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val cached = promotionRepository.getAllPromotions()
+                if (cached.isNotEmpty()) {
+                    updatePromotionState(groupPromotions(cached))
+                } else {
+                    _uiState.update { it.copy(promotions = PromotionsState.Loading) }
+                }
+                val ok = promotionRepository.refresh()
+                val all = promotionRepository.getAllPromotions()
+                val grouped = groupPromotions(all)
+                val chainToLocales = computeChainToLocales(_uiState.value.allLocales)
+                updatePromotionState(grouped)
+                _uiState.update { it.copy(
+                    chainToLocales = chainToLocales,
+                    promotions = when (val p = _uiState.value.promotions) {
+                        is PromotionsState.Loaded -> p.copy(error = if (ok) null else "No se pudieron descargar las promociones")
+                        else -> PromotionsState.Loaded(error = if (ok) null else "No se pudieron descargar las promociones")
+                    },
+                )}
+            } catch (e: Exception) {
+                Timber.w(e, "Error refrescando promociones")
+                _uiState.update { state ->
+                    state.copy(
+                        promotions = when (state.promotions) {
+                            is PromotionsState.Loading -> PromotionsState.Idle
+                            else -> state.promotions
+                        },
+                    )
+                }
+            }
+        }
+    }
+
     fun clearDiagnostic() {
         _uiState.update { it.copy(promotionDiagnostic = null) }
+    }
+
+    fun clearPromotionError() {
+        _uiState.update { it.copy(
+            promotions = when (val p = _uiState.value.promotions) {
+                is PromotionsState.Loaded -> p.copy(error = null)
+                else -> p
+            },
+        )}
     }
 }

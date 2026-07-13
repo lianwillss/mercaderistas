@@ -56,8 +56,7 @@ fun FilterChipsSection(
             ) {
                 Text(
                     text = "Todas",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Medium,
+                    style = MaterialTheme.typography.labelLarge,
                     color = textColor
                 )
             }
@@ -88,8 +87,8 @@ fun FilterChipsSection(
             ) {
                 Text(
                     text = brand,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                    style = if (isSelected) MaterialTheme.typography.titleSmall
+                        else MaterialTheme.typography.labelLarge,
                     color = textColor
                 )
             }

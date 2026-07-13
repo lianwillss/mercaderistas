@@ -1,12 +1,5 @@
 package com.rutamercaderistas.ui.components
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,19 +21,21 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.rutamercaderistas.services.RuteroRepository
+import com.rutamercaderistas.ui.theme.StoreColorRed
 
 @Composable
 fun StatsCards(
     stats: RuteroRepository.Stats,
+    modifier: Modifier = Modifier,
     onLocalesClick: () -> Unit = {},
     onMarcasClick: () -> Unit = {},
     marcasConPromo: Int = 0,
-    modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier
@@ -68,10 +63,9 @@ fun StatsCards(
             badge = if (marcasConPromo > 0) {
                 {
                     Text(
-                        text = "${marcasConPromo} con promo",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFFE53935),
+                        text = "$marcasConPromo con promo",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = StoreColorRed,
                     )
                 }
             } else null
@@ -92,10 +86,10 @@ private fun StatCard(
     icon: ImageVector,
     value: Int,
     label: String,
-    containerColor: androidx.compose.ui.graphics.Color,
-    iconColor: androidx.compose.ui.graphics.Color,
-    onClick: () -> Unit = {},
+    containerColor: Color,
+    iconColor: Color,
     modifier: Modifier = Modifier,
+    onClick: () -> Unit = {},
     badge: (@Composable () -> Unit)? = null,
 ) {
     Card(
@@ -118,21 +112,11 @@ private fun StatCard(
                 modifier = Modifier.size(12.dp)
             )
             Spacer(modifier = Modifier.height(3.dp))
-            AnimatedContent(
-                targetState = value,
-                transitionSpec = {
-                    (fadeIn(tween(300)) + slideInVertically(tween(300)) { -it / 4 }) togetherWith
-                        (fadeOut(tween(200)) + slideOutVertically(tween(200)) { it / 4 })
-                },
-                label = "stat_value"
-            ) { targetValue ->
-                Text(
-                    text = "$targetValue",
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
+            Text(
+                text = "$value",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
             if (badge != null) {
                 Spacer(modifier = Modifier.height(2.dp))
                 badge()

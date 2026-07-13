@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
@@ -45,11 +44,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.models.BrandReference
 import com.rutamercaderistas.models.DiaSemana
 import com.rutamercaderistas.ui.components.DaySelector
@@ -59,6 +60,7 @@ import com.rutamercaderistas.ui.components.ShimmerDaySelector
 import com.rutamercaderistas.ui.components.ShimmerLoadingContent
 import com.rutamercaderistas.ui.components.ShimmerStatsCards
 import com.rutamercaderistas.ui.components.StatsCards
+import com.rutamercaderistas.ui.components.PromoDaySection
 import com.rutamercaderistas.ui.components.StoreCard
 import com.rutamercaderistas.util.openMaps
 import com.rutamercaderistas.viewmodel.PromotionDiagnostic
@@ -73,6 +75,8 @@ import java.time.LocalDate
 fun MainScreen(
     routeViewModel: RouteViewModel,
     syncViewModel: SyncViewModel,
+    brandReference: BrandReference,
+    preferencesRepository: PreferencesRepository,
     modifier: Modifier = Modifier,
     onCheckUpdate: () -> Unit = {},
 ) {
@@ -80,6 +84,11 @@ fun MainScreen(
     val syncState by syncViewModel.state.collectAsState()
     val ctx = LocalContext.current
     val navController = rememberNavController()
+
+    var transportMode by remember { mutableStateOf("transit") }
+    LaunchedEffect(Unit) {
+        transportMode = preferencesRepository.getTransportMode() ?: "transit"
+    }
 
     NavHost(
         navController = navController,
@@ -92,6 +101,8 @@ fun MainScreen(
                 syncState = syncState,
                 routeViewModel = routeViewModel,
                 syncViewModel = syncViewModel,
+                brandReference = brandReference,
+                transportMode = transportMode,
                 onCheckUpdate = onCheckUpdate,
                 onNavigateToAllLocales = {
                     navController.navigate("all_locales") {
@@ -111,16 +122,19 @@ fun MainScreen(
             )
         }
         composable(
-            "all_locales",
+            "all_locales?brand={brand}",
+            arguments = listOf(navArgument("brand") { defaultValue = ""; type = NavType.StringType }),
             enterTransition = { slideInVertically { it } },
             exitTransition = { slideOutVertically { it } },
             popEnterTransition = { slideInVertically { -it } },
             popExitTransition = { slideOutVertically { it } },
-        ) {
+        ) { backStackEntry ->
+            val brand = backStackEntry.arguments?.getString("brand") ?: ""
             AllLocalesScreen(
                 locales = routeState.allLocales,
                 onClose = { navController.popBackStack() },
-                onAddressClick = { address -> openMaps(ctx, address) },
+                onAddressClick = { address -> openMaps(ctx, address, transportMode) },
+                initialSearch = brand,
             )
         }
         composable(
@@ -132,7 +146,39 @@ fun MainScreen(
         ) {
             PromotionsOverviewScreen(
                 promotionsByBrand = routeState.promotionsByBrand,
+                chainToLocales = routeState.chainToLocales,
                 onClose = { navController.popBackStack() },
+                onRefresh = {
+                    routeViewModel.refreshPromotions()
+                    syncViewModel.syncFromDriveWithRouteReload(routeState.selectedRoute)
+                },
+                isRefreshing = routeState.isPromotionsLoading,
+                onPromoClick = { brandName ->
+                    navController.navigate("all_locales?brand=$brandName") {
+                        popUpTo("main") { inclusive = false }
+                    }
+                },
+                promotionErrorMessage = routeState.promotionErrorMessage,
+                onDismissError = { routeViewModel.clearPromotionError() },
+                routeBrands = routeState.routeBrands,
+                onSharePromo = { promo ->
+                    val text = buildString {
+                        appendLine("\uD83D\uDCE3 ${promo.productName}")
+                        if (promo.price.isNotBlank()) appendLine("\uD83D\uDCB0 ${promo.price}")
+                        if (promo.chain.isNotBlank()) appendLine("\uD83C\uDFEA ${promo.chain}")
+                        if (promo.brand.isNotBlank()) appendLine("\uD83C\uDFF7 ${promo.brand}")
+                        if (promo.startDate.isNotBlank() || promo.endDate.isNotBlank()) {
+                            append("\uD83D\uDCC5 ")
+                            if (promo.startDate.isNotBlank()) append("${promo.startDate} → ")
+                            appendLine(promo.endDate)
+                        }
+                    }
+                    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(android.content.Intent.EXTRA_TEXT, text.trimEnd())
+                    }
+                    ctx.startActivity(android.content.Intent.createChooser(intent, "Compartir promoción"))
+                },
             )
         }
         composable(
@@ -154,6 +200,8 @@ private fun MainRoute(
     syncState: SyncUiState,
     routeViewModel: RouteViewModel,
     syncViewModel: SyncViewModel,
+    brandReference: BrandReference,
+    transportMode: String,
     onCheckUpdate: () -> Unit,
     onNavigateToAllLocales: () -> Unit,
     onNavigateToPromotions: () -> Unit,
@@ -169,6 +217,7 @@ private fun MainRoute(
     val isSyncing = syncState.isSyncing
     val ctx = LocalContext.current
 
+    var searchActive by remember { mutableStateOf(false) }
     var showPromoDiagnostic by remember { mutableStateOf(false) }
     val diagnostic = routeState.promotionDiagnostic
 
@@ -201,7 +250,6 @@ private fun MainRoute(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .statusBarsPadding()
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             HeaderSection(
@@ -219,6 +267,8 @@ private fun MainRoute(
                     routeViewModel.loadPromotionDiagnostic()
                     showPromoDiagnostic = true
                 },
+                promosExpiringToday = routeState.promosExpiringToday,
+                promosExpiringTomorrow = routeState.promosExpiringTomorrow,
             )
 
             if (isSyncing) {
@@ -245,9 +295,10 @@ private fun MainRoute(
                 recentRoutes = recentRoutes,
                 selectedRoute = selectedRoute,
                 onRouteSelected = { route -> routeViewModel.selectRoute(route) },
+                onSearchActiveChanged = { searchActive = it },
             )
 
-            if (isDataLoaded && recentRoutes.isNotEmpty()) {
+            if (isDataLoaded && recentRoutes.isNotEmpty() && !searchActive) {
                 RecentRoutesRow(
                     routes = recentRoutes.take(5),
                     selectedRoute = selectedRoute,
@@ -290,6 +341,7 @@ private fun MainRoute(
                 PullToRefreshBox(
                     isRefreshing = isSyncing,
                     onRefresh = {
+                        routeViewModel.refreshPromotions()
                         syncViewModel.syncFromDriveWithRouteReload(selectedRoute)
                         onCheckUpdate()
                     },
@@ -315,6 +367,37 @@ private fun MainRoute(
                                 }
                             }
                         } else {
+                            if (!syncState.isOnline) {
+                                item(key = "offline_badge") {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 24.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                                .padding(horizontal = 10.dp, vertical = 5.dp),
+                                        ) {
+                                            Text(
+                                                text = "\uD83D\uDCE6 Sin conexi\u00F3n \u00B7 datos locales",
+                                                style = MaterialTheme.typography.labelLarge,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            item(key = "promo_day") {
+                                PromoDaySection(
+                                    locales = locales,
+                                    promotionsByBrand = routeState.promotionsByBrand,
+                                    modifier = Modifier.padding(horizontal = 20.dp),
+                                    isRefreshing = isSyncing,
+                                )
+                            }
             itemsIndexed(
                 items = locales,
                 key = { _, local -> local.codigo + local.local },
@@ -325,9 +408,16 @@ private fun MainRoute(
                     marcaResaltada = null,
                     promotionsByBrand = routeState.promotionsByBrand,
                     onBrandClick = { brandName ->
-                        BrandReference.openPdfForBrand(ctx, brandName)
+                        brandReference.openPdfForBrand(ctx, brandName)
                     },
-                    onAddressClick = { address -> openMaps(ctx, address) },
+                    onAddressClick = { address -> openMaps(ctx, address, transportMode) },
+                    onShareLocal = { text ->
+                        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(android.content.Intent.EXTRA_TEXT, text)
+                        }
+                        ctx.startActivity(android.content.Intent.createChooser(intent, "Compartir local"))
+                    },
                     modifier = Modifier.padding(horizontal = 20.dp),
                 )
             }
@@ -402,7 +492,18 @@ private fun PromotionDiagnosticDialog(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "Cruce con local actual:",
+                    text = "Catálogo por cadena:",
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    text = diagnostic.chainCatalog,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = "Cruce con locales del día (${diagnostic.currentLocaleResult.count { it == '•' }} locales):",
                     style = MaterialTheme.typography.titleSmall,
                 )
                 Text(

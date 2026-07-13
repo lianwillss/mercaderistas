@@ -28,4 +28,7 @@ interface PromotionDao {
 
     @Query("SELECT * FROM promotions")
     suspend fun getAll(): List<PromotionEntity>
+
+    @Query("DELETE FROM promotions WHERE endDate < :today")
+    suspend fun deleteExpired(today: String): Int
 }

@@ -2,14 +2,15 @@ package com.rutamercaderistas.models
 
 import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
 import android.widget.Toast
+import com.rutamercaderistas.data.preferences.BrandPagesRepository
 import timber.log.Timber
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.snackbar.Snackbar
 import com.rutamercaderistas.PdfViewerActivity
 import com.rutamercaderistas.utils.normalizeMarca
 import androidx.lifecycle.lifecycleScope
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -17,12 +18,18 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import javax.inject.Inject
+import javax.inject.Singleton
 
-object BrandReference {
-
-    val PDF_FILE_NAME get() = PdfDownloader.PDF_FILE_NAME
-
-    const val PAGES_PER_BRAND = 6
+@Singleton
+class BrandReference @Inject constructor(
+    private val brandPagesRepository: BrandPagesRepository,
+    @ApplicationContext private val appContext: Context,
+) {
+    companion object {
+        val PDF_FILE_NAME get() = PdfDownloader.PDF_FILE_NAME
+        const val PAGES_PER_BRAND = 6
+    }
 
     private val brandPages = mapOf(
         "ABEJA DORADA" to 8, "ALUSWEET" to 9, "ASMODEE" to 11,
@@ -68,20 +75,19 @@ object BrandReference {
         result
     }
 
-    private var prefs: SharedPreferences? = null
-    private val detectedPages = mutableMapOf<String, Int>()
+    private val detectedPages = ConcurrentHashMap<String, Int>()
     private val lastTapTime = ConcurrentHashMap<String, Long>()
 
-    fun init(context: Context) {
-        prefs = context.applicationContext.getSharedPreferences("brand_pages", Context.MODE_PRIVATE)
-        detectedPages.clear()
-        prefs?.all?.forEach { (key, value) ->
-            if (value is Int) detectedPages[key] = value
-        }
-        Timber.d("init: %d marcas detectadas cargadas", detectedPages.size)
-    }
-
     private val fallbackScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    init {
+        fallbackScope.launch(Dispatchers.IO) {
+            val all = brandPagesRepository.getAll()
+            if (all.isNotEmpty()) {
+                detectedPages.putAll(all)
+            }
+        }
+    }
 
     private fun scope(context: Context): CoroutineScope {
         return (context as? AppCompatActivity)?.lifecycleScope ?: fallbackScope
@@ -105,9 +111,9 @@ object BrandReference {
         return false
     }
 
-    private fun saveDetectedPage(normalizedName: String, page: Int) {
+    private suspend fun saveDetectedPage(normalizedName: String, page: Int) {
         detectedPages[normalizedName] = page
-        prefs?.edit()?.putInt(normalizedName, page)?.apply()
+        brandPagesRepository.set(normalizedName, page)
     }
 
     fun getThumbnailFile(context: Context, brandName: String): File? {

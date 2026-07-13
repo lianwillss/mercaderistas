@@ -28,13 +28,18 @@ class RecentRoutesStore(private val context: Context) {
     }
 
     suspend fun addRoute(rutero: String) {
-        val current = recentRoutesFlow.first().toMutableList()
-        current.remove(rutero)
-        current.add(0, rutero)
-        val trimmed = current.take(MAX_RECENTES)
-        val json = org.json.JSONArray(trimmed).toString()
         context.recentRoutesDataStore.edit { prefs ->
-            prefs[RECENT_ROUTES_KEY] = json
+            val current = prefs[RECENT_ROUTES_KEY]?.let { json ->
+                try {
+                    val arr = org.json.JSONArray(json)
+                    (0 until arr.length()).map { arr.getString(it) }
+                } catch (_: Exception) { null }
+            } ?: emptyList()
+            val updated = current.toMutableList().apply {
+                remove(rutero)
+                add(0, rutero)
+            }.take(MAX_RECENTES)
+            prefs[RECENT_ROUTES_KEY] = org.json.JSONArray(updated).toString()
         }
     }
 

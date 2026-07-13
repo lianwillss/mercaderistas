@@ -1,8 +1,11 @@
 package com.rutamercaderistas.data.network
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
+import java.net.URI
 import java.net.URL
 import java.net.UnknownHostException
 
@@ -11,7 +14,7 @@ suspend fun downloadBytes(
     connectTimeout: Int = 30_000,
     readTimeout: Int = 60_000,
     maxRedirects: Int = 5,
-): Result<ByteArray> {
+): Result<ByteArray> = withContext(Dispatchers.IO) {
     var currentUrl = url
     var limit = maxRedirects
     while (limit > 0) {
@@ -31,23 +34,31 @@ suspend fun downloadBytes(
                 status == HttpURLConnection.HTTP_SEE_OTHER ||
                 status == 307 || status == 308
             ) {
-                currentUrl = conn.getHeaderField("Location") ?: return Result.failure(Exception("Redirect sin Location"))
+                currentUrl = conn.getHeaderField("Location")
+                    ?: return@withContext Result.failure(Exception("Redirect sin Location"))
+                if (!currentUrl.startsWith("http://") && !currentUrl.startsWith("https://")) {
+                    try {
+                        currentUrl = URI(url).resolve(currentUrl).toString()
+                    } catch (_: Exception) {
+                        return@withContext Result.failure(Exception("Redirect inválido: $currentUrl"))
+                    }
+                }
                 limit--
                 continue
             }
-            return Result.success(conn.inputStream.use { it.readBytes() })
+            return@withContext Result.success(conn.inputStream.use { it.readBytes() })
         } catch (e: SocketTimeoutException) {
             Timber.w(e, "Timeout conectando a %s", currentUrl)
-            return Result.failure(e)
+            return@withContext Result.failure(e)
         } catch (e: UnknownHostException) {
             Timber.w(e, "Sin conexión a %s", currentUrl)
-            return Result.failure(e)
+            return@withContext Result.failure(e)
         } catch (e: Exception) {
             Timber.w(e, "Error descargando %s", currentUrl)
-            return Result.failure(e)
+            return@withContext Result.failure(e)
         } finally {
             conn?.disconnect()
         }
     }
-    return Result.failure(Exception("Demasiados redirects"))
+    return@withContext Result.failure(Exception("Demasiados redirects"))
 }

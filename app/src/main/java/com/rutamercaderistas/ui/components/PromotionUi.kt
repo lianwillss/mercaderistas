@@ -1,6 +1,7 @@
 package com.rutamercaderistas.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -17,22 +19,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.rutamercaderistas.data.local.PromotionEntity
+import com.rutamercaderistas.ui.DateFormatters
 import com.rutamercaderistas.ui.theme.AccentBlue
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 @Composable
-fun PromotionBadge(count: Int) {
+fun PromotionBadge(
+    count: Int,
+    expanded: Boolean = false,
+    onClick: () -> Unit = {},
+) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
-            .background(Color(0x22FF6B6B))
+            .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f))
+            .clickable(onClick = onClick)
             .padding(horizontal = 5.dp, vertical = 2.dp)
     ) {
         Row(
@@ -41,28 +46,28 @@ fun PromotionBadge(count: Int) {
         ) {
             Text(text = "\uD83D\uDD25", style = MaterialTheme.typography.labelSmall)
             Text(
-                text = "${count} promo${if (count != 1) "nes" else ""}",
+                text = "${count} promo${if (count != 1) "s" else ""}",
                 style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFFE53935),
+                color = MaterialTheme.colorScheme.error,
             )
+            if (expanded) {
+                Text(
+                    text = "▲",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
         }
     }
 }
 
-private val dateFormatter = DateTimeFormatter.ofPattern("d MMM", Locale("es"))
-
-private fun formatDate(iso: String): String {
-    return try {
-        LocalDate.parse(iso).format(dateFormatter)
-    } catch (_: Exception) {
-        iso
-    }
-}
+private fun formatDate(iso: String): String = DateFormatters.formatFull(iso)
 
 @Composable
 fun PromotionList(
     promotions: List<PromotionEntity>,
     marginStart: Dp = 0.dp,
+    showChain: Boolean = false,
 ) {
     Column(
         modifier = Modifier
@@ -71,47 +76,58 @@ fun PromotionList(
     ) {
         promotions.forEachIndexed { index, promo ->
             if (index > 0) {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(8.dp))
             }
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 22.dp, top = 3.dp, bottom = 1.dp),
-                verticalAlignment = Alignment.Top
+                    .padding(start = 22.dp),
             ) {
                 Text(
-                    text = "\u2022",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(end = 6.dp)
+                    text = promo.productName,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = promo.productName,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Column(
-                        modifier = Modifier.padding(top = 1.dp),
+                if (showChain && promo.chain.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(chainColor(promo.chain).copy(alpha = 0.12f))
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
                     ) {
-                        if (promo.price.isNotBlank()) {
-                            Text(
-                                text = promo.price,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = AccentBlue,
-                            )
-                        }
+                        Text(
+                            text = promo.chain.uppercase(),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = chainColor(promo.chain),
+                        )
+                    }
+                }
+                if (promo.price.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = promo.price,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = AccentBlue,
+                    )
+                }
+                if (promo.endDate.isNotBlank() || promo.startDate.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(1.dp))
+                    val dateText = buildString {
+                        if (promo.startDate.isNotBlank()) append(formatDate(promo.startDate))
                         if (promo.endDate.isNotBlank()) {
-                            Text(
-                                text = "Hasta ${formatDate(promo.endDate)}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            if (isNotEmpty()) append(" → ")
+                            append(formatDate(promo.endDate))
                         }
                     }
+                    Text(
+                        text = dateText,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontStyle = FontStyle.Italic,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }

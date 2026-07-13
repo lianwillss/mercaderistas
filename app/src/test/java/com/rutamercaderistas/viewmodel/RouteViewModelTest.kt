@@ -1,18 +1,23 @@
 package com.rutamercaderistas.viewmodel
 
-import android.content.Context
-import android.content.SharedPreferences
-import com.rutamercaderistas.Constants
 import com.rutamercaderistas.data.export.RouteExporter
+import com.rutamercaderistas.data.local.PromotionEntity
+import com.rutamercaderistas.data.preferences.FileRepository
+import com.rutamercaderistas.data.preferences.PreferencesRepository
+import com.rutamercaderistas.domain.usecase.ComputeChainToLocalesUseCase
+import com.rutamercaderistas.domain.usecase.ComputeRouteBrandsUseCase
+import com.rutamercaderistas.domain.usecase.CountExpiringPromotionsUseCase
+import com.rutamercaderistas.domain.usecase.GroupPromotionsUseCase
 import com.rutamercaderistas.models.DiaSemana
 import com.rutamercaderistas.models.EntradaRuta
+import com.rutamercaderistas.services.PromotionRepository
 import com.rutamercaderistas.services.RecentRoutesStore
 import com.rutamercaderistas.services.RuteroManager
 import com.rutamercaderistas.services.RuteroRepository
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -20,33 +25,33 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
+import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
-import java.io.File
 
 class RouteViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
-    private lateinit var context: Context
-    private lateinit var prefs: SharedPreferences
-    private lateinit var prefsEditor: SharedPreferences.Editor
+    private lateinit var fileRepository: FileRepository
+    private lateinit var preferencesRepository: PreferencesRepository
     private lateinit var ruteroManager: RuteroManager
     private lateinit var recentRoutesStore: RecentRoutesStore
     private lateinit var routeExporter: RouteExporter
     private lateinit var repository: RuteroRepository
+    private lateinit var promotionRepository: PromotionRepository
+    private lateinit var groupPromotions: GroupPromotionsUseCase
+    private lateinit var computeChainToLocales: ComputeChainToLocalesUseCase
+    private lateinit var computeRouteBrands: ComputeRouteBrandsUseCase
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
 
-        prefsEditor = mockk(relaxed = true)
-        prefs = mockk {
-            every { edit() } returns prefsEditor
-            every { getString(any(), any()) } returns null
+        fileRepository = mockk(relaxed = true) {
+            every { excelExists() } returns true
         }
-        context = mockk(relaxed = true) {
-            every { getSharedPreferences(Constants.PREFS_NAME, Context.MODE_PRIVATE) } returns prefs
-            every { filesDir } returns File(System.getProperty("java.io.tmpdir"))
+        preferencesRepository = mockk(relaxed = true) {
+            coEvery { getSelectedRoute() } returns null
         }
         ruteroManager = mockk(relaxed = true)
         recentRoutesStore = mockk(relaxed = true) {
@@ -54,12 +59,32 @@ class RouteViewModelTest {
         }
         routeExporter = mockk(relaxed = true)
         repository = RuteroRepository()
+        promotionRepository = mockk(relaxed = true) {
+            coEvery { getAllPromotions() } returns emptyList()
+            coEvery { refresh() } returns true
+        }
+        groupPromotions = GroupPromotionsUseCase(CountExpiringPromotionsUseCase())
+        computeChainToLocales = ComputeChainToLocalesUseCase()
+        computeRouteBrands = ComputeRouteBrandsUseCase()
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
     }
+
+    private fun createViewModel() = RouteViewModel(
+        fileRepository = fileRepository,
+        preferencesRepository = preferencesRepository,
+        ruteroManager = ruteroManager,
+        recentRoutesStore = recentRoutesStore,
+        routeExporter = routeExporter,
+        repository = repository,
+        promotionRepository = promotionRepository,
+        groupPromotions = groupPromotions,
+        computeChainToLocales = computeChainToLocales,
+        computeRouteBrands = computeRouteBrands,
+    )
 
     @Test
     fun `selectRoute loads route and updates repository`() = runTest(testDispatcher) {
@@ -68,12 +93,12 @@ class RouteViewModelTest {
         )
         coEvery { ruteroManager.loadRoute("RUTA-1") } returns entries
 
-        val viewModel = RouteViewModel(context, ruteroManager, recentRoutesStore, routeExporter, repository)
+        val viewModel = createViewModel()
         viewModel.selectRoute("RUTA-1")
 
         testDispatcher.scheduler.advanceUntilIdle()
 
-        verify { recentRoutesStore.addRoute("RUTA-1") }
+        coVerify { recentRoutesStore.addRoute("RUTA-1") }
         assertEquals("RUTA-1", repository.getActiveRuteroName())
         assertEquals(1, repository.getStats().totalLocales)
     }
@@ -84,13 +109,12 @@ class RouteViewModelTest {
             EntradaRuta("", "EMU-2", "1", "Local A", "", "Cliente 1"),
         )
 
-        val viewModel = RouteViewModel(context, ruteroManager, recentRoutesStore, routeExporter, repository)
+        val viewModel = createViewModel()
         viewModel.selectRoute("EMU-2")
 
         testDispatcher.scheduler.advanceUntilIdle()
 
-        verify { prefsEditor.putString(Constants.KEY_RUTERO, "EMU-2") }
-        verify { prefsEditor.apply() }
+        coVerify { preferencesRepository.setSelectedRoute("EMU-2") }
     }
 
     @Test
@@ -101,7 +125,7 @@ class RouteViewModelTest {
         )
         coEvery { ruteroManager.loadRoute("RUTA-1") } returns entries
 
-        val viewModel = RouteViewModel(context, ruteroManager, recentRoutesStore, routeExporter, repository)
+        val viewModel = createViewModel()
         viewModel.selectRoute("RUTA-1")
         testDispatcher.scheduler.advanceUntilIdle()
 
@@ -119,7 +143,7 @@ class RouteViewModelTest {
             EntradaRuta("", "RUTA-1", "1", "Local A", "", "Cliente 1"),
         )
 
-        val viewModel = RouteViewModel(context, ruteroManager, recentRoutesStore, routeExporter, repository)
+        val viewModel = createViewModel()
         viewModel.loadInitialData()
         testDispatcher.scheduler.advanceUntilIdle()
 
@@ -128,13 +152,13 @@ class RouteViewModelTest {
 
     @Test
     fun `loadInitialData selects saved route when available`() = runTest(testDispatcher) {
-        every { prefs.getString(Constants.KEY_RUTERO, null) } returns "RUTA-2"
+        coEvery { preferencesRepository.getSelectedRoute() } returns "RUTA-2"
         coEvery { ruteroManager.loadIndex() } returns listOf("RUTA-1", "RUTA-2")
         coEvery { ruteroManager.loadRoute("RUTA-2") } returns listOf(
             EntradaRuta("", "RUTA-2", "1", "Local A", "", "Cliente 1"),
         )
 
-        val viewModel = RouteViewModel(context, ruteroManager, recentRoutesStore, routeExporter, repository)
+        val viewModel = createViewModel()
         viewModel.loadInitialData()
         testDispatcher.scheduler.advanceUntilIdle()
 
@@ -149,19 +173,19 @@ class RouteViewModelTest {
         coEvery { ruteroManager.loadRoute("RUTA-1") } returns entries
         coEvery { routeExporter.exportAsImage(any(), any(), any()) } returns mockk()
 
-        val viewModel = RouteViewModel(context, ruteroManager, recentRoutesStore, routeExporter, repository)
+        val viewModel = createViewModel()
         viewModel.selectRoute("RUTA-1")
         testDispatcher.scheduler.advanceUntilIdle()
 
         viewModel.exportRoute()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        verify { routeExporter.exportAsImage("RUTA-1", entries, repository.getStats()) }
+        coVerify { routeExporter.exportAsImage("RUTA-1", entries, repository.getStats()) }
     }
 
     @Test
     fun `exportRoute shows error when no route selected`() = runTest(testDispatcher) {
-        val viewModel = RouteViewModel(context, ruteroManager, recentRoutesStore, routeExporter, repository)
+        val viewModel = createViewModel()
         viewModel.exportRoute()
 
         assertEquals("Selecciona una ruta primero", viewModel.uiState.value.snackbarMessage)
@@ -177,7 +201,7 @@ class RouteViewModelTest {
         )
         coEvery { ruteroManager.loadRoute("RUTA-1") } returns entries
 
-        val viewModel = RouteViewModel(context, ruteroManager, recentRoutesStore, routeExporter, repository)
+        val viewModel = createViewModel()
         viewModel.selectRoute("RUTA-1")
         testDispatcher.scheduler.advanceUntilIdle()
 
@@ -190,7 +214,7 @@ class RouteViewModelTest {
 
     @Test
     fun `clearSnackbar resets snackbar message`() = runTest(testDispatcher) {
-        val viewModel = RouteViewModel(context, ruteroManager, recentRoutesStore, routeExporter, repository)
+        val viewModel = createViewModel()
         viewModel.exportRoute()
         assertNotNull(viewModel.uiState.value.snackbarMessage)
 

@@ -23,7 +23,7 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, DB_NAME)
-                .fallbackToDestructiveMigration(dropAllTables = true)
+                .fallbackToDestructiveMigration() // TODO: add Migration objects before production release
                 .build()
     }
 }

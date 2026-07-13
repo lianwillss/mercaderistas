@@ -2,7 +2,7 @@ package com.rutamercaderistas
 
 object Constants {
     // Promotions CSV
-    const val PROMOTIONS_DRIVE_FILE_ID = "1Xyy0XcsX0MyWdRGU9441Qhu7mAxDkaHG"
+    const val PROMOTIONS_DRIVE_FILE_ID = "10fqnue63wMiraRjabc0euN5czXi5A563"
     const val PROMOTIONS_CSV_URL = "https://drive.usercontent.google.com/download?id=$PROMOTIONS_DRIVE_FILE_ID&export=download"
     const val PROMOTION_REFRESH_INTERVAL_HOURS = 12L
     const val PROMOTION_REFRESH_INTERVAL_MS = PROMOTION_REFRESH_INTERVAL_HOURS * 60 * 60 * 1000L

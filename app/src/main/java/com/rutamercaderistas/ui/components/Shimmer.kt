@@ -38,7 +38,7 @@ private fun shimmerBrush(): Brush {
         targetValue = 900f,
         animationSpec = infiniteRepeatable(
             animation = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
+            repeatMode = RepeatMode.Restart,
         ),
         label = "shimmerX"
     )
@@ -94,7 +94,7 @@ fun ShimmerStoreCard(modifier: Modifier = Modifier) {
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(24.dp))
-                .background(Color.White)
+                .background(MaterialTheme.colorScheme.surface)
                 .padding(16.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -127,7 +127,7 @@ fun ShimmerStatsCards(modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color.White)
+                    .background(MaterialTheme.colorScheme.surface)
                     .padding(8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -153,13 +153,59 @@ fun ShimmerDaySelector(modifier: Modifier = Modifier) {
             Column(
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color.White)
+                    .background(MaterialTheme.colorScheme.surface)
                     .padding(horizontal = 10.dp, vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 ShimmerSmallBlock(modifier = Modifier.size(24.dp, 12.dp))
                 Spacer(modifier = Modifier.height(2.dp))
                 ShimmerSmallBlock(modifier = Modifier.size(16.dp, 10.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun ShimmerPromotionsContent(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp)
+    ) {
+        repeat(3) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(20.dp)
+            ) {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ShimmerCircle(40)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            ShimmerBlock(widthFraction = 0.45f)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        ShimmerSmallBlock(modifier = Modifier.width(70.dp))
+                    }
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ShimmerSmallBlock(modifier = Modifier.width(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        ShimmerBlock(widthFraction = 0.3f)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        ShimmerSmallBlock(modifier = Modifier.width(50.dp))
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    ShimmerBlock(widthFraction = 0.7f)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    ShimmerSmallBlock(widthFraction = 0.25f)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    ShimmerSmallBlock(widthFraction = 0.35f)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    ShimmerSmallBlock(widthFraction = 0.2f)
+                }
             }
         }
     }

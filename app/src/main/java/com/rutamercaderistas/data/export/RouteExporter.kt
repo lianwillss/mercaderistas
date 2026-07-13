@@ -69,7 +69,9 @@ class RouteExporter @Inject constructor(
         val byDay = groupByDay(entries)
 
         val totalH = measureHeight(contentW, routeName, stats, byDay)
-        val bitmap = Bitmap.createBitmap(w, totalH, Bitmap.Config.ARGB_8888)
+        val maxH = 12000
+        val finalH = minOf(totalH, maxH)
+        val bitmap = Bitmap.createBitmap(w, finalH, Bitmap.Config.ARGB_8888)
         try {
             val c = Canvas(bitmap)
             c.drawColor(WHITE)
