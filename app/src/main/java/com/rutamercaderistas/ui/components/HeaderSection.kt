@@ -13,18 +13,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -56,6 +53,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
+import com.rutamercaderistas.data.local.PromotionEntity
 import kotlin.math.PI
 import kotlin.math.sin
 
@@ -72,8 +70,8 @@ fun HeaderSection(
     onShare: () -> Unit = {},
     onCheckUpdate: () -> Unit = {},
     onOpenPromoDiagnostic: () -> Unit = {},
-    promosExpiringToday: Int = 0,
-    promosExpiringTomorrow: Int = 0,
+    promosExpiringSoon: List<PromotionEntity> = emptyList(),
+    onExpiringSoonClick: () -> Unit = {},
 ) {
     var expanded by remember { mutableStateOf(value = false) }
     val haptic = LocalHapticFeedback.current
@@ -197,63 +195,29 @@ fun HeaderSection(
                                 modifier = Modifier.weight(1f, fill = false),
                             )
                         }
-                        if (promosExpiringToday > 0 || promosExpiringTomorrow > 0) {
+                        if (promosExpiringSoon.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(6.dp))
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFFFFF0E0).copy(alpha = 0.9f))
+                                    .clickable { onExpiringSoonClick() }
+                                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                                contentAlignment = Alignment.Center,
                             ) {
-                                if (promosExpiringToday > 0) {
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(Color(0xFFFFF0E0).copy(alpha = 0.9f))
-                                            .heightIn(min = 26.dp, max = 36.dp)
-                                            .widthIn(min = 60.dp, max = 200.dp)
-                                            .padding(horizontal = 10.dp, vertical = 4.dp),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(
-                                                text = "\uD83D\uDD25",
-                                                style = MaterialTheme.typography.labelSmall,
-                                            )
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(
-                                                text = "$promosExpiringToday promo${if (promosExpiringToday == 1) "" else "s"} hoy",
-                                                style = MaterialTheme.typography.labelLarge,
-                                                color = Color(0xFFD97706),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                            )
-                                        }
-                                    }
-                                }
-                                if (promosExpiringTomorrow > 0) {
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(Color(0xFFE0F2FE).copy(alpha = 0.9f))
-                                            .heightIn(min = 26.dp, max = 36.dp)
-                                            .widthIn(min = 60.dp, max = 200.dp)
-                                            .padding(horizontal = 10.dp, vertical = 4.dp),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(
-                                                text = "\uD83D\uDD25",
-                                                style = MaterialTheme.typography.labelSmall,
-                                            )
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(
-                                                text = "$promosExpiringTomorrow ma\u00F1ana",
-                                                style = MaterialTheme.typography.labelLarge,
-                                                color = Color(0xFF0369A1),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                            )
-                                        }
-                                    }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "\u26A0\uFE0F",
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Por vencer (${promosExpiringSoon.size})",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = Color(0xFFD97706),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
                                 }
                             }
                         }

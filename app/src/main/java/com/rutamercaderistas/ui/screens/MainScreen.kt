@@ -60,8 +60,8 @@ import com.rutamercaderistas.ui.components.ShimmerDaySelector
 import com.rutamercaderistas.ui.components.ShimmerLoadingContent
 import com.rutamercaderistas.ui.components.ShimmerStatsCards
 import com.rutamercaderistas.ui.components.StatsCards
-import com.rutamercaderistas.ui.components.PromoDaySection
 import com.rutamercaderistas.ui.components.StoreCard
+import com.rutamercaderistas.ui.components.PromoExpiringSoonModal
 import com.rutamercaderistas.util.openMaps
 import com.rutamercaderistas.viewmodel.PromotionDiagnostic
 import com.rutamercaderistas.viewmodel.RouteUiState
@@ -219,6 +219,7 @@ private fun MainRoute(
 
     var searchActive by remember { mutableStateOf(false) }
     var showPromoDiagnostic by remember { mutableStateOf(false) }
+    var showExpiringSoon by remember { mutableStateOf(false) }
     val diagnostic = routeState.promotionDiagnostic
 
     val activeDayNumbers by remember(activeDays) {
@@ -267,8 +268,8 @@ private fun MainRoute(
                     routeViewModel.loadPromotionDiagnostic()
                     showPromoDiagnostic = true
                 },
-                promosExpiringToday = routeState.promosExpiringToday,
-                promosExpiringTomorrow = routeState.promosExpiringTomorrow,
+                promosExpiringSoon = routeState.promosExpiringSoon,
+                onExpiringSoonClick = { showExpiringSoon = true },
             )
 
             if (isSyncing) {
@@ -390,15 +391,7 @@ private fun MainRoute(
                                     }
                                 }
                             }
-                            item(key = "promo_day") {
-                                PromoDaySection(
-                                    locales = locales,
-                                    promotionsByBrand = routeState.promotionsByBrand,
-                                    modifier = Modifier.padding(horizontal = 20.dp),
-                                    isRefreshing = isSyncing,
-                                )
-                            }
-            itemsIndexed(
+                            itemsIndexed(
                 items = locales,
                 key = { _, local -> local.codigo + local.local },
             ) { index, local ->
@@ -445,6 +438,13 @@ private fun MainRoute(
                 showPromoDiagnostic = false
                 routeViewModel.clearDiagnostic()
             },
+        )
+    }
+
+    if (showExpiringSoon && routeState.promosExpiringSoon.isNotEmpty()) {
+        PromoExpiringSoonModal(
+            promos = routeState.promosExpiringSoon,
+            onDismiss = { showExpiringSoon = false },
         )
     }
 }

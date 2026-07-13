@@ -10,6 +10,7 @@ data class GroupedPromotions(
     val totalPromosActivas: Int,
     val promosExpiringToday: Int,
     val promosExpiringTomorrow: Int,
+    val promosExpiringSoon: List<PromotionEntity>,
 )
 
 class GroupPromotionsUseCase @Inject constructor(
@@ -23,6 +24,7 @@ class GroupPromotionsUseCase @Inject constructor(
             totalPromosActivas = byBrand.values.sumOf { it.size },
             promosExpiringToday = countExpiring.countToday(promos),
             promosExpiringTomorrow = countExpiring.countTomorrow(promos),
+            promosExpiringSoon = countExpiring.getExpiringSoon(promos),
         )
     }
 }

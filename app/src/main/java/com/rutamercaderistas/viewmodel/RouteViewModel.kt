@@ -62,6 +62,7 @@ sealed interface PromotionsState {
         val totalPromosActivas: Int = 0,
         val promosExpiringToday: Int = 0,
         val promosExpiringTomorrow: Int = 0,
+        val promosExpiringSoon: List<PromotionEntity> = emptyList(),
         val error: String? = null,
     ) : PromotionsState
 }
@@ -91,6 +92,7 @@ data class RouteUiState(
     val totalPromosActivas: Int get() = (promotions as? PromotionsState.Loaded)?.totalPromosActivas ?: 0
     val promosExpiringToday: Int get() = (promotions as? PromotionsState.Loaded)?.promosExpiringToday ?: 0
     val promosExpiringTomorrow: Int get() = (promotions as? PromotionsState.Loaded)?.promosExpiringTomorrow ?: 0
+    val promosExpiringSoon: List<PromotionEntity> get() = (promotions as? PromotionsState.Loaded)?.promosExpiringSoon ?: emptyList()
     val promotionErrorMessage: String? get() = (promotions as? PromotionsState.Loaded)?.error
 }
 
@@ -180,6 +182,7 @@ class RouteViewModel @Inject constructor(
                     totalPromosActivas = result.totalPromosActivas,
                     promosExpiringToday = result.promosExpiringToday,
                     promosExpiringTomorrow = result.promosExpiringTomorrow,
+                    promosExpiringSoon = result.promosExpiringSoon,
                 ),
             )}
         }
@@ -211,6 +214,7 @@ class RouteViewModel @Inject constructor(
                 totalPromosActivas = grouped.totalPromosActivas,
                 promosExpiringToday = grouped.promosExpiringToday,
                 promosExpiringTomorrow = grouped.promosExpiringTomorrow,
+                promosExpiringSoon = grouped.promosExpiringSoon,
             ),
         )}
     }
