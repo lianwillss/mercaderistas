@@ -96,9 +96,9 @@ fun StoreCard(
 
     val hasPromos = remember(local, promotionsByBrand) {
         local.clientes.any { cliente ->
-            val cleanName = brandCleanCache[cliente.nombre] ?: cliente.nombre.cleanBrand()
+            val cleanName = brandCleanCache[cliente.nombre] ?: normalizeBrand(cliente.nombre).cleanBrand()
             val promos = promotionsByBrand[cleanName].orEmpty()
-                .filter { local.cadena.isBlank() || normalizeChain(it.chain) == normalizeChain(local.cadena) }
+                .filter { effectiveChain(local.cadena, local.formato).isBlank() || normalizeChain(it.chain) == normalizeChain(effectiveChain(local.cadena, local.formato)) }
             promos.isNotEmpty()
         }
     }
@@ -278,10 +278,26 @@ fun StoreCard(
                 val cleanBrandName = brandCleanCache[cliente.nombre] ?: normalizeBrand(cliente.nombre).cleanBrand()
                 val promos = promotionsByBrand[cleanBrandName]
                     .orEmpty()
-                    .filter { local.cadena.isBlank() || normalizeChain(it.chain) == normalizeChain(local.cadena) }
+                    .filter { effectiveChain(local.cadena, local.formato).isBlank() || normalizeChain(it.chain) == normalizeChain(effectiveChain(local.cadena, local.formato)) }
                 if (promos.isNotEmpty()) {
-                    Timber.d("STORE: \"%s\" (cadena=\"%s\") → marca=\"%s\" (clean=\"%s\") → %d promos",
-                        local.local, local.cadena, cliente.nombre, cleanBrandName, promos.size)
+                    Timber.d("STORE: \"%s\" | cadena=\"%s\" formato=\"%s\" effChain=\"%s\" | marca=\"%s\" clean=\"%s\" → %d promos",
+                        local.local, local.cadena, local.formato,
+                        normalizeChain(effectiveChain(local.cadena, local.formato)),
+                        cliente.nombre, cleanBrandName, promos.size)
+                } else {
+                    val effChain = effectiveChain(local.cadena, local.formato)
+                    val normEffChain = normalizeChain(effChain)
+                    val brandPromos = promotionsByBrand[cleanBrandName].orEmpty()
+                    val chainCount = brandPromos.size
+                    val matchingChain = brandPromos.filter { normalizeChain(it.chain) == normEffChain }
+                    val nonMatching = brandPromos.filter { normalizeChain(it.chain) != normEffChain }
+                    if (chainCount > 0) {
+                        Timber.d("STORE: \"%s\" | marca=\"%s\" clean=\"%s\" | %d promos en map, 0 tras filtro cadena | effChain=\"%s\" norm=\"%s\" | coincide=%d difiere=%d | chains=%s",
+                            local.local, cliente.nombre, cleanBrandName,
+                            chainCount, effChain, normEffChain,
+                            matchingChain.size, nonMatching.size,
+                            nonMatching.joinToString(",") { "\"${it.chain}\"" })
+                    }
                 }
                 BrandItem(
                     cliente = cliente,
@@ -555,7 +571,7 @@ private fun buildStoreShareText(
             local.clientes.forEach { c ->
                 val clean = brandCleanCache[c.nombre] ?: normalizeBrand(c.nombre).cleanBrand()
                 val promos = promotionsByBrand[clean].orEmpty()
-                    .filter { local.cadena.isBlank() || normalizeChain(it.chain) == normalizeChain(local.cadena) }
+                    .filter { effectiveChain(local.cadena, local.formato).isBlank() || normalizeChain(it.chain) == normalizeChain(effectiveChain(local.cadena, local.formato)) }
                 append("  \u2022 ${c.nombre}")
                 if (promos.isNotEmpty()) append(" \uD83D\uDD25 ${promos.size} promo${if (promos.size != 1) "s" else ""}")
                 appendLine()

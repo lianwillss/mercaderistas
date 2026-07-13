@@ -64,7 +64,8 @@ fun PromoDaySection(
                 val cleanName = normalizeBrand(cliente.nombre).cleanBrand()
                 val brandPromos = promotionsByBrand[cleanName].orEmpty()
                 for (promo in brandPromos) {
-                    val ok = local.cadena.isBlank() || normalizeChain(promo.chain) == normalizeChain(local.cadena)
+                    val localChain = effectiveChain(local.cadena, local.formato)
+                    val ok = localChain.isBlank() || normalizeChain(promo.chain) == normalizeChain(localChain)
                     if (ok && seen.add(promo.productName + promo.brand + promo.chain)) {
                         matched.add(promo)
                     }

@@ -16,6 +16,7 @@ import com.rutamercaderistas.services.PromotionRepository
 import com.rutamercaderistas.services.RecentRoutesStore
 import com.rutamercaderistas.services.RuteroManager
 import com.rutamercaderistas.services.RuteroRepository
+import com.rutamercaderistas.ui.components.effectiveChain
 import com.rutamercaderistas.ui.components.normalizeChain
 import com.rutamercaderistas.utils.normalizeBrand
 import com.rutamercaderistas.utils.cleanBrand
@@ -377,12 +378,13 @@ class RouteViewModel @Inject constructor(
 
             val s = _uiState.value
             val currentLocaleResult = s.currentDayLocales.joinToString("\n\n") { local ->
-                val norm = normalizeChain(local.cadena)
-                val lines = mutableListOf("• ${local.local} (cadena: \"${local.cadena}\" → \"$norm\")")
+                val localChain = effectiveChain(local.cadena, local.formato)
+                val norm = normalizeChain(localChain)
+                val lines = mutableListOf("• ${local.local} (cadena: \"${local.cadena}\", formato: \"${local.formato}\" → \"$norm\")")
                 local.clientes.forEach { cliente ->
                     val clean = normalizeBrand(cliente.nombre).cleanBrand()
                     val promos = s.promotionsByBrand[clean].orEmpty()
-                        .filter { local.cadena.isBlank() || normalizeChain(it.chain) == norm }
+                        .filter { localChain.isBlank() || normalizeChain(it.chain) == norm }
                     lines.add("    ${cliente.nombre} → ${promos.size} promo${if (promos.size != 1) "nes" else ""}")
                     promos.forEach { p ->
                         lines.add("      - ${p.productName} (${p.price})")

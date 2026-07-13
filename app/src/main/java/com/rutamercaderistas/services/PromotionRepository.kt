@@ -114,6 +114,8 @@ class PromotionRepository @Inject constructor(
                         totalRead, filteredByDate, entities.size)
                     val chainStats = entities.groupBy { it.chain }.map { (c, list) -> "$c=${list.size}" }
                     Timber.d("Promociones: vigentes por cadena: %s", chainStats.joinToString(", "))
+                    val brandStats = entities.groupBy { it.brand }.map { (b, list) -> "$b=${list.size}" }.take(20)
+                    Timber.d("Promociones: marcas vigentes (primeras 20): %s", brandStats.joinToString(", "))
 
                     val deleted = promotionDao.deleteExpired(todayStr)
                     if (deleted > 0) Timber.d("Promociones: %d vencidas eliminadas", deleted)

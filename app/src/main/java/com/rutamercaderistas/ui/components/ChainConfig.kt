@@ -29,6 +29,9 @@ private val chainColors = mapOf(
     "PRONTO" to Color(0xFF8B5CF6),
 )
 
+fun effectiveChain(cadena: String, formato: String): String =
+    formato.ifBlank { cadena }
+
 fun normalizeChain(chain: String): String {
     val c = chain.trim().uppercase()
     val coded = codeToChain[c]
