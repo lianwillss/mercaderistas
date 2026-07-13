@@ -9,6 +9,7 @@ import org.apache.poi.xssf.model.SharedStrings
 import org.xml.sax.Attributes
 import org.xml.sax.InputSource
 import org.xml.sax.helpers.DefaultHandler
+import timber.log.Timber
 import java.io.File
 import java.io.InputStream
 import javax.xml.parsers.SAXParserFactory
@@ -81,15 +82,17 @@ class ExcelParser {
                 val handler = sheetHandler(sharedStrings, onRow = { rowNum, values ->
                     if (!headerParsed && rowNum == 1) {
                         mapper.map(values)
+                        Timber.d("HEADERS_ENCONTRADOS: %s", mapper.getMappingSummary())
                         idxRutero = mapper.getIndex("RUTERO"); idxLocal = mapper.getIndex("LOCAL")
                         idxCodigo = mapper.getIndex("COD KPI ONE"); idxCliente = mapper.getIndex("CLIENTE")
                         idxDireccion = mapper.getIndex("DIRECCIÓN", "DIRECCION")
                         idxCadena = mapper.getIndex("CADENA")
-                        idxFormato = mapper.getIndex("FORMATO")
+                        idxFormato = mapper.getIndex("FORMATO", "FORMATO COMERCIAL", "TIPO FORMATO", "TIPO LOCAL", "BANDERA", "SUBCADENA", "SUB CADENA", "TIPO")
                         idxLun = mapper.getIndex("LUNES", "LUN"); idxMar = mapper.getIndex("MARTES", "MAR")
                         idxMie = mapper.getIndex("MIERCOLES", "MIÉRCOLES", "MIE")
                         idxJue = mapper.getIndex("JUEVES", "JUE"); idxVie = mapper.getIndex("VIERNES", "VIE")
                         idxSab = mapper.getIndex("SABADO", "SÁBADO", "SAB"); idxDom = mapper.getIndex("DOMINGO", "DOM")
+                        Timber.d("INDICES_CARGADOS: cadena=%d formato=%d", idxCadena, idxFormato)
                         headerParsed = true
                     } else if (headerParsed) {
                         val rutero = values.getOrElse(idxRutero) { "" }
@@ -153,7 +156,7 @@ class ExcelParser {
                         idxCodigo = mapper.getIndex("COD KPI ONE"); idxCliente = mapper.getIndex("CLIENTE")
                         idxDireccion = mapper.getIndex("DIRECCIÓN", "DIRECCION")
                         idxCadena = mapper.getIndex("CADENA")
-                        idxFormato = mapper.getIndex("FORMATO")
+                        idxFormato = mapper.getIndex("FORMATO", "FORMATO COMERCIAL", "TIPO FORMATO", "TIPO LOCAL", "BANDERA", "SUBCADENA", "SUB CADENA", "TIPO")
                         idxLun = mapper.getIndex("LUNES", "LUN"); idxMar = mapper.getIndex("MARTES", "MAR")
                         idxMie = mapper.getIndex("MIERCOLES", "MIÉRCOLES", "MIE")
                         idxJue = mapper.getIndex("JUEVES", "JUE"); idxVie = mapper.getIndex("VIERNES", "VIE")
