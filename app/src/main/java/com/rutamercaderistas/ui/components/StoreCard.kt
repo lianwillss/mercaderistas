@@ -98,7 +98,7 @@ fun StoreCard(
         local.clientes.any { cliente ->
             val cleanName = brandCleanCache[cliente.nombre] ?: normalizeBrand(cliente.nombre).cleanBrand()
             val promos = promotionsByBrand[cleanName].orEmpty()
-                .filter { effectiveChain(local.cadena, local.formato).isBlank() || normalizeChain(it.chain) == normalizeChain(effectiveChain(local.cadena, local.formato)) }
+                .filter { normalizeChain(it.chain) == normalizeChain(local.cadena) || normalizeChain(it.chain) == normalizeChain(effectiveChain(local.cadena, local.formato)) }
             promos.isNotEmpty()
         }
     }
@@ -278,7 +278,7 @@ fun StoreCard(
                 val cleanBrandName = brandCleanCache[cliente.nombre] ?: normalizeBrand(cliente.nombre).cleanBrand()
                 val promos = promotionsByBrand[cleanBrandName]
                     .orEmpty()
-                    .filter { effectiveChain(local.cadena, local.formato).isBlank() || normalizeChain(it.chain) == normalizeChain(effectiveChain(local.cadena, local.formato)) }
+                    .filter { normalizeChain(it.chain) == normalizeChain(local.cadena) || normalizeChain(it.chain) == normalizeChain(effectiveChain(local.cadena, local.formato)) }
                 if (promos.isNotEmpty()) {
                     Timber.d("STORE: \"%s\" | cadena=\"%s\" formato=\"%s\" effChain=\"%s\" | marca=\"%s\" clean=\"%s\" → %d promos",
                         local.local, local.cadena, local.formato,
@@ -571,7 +571,7 @@ private fun buildStoreShareText(
             local.clientes.forEach { c ->
                 val clean = brandCleanCache[c.nombre] ?: normalizeBrand(c.nombre).cleanBrand()
                 val promos = promotionsByBrand[clean].orEmpty()
-                    .filter { effectiveChain(local.cadena, local.formato).isBlank() || normalizeChain(it.chain) == normalizeChain(effectiveChain(local.cadena, local.formato)) }
+                    .filter { normalizeChain(it.chain) == normalizeChain(local.cadena) || normalizeChain(it.chain) == normalizeChain(effectiveChain(local.cadena, local.formato)) }
                 append("  \u2022 ${c.nombre}")
                 if (promos.isNotEmpty()) append(" \uD83D\uDD25 ${promos.size} promo${if (promos.size != 1) "s" else ""}")
                 appendLine()

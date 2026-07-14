@@ -13,8 +13,8 @@ android {
         applicationId "com.rutamercaderistas"
         minSdk 26
         targetSdk 34
-        versionCode 11014
-        versionName "11.14"
+        versionCode 11015
+        versionName "11.15"
         resConfigs "es"
     }
 
