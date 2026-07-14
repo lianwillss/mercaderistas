@@ -45,6 +45,7 @@ private fun inferChainFromName(storeName: String, cadena: String, formato: Strin
     val normCadena = normalizeChain(cadena)
     val chains = holdingToChains[normCadena] ?: return cadena
     val name = storeName.uppercase()
+    if (normCadena == "CENCOSUD" && name.contains("SISA")) return "SANTA ISABEL"
     for (chain in chains) {
         if (name.contains(chain)) return chain
     }
