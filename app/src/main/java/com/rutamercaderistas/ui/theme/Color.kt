@@ -41,6 +41,7 @@ fun storeColor(name: String): Color {
         "UNIMARC" -> StoreColorRed
         "TOTTUS" -> StoreColorYellow
         "ALVI" -> StoreColorPurple
+        "CENCOSUD" -> AccentBlue
         else -> AccentBlue
     }
 }
@@ -53,6 +54,7 @@ fun storeSoftColor(name: String): Color {
         "UNIMARC" -> StoreColorRedSoft
         "TOTTUS" -> StoreColorYellowSoft
         "ALVI" -> StoreColorPurpleSoft
+        "CENCOSUD" -> AccentBlueSoft
         else -> AccentBlueSoft
     }
 }

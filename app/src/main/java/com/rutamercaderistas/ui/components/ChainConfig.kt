@@ -27,6 +27,7 @@ private val chainColors = mapOf(
     "FALABELLA" to Color(0xFFEC4899),
     "ALVI" to Color(0xFF3B82F6),
     "PRONTO" to Color(0xFF8B5CF6),
+    "CENCOSUD" to Color(0xFF1A56DB),
 )
 
 private val holdingToChains = mapOf(

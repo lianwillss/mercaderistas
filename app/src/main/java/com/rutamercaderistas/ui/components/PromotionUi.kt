@@ -26,6 +26,9 @@ import androidx.compose.ui.unit.dp
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.ui.DateFormatters
 import com.rutamercaderistas.ui.theme.AccentBlue
+import com.rutamercaderistas.ui.theme.AccentGreen
+import com.rutamercaderistas.ui.theme.AccentOrange
+import com.rutamercaderistas.ui.theme.StoreColorPurple
 
 @Composable
 fun PromotionBadge(
@@ -59,6 +62,33 @@ fun PromotionBadge(
             }
         }
     }
+}
+
+private enum class PriceType { MONEY, PERCENT, MULTI_BUY, TEXT }
+
+private fun classifyPrice(price: String): PriceType {
+    val t = price.trim().uppercase()
+    return when {
+        t.startsWith("$") -> PriceType.MONEY
+        t.contains("%") -> PriceType.PERCENT
+        Regex("""\d+X\d+""").containsMatchIn(t) -> PriceType.MULTI_BUY
+        else -> PriceType.TEXT
+    }
+}
+
+@Composable
+fun PromoPriceLabel(price: String) {
+    val (color, prefix) = when (classifyPrice(price)) {
+        PriceType.MONEY -> AccentBlue to null
+        PriceType.PERCENT -> AccentGreen to null
+        PriceType.MULTI_BUY -> StoreColorPurple to null
+        PriceType.TEXT -> AccentOrange to null
+    }
+    Text(
+        text = price.trim(),
+        style = MaterialTheme.typography.labelMedium,
+        color = color,
+    )
 }
 
 private fun formatDate(iso: String): String = DateFormatters.formatFull(iso)
@@ -107,11 +137,7 @@ fun PromotionList(
                 }
                 if (promo.price.isNotBlank()) {
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = promo.price,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = AccentBlue,
-                    )
+                    PromoPriceLabel(price = promo.price)
                 }
                 if (promo.endDate.isNotBlank() || promo.startDate.isNotBlank()) {
                     Spacer(modifier = Modifier.height(1.dp))

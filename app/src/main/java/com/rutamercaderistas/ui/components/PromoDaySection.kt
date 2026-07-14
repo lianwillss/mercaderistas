@@ -240,11 +240,7 @@ fun PromoDaySection(
                                 )
                                 Row {
                                     if (promo.price.isNotBlank()) {
-                                        Text(
-                                            text = promo.price,
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.primary,
-                                        )
+                                        PromoPriceLabel(price = promo.price)
                                         Spacer(modifier = Modifier.width(6.dp))
                                     }
                                     if (promo.endDate.isNotBlank()) {

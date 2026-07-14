@@ -18,12 +18,14 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.cancel
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -42,10 +44,12 @@ class RouteViewModelTest {
     private lateinit var groupPromotions: GroupPromotionsUseCase
     private lateinit var computeChainToLocales: ComputeChainToLocalesUseCase
     private lateinit var computeRouteBrands: ComputeRouteBrandsUseCase
+    private var createdViewModels = mutableListOf<RouteViewModel>()
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        createdViewModels.clear()
 
         fileRepository = mockk(relaxed = true) {
             every { excelExists() } returns true
@@ -70,21 +74,27 @@ class RouteViewModelTest {
 
     @After
     fun tearDown() {
+        createdViewModels.forEach { it.viewModelScope.cancel() }
+        createdViewModels.clear()
         Dispatchers.resetMain()
     }
 
-    private fun createViewModel() = RouteViewModel(
-        fileRepository = fileRepository,
-        preferencesRepository = preferencesRepository,
-        ruteroManager = ruteroManager,
-        recentRoutesStore = recentRoutesStore,
-        routeExporter = routeExporter,
-        repository = repository,
-        promotionRepository = promotionRepository,
-        groupPromotions = groupPromotions,
-        computeChainToLocales = computeChainToLocales,
-        computeRouteBrands = computeRouteBrands,
-    )
+    private fun createViewModel(): RouteViewModel {
+        val vm = RouteViewModel(
+            fileRepository = fileRepository,
+            preferencesRepository = preferencesRepository,
+            ruteroManager = ruteroManager,
+            recentRoutesStore = recentRoutesStore,
+            routeExporter = routeExporter,
+            repository = repository,
+            promotionRepository = promotionRepository,
+            groupPromotions = groupPromotions,
+            computeChainToLocales = computeChainToLocales,
+            computeRouteBrands = computeRouteBrands,
+        )
+        createdViewModels.add(vm)
+        return vm
+    }
 
     @Test
     fun `selectRoute loads route and updates repository`() = runTest(testDispatcher) {

@@ -191,7 +191,7 @@ class RouteViewModel @Inject constructor(
 
     fun loadInitialData() {
         viewModelScope.launch {
-            val index = withContext(Dispatchers.IO) { ruteroManager.loadIndex() }
+            val index = ruteroManager.loadIndex()
             if (index.isNotEmpty()) {
                 val lastRoute = preferencesRepository.getSelectedRoute()
                 val route = if (lastRoute != null && index.contains(lastRoute)) lastRoute

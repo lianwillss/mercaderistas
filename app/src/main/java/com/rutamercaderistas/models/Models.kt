@@ -42,8 +42,12 @@ data class EntradaRuta(
 
     val esPrioritaria: Boolean get() {
         val limpio = clienteLimpio.uppercase()
-        return MARCAS_PRIORITARIAS.any { limpio.contains(it) } || 
-               MARCAS_PRIORITARIAS.any { it.contains(limpio) && limpio.length > 3 }
+        return MARCAS_PRIORITARIAS.any { marca ->
+            limpio == marca ||
+            limpio.startsWith("$marca ") ||
+            limpio.contains(" $marca ") ||
+            limpio.endsWith(" $marca")
+        }
     }
 
     // Elimina el ⭐ si viene del Excel
