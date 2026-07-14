@@ -29,6 +29,17 @@ private val chainColors = mapOf(
     "PRONTO" to Color(0xFF8B5CF6),
 )
 
+private val holdingToChains = mapOf(
+    "CENCOSUD" to setOf("JUMBO", "SANTA ISABEL", "SPID", "EASY", "PARIS"),
+)
+
+fun belongsToHolding(chain: String, cadena: String): Boolean {
+    val normChain = normalizeChain(chain)
+    val normCadena = normalizeChain(cadena)
+    val chains = holdingToChains[normCadena] ?: return false
+    return chains.any { normChain == normalizeChain(it) }
+}
+
 fun effectiveChain(cadena: String, formato: String): String =
     formato.ifBlank { cadena }
 
