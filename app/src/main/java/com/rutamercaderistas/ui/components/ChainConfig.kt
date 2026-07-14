@@ -40,6 +40,26 @@ fun belongsToHolding(chain: String, cadena: String): Boolean {
     return chains.any { normChain == normalizeChain(it) }
 }
 
+private fun inferChainFromName(storeName: String, cadena: String, formato: String): String? {
+    if (formato.isNotBlank()) return formato
+    val normCadena = normalizeChain(cadena)
+    val chains = holdingToChains[normCadena] ?: return cadena
+    val name = storeName.uppercase()
+    for (chain in chains) {
+        if (name.contains(chain)) return chain
+    }
+    return null
+}
+
+fun matchesChain(promoChain: String, storeName: String, cadena: String, formato: String): Boolean {
+    val resolved = inferChainFromName(storeName, cadena, formato)
+    return if (resolved != null) {
+        normalizeChain(promoChain) == normalizeChain(resolved)
+    } else {
+        belongsToHolding(promoChain, cadena)
+    }
+}
+
 fun effectiveChain(cadena: String, formato: String): String =
     formato.ifBlank { cadena }
 

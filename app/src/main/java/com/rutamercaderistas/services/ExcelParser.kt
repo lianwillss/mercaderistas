@@ -88,6 +88,10 @@ class ExcelParser {
                         idxDireccion = mapper.getIndex("DIRECCIÓN", "DIRECCION")
                         idxCadena = mapper.getIndex("CADENA")
                         idxFormato = mapper.getIndex("FORMATO", "FORMATO COMERCIAL", "TIPO FORMATO", "TIPO LOCAL", "BANDERA", "SUBCADENA", "SUB CADENA", "TIPO")
+                        if (idxFormato == -1) {
+                            idxFormato = mapper.findFirstContaining("FORMATO", "BANDERA", "SUBCADENA")
+                            if (idxFormato >= 0) Timber.d("FORMATO_ENCONTRADO_FUZZY: indice=%d", idxFormato)
+                        }
                         idxLun = mapper.getIndex("LUNES", "LUN"); idxMar = mapper.getIndex("MARTES", "MAR")
                         idxMie = mapper.getIndex("MIERCOLES", "MIÉRCOLES", "MIE")
                         idxJue = mapper.getIndex("JUEVES", "JUE"); idxVie = mapper.getIndex("VIERNES", "VIE")
@@ -157,6 +161,10 @@ class ExcelParser {
                         idxDireccion = mapper.getIndex("DIRECCIÓN", "DIRECCION")
                         idxCadena = mapper.getIndex("CADENA")
                         idxFormato = mapper.getIndex("FORMATO", "FORMATO COMERCIAL", "TIPO FORMATO", "TIPO LOCAL", "BANDERA", "SUBCADENA", "SUB CADENA", "TIPO")
+                        if (idxFormato == -1) {
+                            idxFormato = mapper.findFirstContaining("FORMATO", "BANDERA", "SUBCADENA")
+                            if (idxFormato >= 0) Timber.d("FORMATO_ENCONTRADO_FUZZY: indice=%d", idxFormato)
+                        }
                         idxLun = mapper.getIndex("LUNES", "LUN"); idxMar = mapper.getIndex("MARTES", "MAR")
                         idxMie = mapper.getIndex("MIERCOLES", "MIÉRCOLES", "MIE")
                         idxJue = mapper.getIndex("JUEVES", "JUE"); idxVie = mapper.getIndex("VIERNES", "VIE")
