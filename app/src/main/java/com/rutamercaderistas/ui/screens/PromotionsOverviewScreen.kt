@@ -72,6 +72,7 @@ import com.rutamercaderistas.ui.components.ShimmerPromotionsContent
 import com.rutamercaderistas.ui.components.chainColor
 import com.rutamercaderistas.ui.components.normalizeChain
 import java.time.LocalDate
+import timber.log.Timber
 
 private fun formatDate(iso: String): String = DateFormatters.formatFull(iso)
 
@@ -98,7 +99,10 @@ private fun urgency(endDate: String): Urgency {
             end == today.plusDays(1) -> Urgency.TOMORROW
             else -> Urgency.NORMAL
         }
-    } catch (_: Exception) { Urgency.NORMAL }
+    } catch (_: Exception) {
+        Timber.w("Error parseando endDate '%s' en computeUrgency", endDate)
+        Urgency.NORMAL
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -173,7 +177,10 @@ fun PromotionsOverviewScreen(
         else chainFiltered.map { (brand, promos) ->
             brand to promos.filter { promo ->
                 try { promo.endDate.isNotBlank() && LocalDate.parse(promo.endDate) == today }
-                catch (_: Exception) { false }
+                catch (_: Exception) {
+                    Timber.w("Error parseando endDate '%s' en filtro hoy", promo.endDate)
+                    false
+                }
             }
         }.filter { it.second.isNotEmpty() }
     }

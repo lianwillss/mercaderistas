@@ -94,6 +94,8 @@ class RouteExporter @Inject constructor(
             c.drawText("Generado por Mercaderistas app", pad.toFloat(), y.toFloat(), paint(TEXT_LIGHT, 11))
             y += dp(20)
 
+            cleanupOldExports()
+
             val file = File(context.cacheDir, "ruta_${sanitize(routeName)}.png")
             file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
             Timber.d("Export done: %s (%dx%d)", file.absolutePath, w, totalH)
@@ -117,6 +119,12 @@ class RouteExporter @Inject constructor(
     }
 
     private fun sanitize(name: String) = name.replace(Regex("[^a-zA-Z0-9_\\-]"), "_").trim('_')
+
+    private fun cleanupOldExports() {
+        context.cacheDir.listFiles()
+            ?.filter { it.name.startsWith("ruta_") && it.name.endsWith(".png") }
+            ?.forEach { it.delete() }
+    }
 
     // ── Measurement ──────────────────────────────────
 

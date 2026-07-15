@@ -1,10 +1,16 @@
 package com.rutamercaderistas.viewmodel
 
 import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.core.app.NotificationCompat
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.Constants
+import com.rutamercaderistas.MainActivity
 import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.services.ApkDownloader
 import com.rutamercaderistas.services.UpdateChecker
@@ -34,6 +40,12 @@ class UpdateViewModel @Inject constructor(
     private val preferencesRepository: PreferencesRepository,
 ) : AndroidViewModel(application) {
 
+    companion object {
+        const val UPDATE_NOTIFICATION_ID = 2001
+        const val UPDATE_CHANNEL_ID = "app_updates"
+        const val EXTRA_SHOW_UPDATE = "show_update"
+    }
+
     private val _state = MutableStateFlow(UpdateUiState())
     val state: StateFlow<UpdateUiState> = _state.asStateFlow()
 
@@ -57,6 +69,7 @@ class UpdateViewModel @Inject constructor(
                         versionCode = info.versionCode,
                         apkUrl = info.apkUrl,
                     )
+                    postUpdateNotification(info.versionName)
                 } else if (showFeedback) {
                     _state.value = _state.value.copy(
                         isChecking = false,
@@ -109,5 +122,30 @@ class UpdateViewModel @Inject constructor(
         if (!_state.value.downloading) {
             _state.value = _state.value.copy(showDialog = false)
         }
+    }
+
+    private fun postUpdateNotification(versionName: String) {
+        val context = getApplication<Application>()
+        val nm = context.getSystemService(NotificationManager::class.java) ?: return
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(EXTRA_SHOW_UPDATE, true)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context, 0, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+        val notification = NotificationCompat.Builder(context, UPDATE_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("Actualización disponible")
+            .setContentText("Nueva versión $versionName disponible")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .build()
+
+        nm.notify(UPDATE_NOTIFICATION_ID, notification)
     }
 }

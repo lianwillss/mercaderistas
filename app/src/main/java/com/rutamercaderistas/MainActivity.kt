@@ -1,5 +1,7 @@
 package com.rutamercaderistas
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -9,19 +11,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -38,6 +38,7 @@ import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.models.BrandReference
 import com.rutamercaderistas.services.PromotionRepository
 import com.rutamercaderistas.ui.screens.MainScreen
+import com.rutamercaderistas.ui.components.IosModal
 import com.rutamercaderistas.ui.theme.MercaderistasTheme
 import com.rutamercaderistas.viewmodel.RouteViewModel
 import com.rutamercaderistas.viewmodel.SyncViewModel
@@ -67,10 +68,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        createUpdateNotificationChannel()
         if (savedInstanceState == null) {
             schedulePeriodicSync()
             promotionRepository.schedulePeriodicRefresh()
             scheduleDailyPromotionNotification()
+            if (intent.getBooleanExtra(UpdateViewModel.EXTRA_SHOW_UPDATE, false)) {
+                updateViewModel.checkForUpdate(force = true, showFeedback = false)
+            }
         }
 
         setContent {
@@ -122,62 +127,43 @@ class MainActivity : ComponentActivity() {
                 }
 
                 if (updateState.showDialog) {
-                    AlertDialog(
-                        onDismissRequest = { updateViewModel.dismissDialog() },
-                        title = {
+                    var visible by remember { mutableStateOf(false) }
+                    LaunchedEffect(Unit) { visible = true }
+
+                    IosModal(
+                        visible = visible,
+                        onDismiss = { updateViewModel.dismissDialog() },
+                        title = "Actualización disponible",
+                        confirmText = if (!updateState.downloading) "Actualizar" else null,
+                        onConfirm = { updateViewModel.downloadAndInstall() },
+                        dismissText = if (!updateState.downloading) "Más tarde" else null,
+                        onDismissAction = { updateViewModel.suppressUntilTomorrow() },
+                    ) {
+                        if (updateState.downloading) {
                             Text(
-                                text = "Actualización disponible",
-                                style = MaterialTheme.typography.headlineSmall,
+                                text = "Descargando versión ${updateState.versionName}…",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                        },
-                        text = {
-                            if (updateState.downloading) {
-                                Column {
-                                    Text(
-                                        text = "Descargando versión ${updateState.versionName}…",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    LinearProgressIndicator(
-                                        progress = { updateState.downloadProgress / 100f },
-                                        modifier = Modifier.fillMaxWidth().height(6.dp),
-                                    )
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Text(
-                                        text = "${updateState.downloadProgress}%",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            } else {
-                                Text(
-                                    text = "Versión ${updateState.versionName} disponible. ¿Quieres actualizar ahora?",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        },
-                        confirmButton = {
-                            if (!updateState.downloading) {
-                                Button(
-                                    onClick = { updateViewModel.downloadAndInstall() },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.primary,
-                                    ),
-                                ) {
-                                    Text("Actualizar", style = MaterialTheme.typography.titleSmall)
-                                }
-                            }
-                        },
-                        dismissButton = {
-                            if (!updateState.downloading) {
-                                TextButton(onClick = { updateViewModel.suppressUntilTomorrow() }) {
-                                    Text("Más tarde")
-                                }
-                            }
-                        },
-                    )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            LinearProgressIndicator(
+                                progress = { updateState.downloadProgress / 100f },
+                                modifier = Modifier.fillMaxWidth().height(6.dp),
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "${updateState.downloadProgress}%",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else {
+                            Text(
+                                text = "Versión ${updateState.versionName} disponible. ¿Quieres actualizar ahora?",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -198,6 +184,18 @@ class MainActivity : ComponentActivity() {
             ExistingPeriodicWorkPolicy.KEEP,
             request,
         )
+    }
+
+    private fun createUpdateNotificationChannel() {
+        val channel = NotificationChannel(
+            UpdateViewModel.UPDATE_CHANNEL_ID,
+            "Actualizaciones",
+            NotificationManager.IMPORTANCE_HIGH,
+        ).apply {
+            description = "Notificaciones de nuevas versiones disponibles"
+        }
+        val nm = getSystemService(NotificationManager::class.java)
+        nm.createNotificationChannel(channel)
     }
 
     private fun schedulePeriodicSync() {

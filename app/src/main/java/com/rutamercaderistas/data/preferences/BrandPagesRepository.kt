@@ -33,4 +33,8 @@ class BrandPagesRepository @Inject constructor(
             prefs[intPreferencesKey(normalizedName)] = page
         }
     }
+
+    suspend fun clearAll() {
+        context.brandPagesDataStore.edit { it.clear() }
+    }
 }

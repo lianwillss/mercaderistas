@@ -69,7 +69,6 @@ fun HeaderSection(
     modifier: Modifier = Modifier,
     onShare: () -> Unit = {},
     onCheckUpdate: () -> Unit = {},
-    onOpenPromoDiagnostic: () -> Unit = {},
     promosExpiringSoon: List<PromotionEntity> = emptyList(),
     onExpiringSoonClick: () -> Unit = {},
 ) {
@@ -306,16 +305,6 @@ fun HeaderSection(
                         },
                         leadingIcon = {
                             Icon(Icons.Outlined.SystemUpdate, contentDescription = "Buscar actualización")
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Diagnóstico de Promociones") },
-                        onClick = {
-                            expanded = false
-                            onOpenPromoDiagnostic()
-                        },
-                        leadingIcon = {
-                            Icon(Icons.Outlined.BugReport, contentDescription = "Diagnóstico de Promociones")
                         }
                     )
                 }

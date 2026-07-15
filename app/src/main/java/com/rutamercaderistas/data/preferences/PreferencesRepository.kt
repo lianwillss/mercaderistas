@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -25,6 +26,7 @@ class PreferencesRepository @Inject constructor(
         private val KEY_UPDATE_SUPPRESSED_UNTIL = longPreferencesKey("update_suppressed_until")
         private val KEY_DRIVE_URL = stringPreferencesKey("drive_url")
         private val KEY_TRANSPORT_MODE = stringPreferencesKey("transport_mode")
+        private val KEY_LAST_VERSION_CODE = intPreferencesKey("last_version_code")
     }
 
     suspend fun getSelectedRoute(): String? =
@@ -69,5 +71,12 @@ class PreferencesRepository @Inject constructor(
             if (value == null) prefs.remove(KEY_TRANSPORT_MODE)
             else prefs[KEY_TRANSPORT_MODE] = value
         }
+    }
+
+    suspend fun getLastVersionCode(): Int =
+        context.prefsDataStore.data.first()[KEY_LAST_VERSION_CODE] ?: 0
+
+    suspend fun setLastVersionCode(value: Int) {
+        context.prefsDataStore.edit { it[KEY_LAST_VERSION_CODE] = value }
     }
 }

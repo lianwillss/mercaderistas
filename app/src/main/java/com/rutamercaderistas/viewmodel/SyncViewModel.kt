@@ -93,7 +93,9 @@ class SyncViewModel @Inject constructor(
                     .build(),
                 networkCallback!!
             )
-        } catch (_: Exception) { }
+        } catch (_: Exception) {
+            Timber.w("connectivityManager.registerNetworkCallback failed")
+        }
     }
 
     override fun onCleared() {

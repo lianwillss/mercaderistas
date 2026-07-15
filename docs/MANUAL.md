@@ -7,80 +7,125 @@ mainfont: Helvetica
 
 # Mercaderistas — Manual de Usuario
 
-Guía básica para usar la aplicación.
+Guía rápida para usar la aplicación en tu ruta de trabajo.
 
 ---
 
 ## 1. Sincronizar datos
 
-La aplicación descarga la información desde Google Drive automáticamente.
+La app descarga automáticamente la información desde Google Drive al abrir.
 
-**Sincronización manual:**
+**Formas de sincronizar:**
 
-1. Toca el botón **⋮** (tres puntos) en la esquina superior derecha.
-2. Selecciona **"Forzar sincronización"**.
-3. Una barra de progreso indica que los datos se están descargando.
-4. Al terminar, la lista de rutas se actualiza.
+| Método | Cómo hacerlo |
+|--------|-------------|
+| Automático | Al abrir la app, si hay conexión |
+| Forzar | ⋮ → **"Forzar sincronización"** |
+| Pull-to-refresh | Deslizar hacia abajo en la pantalla principal o en Promociones |
 
-> La app funciona **sin conexión** después de la primera sincronización.
+> La app funciona **sin conexión** después de la primera sincronización. Los datos quedan guardados.
 
 ---
 
-## 2. Seleccionar una ruta
+## 2. Rutas
+
+### Seleccionar una ruta
 
 1. Toca el campo **"Buscar ruta…"** en la parte superior.
-2. Escribe el nombre de la ruta (ej. "RUTA 1").
-3. Selecciona la ruta de la lista desplegable.
-4. También puedes elegir una **ruta reciente** del historial.
+2. Escribe el nombre (ej. "RUTA 1") o elige una **ruta reciente** del historial.
+3. Toca la ruta para cargarla.
 
----
+### Navegar entre días
 
-## 3. Navegar entre días
-
-- Usa el **selector de días** (LUN, MAR, MIÉ, etc.) para cambiar de día.
+- Usa el **selector de días** (LUN, MAR, MIÉ, etc.).
 - También puedes **deslizar horizontalmente** sobre la pantalla.
+- La app se posiciona automáticamente en el día de hoy al cargar una ruta.
 - Los días sin visitas no aparecen en el selector.
 
----
+### Todos los locales
 
-## 4. Ver locales y marcas
-
-Cada local se muestra como una tarjeta blanca con:
-
-| Elemento | Descripción |
-|----------|-------------|
-| **Icono** | Color según la cadena (ver Jumbo, azul Lider, fucsia SISA, rojo Unimarc, amarillo Tottus, morado Alvi) |
-| **Nombre** | Nombre del local en formato natural |
-| **Código** | Código interno del local |
-| **Dirección** | Ubicación del local (toca para abrir en Google Maps) |
-| **Contador** | Número de marcas que visitar en ese local |
-
-**Marcas prioritarias:**
-
-Aparecen con una tarjeta blanca independiente, barra naranja a la izquierda y un ícono de estrella. Tienen un chip verde con la frecuencia de visita.
-
-**Marcas normales:**
-
-Se muestran como una fila compacta con un círculo de iniciales en color y la frecuencia de visita.
+Toca la tarjeta **"Locales"** en las estadísticas para ver todos los locales de la ruta en una lista completa con búsqueda.
 
 ---
 
-## 5. Abrir PDF de una marca
+## 3. Locales y marcas
 
-1. Toca cualquier marca dentro de un local.
-2. La aplicación abre el PDF del catalogador en la **página exacta** de esa marca.
-3. Si la marca no se encuentra en el PDF, aparece un mensaje: *"Marca no encontrada"*.
+Cada local se muestra como una tarjeta con un icono de color según la cadena:
+
+| Cadena | Color |
+|--------|-------|
+| Jumbo | Verde |
+| Santa Isabel / SISA | Fucsia |
+| Lider | Azul |
+| Unimarc | Rojo |
+| Tottus | Amarillo |
+| Alvi | Morado |
+| Cencosud (varias cadenas) | Azul oscuro |
+
+Cada tarjeta incluye:
+- **Nombre** del local
+- **Código** interno
+- **Dirección** (toca para abrir en Google Maps)
+- **Contador** de marcas para visitar
+- **Marcas prioritarias**: aparecen como tarjeta independiente con barra naranja, estrella y frecuencia de visita.
+- **Marcas normales**: fila compacta con círculo de inicial y frecuencia.
+
+### Abrir PDF de una marca
+
+Toca cualquier marca dentro de un local. La app abre el PDF del catalogador en la **página exacta** de esa marca. Si no se encuentra, muestra: *"Marca no encontrada"*.
 
 ---
 
-## 6. Ver todos los locales
+## 4. Promociones
 
-1. Toca la tarjeta **"Locales"** en la sección de estadísticas (junto a Marcas y Visitas).
-2. Se abre una pantalla completa con **todos los locales** de la ruta.
-3. Cada local muestra su nombre y dirección.
-4. Toca la dirección para abrirla en Google Maps.
-5. Presiona **←** para volver.
+Las promociones aparecen **automáticamente** en los locales que corresponden. La app detecta la cadena real del local y solo muestra las promos aplicables.
+
+### Vista general de promociones
+
+Desde la pantalla de promociones puedes:
+
+| Acción | Cómo |
+|--------|------|
+| **Buscar** | Escribe en el campo de búsqueda (filtra por producto, marca o cadena) |
+| **Filtrar por cadena** | Toca los chips de cadena (Jumbo, Santa Isabel, etc.) |
+| **Solo hoy** | Muestra promos que terminan hoy |
+| **Solo mis marcas** | Filtra solo marcas de tu ruta |
+| **Ver detalle** | Toca una promo expande precio y fechas |
+
+### Tipos de precio
+
+Los precios se muestran con color según el tipo:
+
+| Tipo | Ejemplo | Color |
+|------|---------|-------|
+| Precio en $ | $990 | Azul |
+| Porcentaje | 15% | Verde |
+| Multibuy | 2x1, 3x$2000 | Morado |
+| Texto | "Lleva 2 paga 1" | Naranja |
+
+### Promos por vencer
+
+En la tarjeta de cada día, la app muestra cuántas promos terminan **hoy** y cuántas **mañana**. También hay una **notificación diaria** con las promos próximas a vencer.
 
 ---
 
-*Versión 1.0 — Generado el 2026*
+## 5. Compartir
+
+| Qué compartir | Cómo |
+|--------------|------|
+| **Ruta completa** | ⋮ → **"Compartir"** (texto con todos los locales y marcas del día) |
+| **Ruta como imagen** | ⋮ → **"Exportar"** (imagen para WhatsApp) |
+| **Local individual** | Tocar icono de compartir en la tarjeta del local |
+| **Promoción individual** | Mantener presionado sobre una promo en la vista general |
+
+---
+
+## 6. Ajustes y extras
+
+- **Modo de transporte**: ⋮ → selecciona "Conductor" o "Peatón" para que Google Maps use el medio adecuado.
+- **Sync indicator**: en la parte superior muestra hace cuánto se actualizaron los datos ("hace 5 min", "hace 2 h", etc.).
+- **Indicador offline**: si no hay conexión, aparece un aviso "Sin conexión" en la parte superior.
+
+---
+
+*Versión 11.19 — Generado el 2026*

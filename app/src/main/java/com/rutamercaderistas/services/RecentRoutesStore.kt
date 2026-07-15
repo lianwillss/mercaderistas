@@ -9,6 +9,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import timber.log.Timber
 
 val Context.recentRoutesDataStore: DataStore<Preferences> by preferencesDataStore(name = "recent_routes")
 
@@ -24,7 +25,10 @@ class RecentRoutesStore(private val context: Context) {
         try {
             val arr = org.json.JSONArray(json)
             (0 until arr.length()).map { arr.getString(it) }
-        } catch (_: Exception) { emptyList() }
+        } catch (_: Exception) {
+            Timber.w("Error parseando rutas recientes en Flow")
+            emptyList()
+        }
     }
 
     suspend fun addRoute(rutero: String) {
@@ -33,7 +37,10 @@ class RecentRoutesStore(private val context: Context) {
                 try {
                     val arr = org.json.JSONArray(json)
                     (0 until arr.length()).map { arr.getString(it) }
-                } catch (_: Exception) { null }
+                } catch (_: Exception) {
+                    Timber.w("Error parseando rutas recientes en addRoute")
+                    null
+                }
             } ?: emptyList()
             val updated = current.toMutableList().apply {
                 remove(rutero)

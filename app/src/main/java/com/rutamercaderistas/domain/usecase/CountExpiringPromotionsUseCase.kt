@@ -3,6 +3,7 @@ package com.rutamercaderistas.domain.usecase
 import com.rutamercaderistas.data.local.PromotionEntity
 import java.time.LocalDate
 import javax.inject.Inject
+import timber.log.Timber
 
 class CountExpiringPromotionsUseCase @Inject constructor() {
 
@@ -10,7 +11,10 @@ class CountExpiringPromotionsUseCase @Inject constructor() {
         val today = LocalDate.now()
         return promos.count { promo ->
             try { promo.endDate.isNotBlank() && LocalDate.parse(promo.endDate) == today }
-            catch (_: Exception) { false }
+            catch (_: Exception) {
+                Timber.w("Error parseando endDate '%s' en countToday", promo.endDate)
+                false
+            }
         }
     }
 
@@ -18,7 +22,10 @@ class CountExpiringPromotionsUseCase @Inject constructor() {
         val tomorrow = LocalDate.now().plusDays(1)
         return promos.count { promo ->
             try { promo.endDate.isNotBlank() && LocalDate.parse(promo.endDate) == tomorrow }
-            catch (_: Exception) { false }
+            catch (_: Exception) {
+                Timber.w("Error parseando endDate '%s' en countTomorrow", promo.endDate)
+                false
+            }
         }
     }
 
@@ -31,8 +38,17 @@ class CountExpiringPromotionsUseCase @Inject constructor() {
                     promo.endDate.isNotBlank() && LocalDate.parse(promo.endDate).let { end ->
                         end >= today && end <= limit
                     }
-                } catch (_: Exception) { false }
+                } catch (_: Exception) {
+                    Timber.w("Error parseando endDate '%s' en getExpiringSoon filter", promo.endDate)
+                    false
+                }
             }
-            .sortedBy { promo -> try { LocalDate.parse(promo.endDate) } catch (_: Exception) { LocalDate.MAX } }
+            .sortedBy { promo ->
+                try { LocalDate.parse(promo.endDate) }
+                catch (_: Exception) {
+                    Timber.w("Error parseando endDate '%s' en getExpiringSoon sort", promo.endDate)
+                    LocalDate.MAX
+                }
+            }
     }
 }

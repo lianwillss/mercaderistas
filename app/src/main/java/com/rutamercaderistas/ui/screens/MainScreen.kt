@@ -23,12 +23,11 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
+
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -63,7 +62,6 @@ import com.rutamercaderistas.ui.components.StatsCards
 import com.rutamercaderistas.ui.components.StoreCard
 import com.rutamercaderistas.ui.components.PromoExpiringSoonModal
 import com.rutamercaderistas.util.openMaps
-import com.rutamercaderistas.viewmodel.PromotionDiagnostic
 import com.rutamercaderistas.viewmodel.RouteUiState
 import com.rutamercaderistas.viewmodel.RouteViewModel
 import com.rutamercaderistas.viewmodel.SyncUiState
@@ -218,9 +216,7 @@ private fun MainRoute(
     val ctx = LocalContext.current
 
     var searchActive by remember { mutableStateOf(false) }
-    var showPromoDiagnostic by remember { mutableStateOf(false) }
     var showExpiringSoon by remember { mutableStateOf(false) }
-    val diagnostic = routeState.promotionDiagnostic
 
     val activeDayNumbers by remember(activeDays) {
         derivedStateOf { activeDays.map { day -> diaDelMes(day) } }
@@ -264,10 +260,6 @@ private fun MainRoute(
                 onOpenManual = onNavigateToManual,
                 onShare = { routeViewModel.exportRoute() },
                 onCheckUpdate = onCheckUpdate,
-                onOpenPromoDiagnostic = {
-                    routeViewModel.loadPromotionDiagnostic()
-                    showPromoDiagnostic = true
-                },
                 promosExpiringSoon = routeState.promosExpiringSoon,
                 onExpiringSoonClick = { showExpiringSoon = true },
             )
@@ -431,94 +423,12 @@ private fun MainRoute(
         }
     }
 
-    if (showPromoDiagnostic && diagnostic != null) {
-        PromotionDiagnosticDialog(
-            diagnostic = diagnostic,
-            onDismiss = {
-                showPromoDiagnostic = false
-                routeViewModel.clearDiagnostic()
-            },
-        )
-    }
-
     if (showExpiringSoon && routeState.promosExpiringSoon.isNotEmpty()) {
         PromoExpiringSoonModal(
             promos = routeState.promosExpiringSoon,
             onDismiss = { showExpiringSoon = false },
         )
     }
-}
-
-@Composable
-private fun PromotionDiagnosticDialog(
-    diagnostic: PromotionDiagnostic,
-    onDismiss: () -> Unit,
-) {
-    val scrollState = rememberScrollState()
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text("Diagnóstico de Promociones")
-        },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(scrollState),
-            ) {
-                Text(
-                    text = "Última descarga: ${diagnostic.lastUpdated}",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Text(
-                    text = "Total promociones: ${diagnostic.totalPromos}",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Text(
-                    text = "Marcas con promos: ${diagnostic.distinctBrands}",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = "Primeras 20 promociones:",
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                Text(
-                    text = diagnostic.first20,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = "Catálogo por cadena:",
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                Text(
-                    text = diagnostic.chainCatalog,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = "Cruce con locales del día (${diagnostic.currentLocaleResult.count { it == '•' }} locales):",
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                Text(
-                    text = diagnostic.currentLocaleResult.ifEmpty { "(selecciona un local primero)" },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cerrar")
-            }
-        },
-    )
 }
 
 @Composable
