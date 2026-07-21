@@ -1,34 +1,43 @@
 package com.rutamercaderistas.domain.model
 
-private val codeToChain = mapOf(
-    "J" to "JUMBO",
-    "N" to "SANTA ISABEL",
-    "EX" to "LIDER",
-    "TT" to "TOTTUS",
-    "HI" to "LIDER",
-    "UN" to "UNIMARC",
-    "PP" to "PARIS",
-    "FA" to "FALABELLA",
-    "AL" to "ALVI",
-    "CO" to "PRONTO",
+data class ChainInfo(
+    val name: String,
+    val prefixes: List<String> = emptyList(),
+    val codes: List<String> = emptyList(),
+    val holding: String? = null,
+    val colorHex: Long = 0xFF6B7280,
 )
 
-val chainColorsHex = mapOf(
-    "JUMBO" to 0xFF065F46,
-    "SANTA ISABEL" to 0xFFDC2626,
-    "LIDER" to 0xFF16A34A,
-    "TOTTUS" to 0xFF059669,
-    "UNIMARC" to 0xFFDC2626,
-    "PARIS" to 0xFFEAB308,
-    "FALABELLA" to 0xFFEC4899,
-    "ALVI" to 0xFF3B82F6,
-    "PRONTO" to 0xFF8B5CF6,
-    "CENCOSUD" to 0xFF1A56DB,
+private val ALL_CHAINS = listOf(
+    ChainInfo("JUMBO", prefixes = listOf("JUMBO"), codes = listOf("J"), holding = "CENCOSUD", colorHex = 0xFF065F46),
+    ChainInfo("SANTA ISABEL", prefixes = listOf("SANTA ISABEL", "STA ISABEL", "STA"), codes = listOf("N"), holding = "CENCOSUD", colorHex = 0xFFDC2626),
+    ChainInfo("LIDER", prefixes = listOf("LIDER", "WALMART"), codes = listOf("EX", "HI"), colorHex = 0xFF16A34A),
+    ChainInfo("TOTTUS", prefixes = listOf("TOTTUS"), codes = listOf("TT"), colorHex = 0xFF059669),
+    ChainInfo("UNIMARC", prefixes = listOf("UNIMARC"), codes = listOf("UN"), colorHex = 0xFFDC2626),
+    ChainInfo("PARIS", prefixes = listOf("PARIS"), codes = listOf("PP"), holding = "CENCOSUD", colorHex = 0xFFEAB308),
+    ChainInfo("FALABELLA", prefixes = listOf("FALABELLA"), codes = listOf("FA"), colorHex = 0xFFEC4899),
+    ChainInfo("ALVI", prefixes = listOf("ALVI"), codes = listOf("AL"), colorHex = 0xFF3B82F6),
+    ChainInfo("PRONTO", prefixes = listOf("PRONTO"), codes = listOf("CO"), colorHex = 0xFF8B5CF6),
+    ChainInfo("CENCOSUD", prefixes = listOf("CENCOSUD"), colorHex = 0xFF1A56DB),
+    ChainInfo("SPID", prefixes = listOf("SPID"), holding = "CENCOSUD"),
+    ChainInfo("EASY", prefixes = listOf("EASY"), holding = "CENCOSUD"),
 )
 
-internal val holdingToChains = mapOf(
-    "CENCOSUD" to setOf("JUMBO", "SANTA ISABEL", "SPID", "EASY", "PARIS"),
-)
+val codeToChain: Map<String, String> = ALL_CHAINS
+    .flatMap { chain -> chain.codes.map { it to chain.name } }
+    .toMap()
+
+val chainColorsHex: Map<String, Long> = ALL_CHAINS
+    .filter { it.colorHex != 0xFF6B7280L }
+    .associate { it.name to it.colorHex }
+
+internal val holdingToChains: Map<String, Set<String>> = ALL_CHAINS
+    .filter { it.holding != null }
+    .groupBy { it.holding!! }
+    .mapValues { (_, chains) -> chains.map { it.name }.toSet() }
+
+private val chainPrefixIndex: List<Pair<String, String>> = ALL_CHAINS
+    .flatMap { chain -> chain.prefixes.map { it to chain.name } }
 
 private fun inferChainFromName(storeName: String, cadena: String, formato: String): String? {
     if (formato.isNotBlank()) return formato
@@ -59,17 +68,8 @@ fun normalizeChain(chain: String): String {
             return name
         }
     }
-    return when {
-        c.startsWith("JUMBO") -> "JUMBO"
-        c.startsWith("WALMART") -> "LIDER"
-        c.startsWith("LIDER") -> "LIDER"
-        c.startsWith("SANTA ISABEL") || c.startsWith("STA") -> "SANTA ISABEL"
-        c.startsWith("UNIMARC") -> "UNIMARC"
-        c.startsWith("TOTTUS") -> "TOTTUS"
-        c.startsWith("PARIS") -> "PARIS"
-        c.startsWith("FALABELLA") -> "FALABELLA"
-        c.startsWith("ALVI") -> "ALVI"
-        c.startsWith("PRONTO") -> "PRONTO"
-        else -> c
+    for ((prefix, name) in chainPrefixIndex) {
+        if (c.startsWith(prefix)) return name
     }
+    return c
 }
