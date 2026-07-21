@@ -101,7 +101,7 @@ class UpdateViewModel @Inject constructor(
             downloading = true,
         )
         viewModelScope.launch {
-            val ok = ApkDownloader.downloadAndInstall(
+            val error = ApkDownloader.downloadAndInstall(
                 context,
                 pendingApkUrl,
             ) { pct -> _state.value = UpdateUiState.Dialog(
@@ -111,10 +111,10 @@ class UpdateViewModel @Inject constructor(
                 downloading = true,
                 downloadProgress = pct,
             ) }
-            if (ok) {
-                _state.value = UpdateUiState.Idle
+            if (error != null) {
+                _state.value = UpdateUiState.Message(error)
             } else {
-                _state.value = UpdateUiState.Message("Error al descargar la actualización")
+                _state.value = UpdateUiState.Idle
             }
         }
     }
