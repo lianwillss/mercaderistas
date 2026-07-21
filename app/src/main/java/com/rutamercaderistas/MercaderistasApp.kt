@@ -35,11 +35,15 @@ class MercaderistasApp : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
-        SentryAndroid.init(this) { options ->
-            options.dsn = BuildConfig.SENTRY_DSN
-            options.environment = BuildConfig.BUILD_TYPE
-            options.tracesSampleRate = if (BuildConfig.DEBUG) 1.0 else 0.2
-            options.isDebug = BuildConfig.DEBUG
+        try {
+            SentryAndroid.init(this) { options ->
+                options.dsn = BuildConfig.SENTRY_DSN
+                options.environment = BuildConfig.BUILD_TYPE
+                options.tracesSampleRate = 0.0
+                options.isDebug = BuildConfig.DEBUG
+            }
+        } catch (_: Exception) {
+            Timber.w("Sentry init failed")
         }
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
