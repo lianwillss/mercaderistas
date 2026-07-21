@@ -1,13 +1,9 @@
-name: Build and Release
+name: Build & Release
 
 on:
   push:
     tags:
-      - "v*"
-  workflow_dispatch:
-
-permissions:
-  contents: write
+      - 'v*'
 
 jobs:
   build:
@@ -17,55 +13,24 @@ jobs:
 
       - uses: actions/setup-java@v4
         with:
-          distribution: "zulu"
-          java-version: 17
+          distribution: 'temurin'
+          java-version: '17'
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Set version from tag
-        run: |
-          TAG=${GITHUB_REF_NAME#v}
-          MAJOR=$(echo "$TAG" | cut -d. -f1)
-          MINOR=$(echo "$TAG" | cut -d. -f2)
-          echo "VERSION_CODE=$(( MAJOR * 1000 + MINOR ))" >> $GITHUB_ENV
-          echo "VERSION_NAME=${TAG}" >> $GITHUB_ENV
-
-      - name: Inject versionCode and versionName
-        run: |
-          sed -i "s/versionCode [0-9]*/versionCode ${{ env.VERSION_CODE }}/" app/build.gradle
-          sed -i "s/versionName \".*\"/versionName \"${{ env.VERSION_NAME }}\"/" app/build.gradle
-
       - name: Decode keystore
-        run: |
-          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
-            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > $GITHUB_WORKSPACE/keystore.jks
-            echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/keystore.jks" >> $GITHUB_ENV
-          fi
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > keystore.jks
 
       - name: Build release APK
         run: ./gradlew assembleRelease
         env:
-          ORG_GRADLE_PROJECT_org.gradle.jvmargs: -Xmx4096m
-          KEYSTORE_PATH: ${{ env.KEYSTORE_PATH }}
+          KEYSTORE_PATH: ${{ github.workspace }}/keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      - name: Find APK
-        id: find_apk
-        run: |
-          APK=$(find app/build/outputs/apk/release -name "*-universal-*.apk" | head -1)
-          echo "APK_PATH=$APK" >> $GITHUB_OUTPUT
-          echo "Found: $APK"
-
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "v${{ env.VERSION_NAME }}"
-          tag_name: ${{ github.ref_name }}
-          body: |
-            ## v${{ env.VERSION_NAME }}
-
-            Descarga el APK e instálalo en tu dispositivo.
-          files: ${{ steps.find_apk.outputs.APK_PATH }}
+          files: app/build/outputs/apk/release/app-universal-release.apk
           generate_release_notes: true
