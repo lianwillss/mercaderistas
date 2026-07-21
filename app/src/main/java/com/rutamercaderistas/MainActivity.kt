@@ -1,7 +1,5 @@
 package com.rutamercaderistas
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -47,6 +45,7 @@ import com.rutamercaderistas.viewmodel.UpdateUiState
 import com.rutamercaderistas.viewmodel.UpdateViewModel
 import com.rutamercaderistas.worker.DailyPromotionNotificationWorker
 import com.rutamercaderistas.worker.SyncWorker
+import com.rutamercaderistas.worker.UpdateCheckWorker
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import java.util.concurrent.TimeUnit
@@ -70,11 +69,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        createUpdateNotificationChannel()
         if (savedInstanceState == null) {
             schedulePeriodicSync()
             promotionRepository.schedulePeriodicRefresh()
             scheduleDailyPromotionNotification()
+            schedulePeriodicUpdateCheck()
             if (intent.getBooleanExtra(UpdateViewModel.EXTRA_SHOW_UPDATE, false)) {
                 updateViewModel.checkForUpdate(force = true, showFeedback = false)
             }
@@ -240,16 +239,21 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    private fun createUpdateNotificationChannel() {
-        val channel = NotificationChannel(
-            UpdateViewModel.UPDATE_CHANNEL_ID,
-            "Actualizaciones",
-            NotificationManager.IMPORTANCE_HIGH,
-        ).apply {
-            description = "Notificaciones de nuevas versiones disponibles"
-        }
-        val nm = getSystemService(NotificationManager::class.java)
-        nm.createNotificationChannel(channel)
+    private fun schedulePeriodicUpdateCheck() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val request = PeriodicWorkRequestBuilder<UpdateCheckWorker>(6, TimeUnit.HOURS)
+            .setConstraints(constraints)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.SECONDS)
+            .build()
+
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "periodic_update_check",
+            ExistingPeriodicWorkPolicy.KEEP,
+            request,
+        )
     }
 
     private fun schedulePeriodicSync() {

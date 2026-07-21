@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.os.Build
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.core.app.NotificationCompat
@@ -13,6 +14,7 @@ import com.rutamercaderistas.Constants
 import com.rutamercaderistas.MainActivity
 import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.services.ApkDownloader
+import com.rutamercaderistas.services.DownloadResult
 import com.rutamercaderistas.services.UpdateChecker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -101,7 +103,7 @@ class UpdateViewModel @Inject constructor(
             downloading = true,
         )
         viewModelScope.launch {
-            val error = ApkDownloader.downloadAndInstall(
+            val result = ApkDownloader.download(
                 context,
                 pendingApkUrl,
             ) { pct -> _state.value = UpdateUiState.Dialog(
@@ -111,10 +113,17 @@ class UpdateViewModel @Inject constructor(
                 downloading = true,
                 downloadProgress = pct,
             ) }
-            if (error != null) {
-                _state.value = UpdateUiState.Message(error)
-            } else {
-                _state.value = UpdateUiState.Idle
+            when (result) {
+                is DownloadResult.Error -> {
+                    _state.value = UpdateUiState.Message(result.message)
+                }
+                is DownloadResult.Success -> {
+                    postReadyNotification(pendingVersionName)
+                    withContext(Dispatchers.Main) {
+                        ApkDownloader.installApk(context, result.file)
+                    }
+                    _state.value = UpdateUiState.Idle
+                }
             }
         }
     }
@@ -141,6 +150,20 @@ class UpdateViewModel @Inject constructor(
     }
 
     private fun postUpdateNotification(versionName: String) {
+        postChannelNotification(
+            title = "Actualización disponible",
+            text = "Nueva versión $versionName disponible",
+        )
+    }
+
+    private fun postReadyNotification(versionName: String) {
+        postChannelNotification(
+            title = "Actualización lista para instalar",
+            text = "Versión $versionName — toca para instalar",
+        )
+    }
+
+    private fun postChannelNotification(title: String, text: String) {
         val context = getApplication<Application>()
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
 
@@ -155,8 +178,8 @@ class UpdateViewModel @Inject constructor(
 
         val notification = NotificationCompat.Builder(context, UPDATE_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("Actualización disponible")
-            .setContentText("Nueva versión $versionName disponible")
+            .setContentTitle(title)
+            .setContentText(text)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)

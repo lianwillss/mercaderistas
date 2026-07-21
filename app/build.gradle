@@ -14,16 +14,23 @@ android {
         applicationId "com.rutamercaderistas"
         minSdk 26
         targetSdk 35
-        versionCode 11027
-        versionName "11.27"
+        versionCode 11030
+        versionName "11.30"
         resConfigs "es"
     }
 
+    // ── Local keystore properties (dev machine only, gitignored) ──
+    def keystorePropertiesFile = rootProject.file('keystore.properties')
+    def keystoreProperties = new Properties()
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+    }
+
     // ── Signing config (CI env vars only) ──
-    def ksPath = System.getenv("KEYSTORE_PATH")
-    def ksPassword = System.getenv("KEYSTORE_PASSWORD")
-    def ksAlias = System.getenv("KEY_ALIAS")
-    def ksKeyPassword = System.getenv("KEY_PASSWORD")
+    def ksPath = keystoreProperties['storeFile'] ?: System.getenv("KEYSTORE_PATH")
+    def ksPassword = keystoreProperties['storePassword'] ?: System.getenv("KEYSTORE_PASSWORD")
+    def ksAlias = keystoreProperties['keyAlias'] ?: System.getenv("KEY_ALIAS")
+    def ksKeyPassword = keystoreProperties['keyPassword'] ?: System.getenv("KEY_PASSWORD")
 
     if (ksPath != null) {
         signingConfigs {
@@ -33,10 +40,21 @@ android {
                 keyAlias = ksAlias
                 keyPassword = ksKeyPassword
             }
+            debug {
+                storeFile = file(ksPath)
+                storePassword = ksPassword
+                keyAlias = ksAlias
+                keyPassword = ksKeyPassword
+            }
         }
     }
 
     buildTypes {
+        debug {
+            if (ksPath != null) {
+                signingConfig = signingConfigs.debug
+            }
+        }
         release {
             minifyEnabled true
             shrinkResources = true

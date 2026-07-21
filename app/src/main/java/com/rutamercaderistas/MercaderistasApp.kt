@@ -8,6 +8,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.rutamercaderistas.data.preferences.BrandPagesRepository
 import com.rutamercaderistas.data.preferences.PreferencesRepository
+import com.rutamercaderistas.viewmodel.UpdateViewModel
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,8 +37,15 @@ class MercaderistasApp : Application(), Configuration.Provider {
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         }
-        createNotificationChannel()
+        createNotificationChannels()
+        cleanTempApk()
         runUpgradeCleanup()
+    }
+
+    private fun cleanTempApk() {
+        applicationScope.launch {
+            File(cacheDir, "apk").deleteRecursively()
+        }
     }
 
     private fun runUpgradeCleanup() {
@@ -58,17 +66,25 @@ class MercaderistasApp : Application(), Configuration.Provider {
         preferencesRepository.setLastVersionCode(BuildConfig.VERSION_CODE)
     }
 
-    private fun createNotificationChannel() {
+    private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
+            val promociones = NotificationChannel(
                 "promociones",
                 "Promociones",
                 NotificationManager.IMPORTANCE_DEFAULT,
             ).apply {
                 description = "Notificaciones de promociones por vencer"
             }
+            val actualizaciones = NotificationChannel(
+                UpdateViewModel.UPDATE_CHANNEL_ID,
+                "Actualizaciones",
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply {
+                description = "Notificaciones de nuevas versiones disponibles"
+            }
             val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+            manager.createNotificationChannel(promociones)
+            manager.createNotificationChannel(actualizaciones)
         }
     }
 
