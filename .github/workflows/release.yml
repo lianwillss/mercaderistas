@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -34,3 +37,4 @@ jobs:
         with:
           files: app/build/outputs/apk/release/app-universal-release.apk
           generate_release_notes: true
+          overwrite: true
