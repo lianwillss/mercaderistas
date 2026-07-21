@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import com.rutamercaderistas.BuildConfig
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.res.stringResource
 import com.rutamercaderistas.R
@@ -37,6 +38,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextOverflow
@@ -141,10 +144,12 @@ fun StoreCard(
                             overflow = TextOverflow.Ellipsis,
                         )
                         if (hasPromos) {
+                            val promosCd = stringResource(R.string.promociones_cd)
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = "\uD83D\uDD25",
                                 style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.semantics { contentDescription = promosCd },
                             )
                         }
                     }
@@ -335,22 +340,28 @@ private fun buildStoreShareText(
 @Preview(showBackground = true)
 @Composable
 private fun StoreCardPreview() {
-    StoreCardPreviewContent()
+    if (BuildConfig.DEBUG) {
+        StoreCardPreviewContent()
+    }
 }
 
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun StoreCardPreviewDark() {
-    StoreCardPreviewContent()
+    if (BuildConfig.DEBUG) {
+        StoreCardPreviewContent()
+    }
 }
 
 @Preview(showBackground = true)
 @Composable
 private fun StoreCardPreviewEmpty() {
-    StoreCardPreviewContent(
-        marcasConPromo = false,
-        withPromotions = false,
-    )
+    if (BuildConfig.DEBUG) {
+        StoreCardPreviewContent(
+            marcasConPromo = false,
+            withPromotions = false,
+        )
+    }
 }
 
 @Composable

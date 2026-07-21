@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
+import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.R
 import com.rutamercaderistas.services.RuteroRepository
 import com.rutamercaderistas.ui.theme.ComponentShapes
@@ -136,31 +137,37 @@ private fun StatCard(
 @Preview(showBackground = true)
 @Composable
 private fun StatsCardsPreview() {
-    com.rutamercaderistas.ui.theme.MercaderistasTheme {
-        StatsCards(
-            stats = RuteroRepository.Stats(12, 45, 67),
-            onLocalesClick = {},
-            onMarcasClick = {},
-            marcasConPromo = 3,
-        )
+    if (BuildConfig.DEBUG) {
+        com.rutamercaderistas.ui.theme.MercaderistasTheme {
+            StatsCards(
+                stats = RuteroRepository.Stats(12, 45, 67),
+                onLocalesClick = {},
+                onMarcasClick = {},
+                marcasConPromo = 3,
+            )
+        }
     }
 }
 
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun StatsCardsPreviewDark() {
-    StatsCardsPreview()
+    if (BuildConfig.DEBUG) {
+        StatsCardsPreview()
+    }
 }
 
 @Preview(showBackground = true)
 @Composable
 private fun StatsCardsPreviewNoPromos() {
-    com.rutamercaderistas.ui.theme.MercaderistasTheme {
-        StatsCards(
-            stats = RuteroRepository.Stats(8, 20, 30),
-            onLocalesClick = {},
-            onMarcasClick = {},
-            marcasConPromo = 0,
-        )
+    if (BuildConfig.DEBUG) {
+        com.rutamercaderistas.ui.theme.MercaderistasTheme {
+            StatsCards(
+                stats = RuteroRepository.Stats(8, 20, 30),
+                onLocalesClick = {},
+                onMarcasClick = {},
+                marcasConPromo = 0,
+            )
+        }
     }
 }

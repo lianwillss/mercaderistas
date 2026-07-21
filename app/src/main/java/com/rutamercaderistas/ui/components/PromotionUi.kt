@@ -20,6 +20,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
@@ -44,11 +46,14 @@ fun PromotionBadge(
             .clickable(onClick = onClick)
             .padding(horizontal = 5.dp, vertical = 2.dp)
     ) {
+        val promoIconCd = stringResource(R.string.promo_icon_cd)
+        val expandidoCd = stringResource(R.string.expandido_cd)
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            Text(text = "\uD83D\uDD25", style = MaterialTheme.typography.labelSmall)
+            Text(text = "\uD83D\uDD25", style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.semantics { contentDescription = promoIconCd })
             Text(
                 text = stringResource(R.string.promos_count, count, if (count != 1) "s" else ""),
                 style = MaterialTheme.typography.labelSmall,
@@ -59,6 +64,7 @@ fun PromotionBadge(
                     text = "▲",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.semantics { contentDescription = expandidoCd },
                 )
             }
         }
@@ -91,8 +97,6 @@ fun PromoPriceLabel(price: String) {
         color = color,
     )
 }
-
-private fun formatDate(iso: String): String = DateFormatters.formatFull(iso)
 
 @Composable
 fun PromotionList(

@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
+import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.models.DiaSemana
 
 @Composable
@@ -91,18 +91,22 @@ fun DaySelector(
 @Preview(showBackground = true)
 @Composable
 fun DaySelectorPreview() {
-    com.rutamercaderistas.ui.theme.MercaderistasTheme {
-        DaySelector(
-            days = listOf(DiaSemana.LUNES, DiaSemana.MARTES, DiaSemana.MIERCOLES),
-            dayNumbers = listOf(15, 16, 17),
-            selectedIndex = 0,
-            onDaySelected = {},
-        )
+    if (BuildConfig.DEBUG) {
+        com.rutamercaderistas.ui.theme.MercaderistasTheme {
+            DaySelector(
+                days = listOf(DiaSemana.LUNES, DiaSemana.MARTES, DiaSemana.MIERCOLES),
+                dayNumbers = listOf(15, 16, 17),
+                selectedIndex = 0,
+                onDaySelected = {},
+            )
+        }
     }
 }
 
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun DaySelectorPreviewDark() {
-    DaySelectorPreview()
+    if (BuildConfig.DEBUG) {
+        DaySelectorPreview()
+    }
 }

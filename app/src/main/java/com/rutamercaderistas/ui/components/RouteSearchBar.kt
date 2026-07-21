@@ -5,8 +5,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.ui.res.stringResource
+import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.R
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -341,19 +341,23 @@ private fun findMatchRange(original: String, query: String): IntRange? {
 @Preview(showBackground = true)
 @Composable
 private fun RouteSearchBarPreview() {
-    com.rutamercaderistas.ui.theme.MercaderistasTheme {
-        RouteSearchBar(
-            routes = listOf("Ruta Norte", "Ruta Sur", "Ruta Centro"),
-            recentRoutes = listOf("Ruta Norte"),
-            selectedRoute = null,
-            onRouteSelected = {},
-            onSearchActiveChanged = {},
-        )
+    if (BuildConfig.DEBUG) {
+        com.rutamercaderistas.ui.theme.MercaderistasTheme {
+            RouteSearchBar(
+                routes = listOf("Ruta Norte", "Ruta Sur", "Ruta Centro"),
+                recentRoutes = listOf("Ruta Norte"),
+                selectedRoute = null,
+                onRouteSelected = {},
+                onSearchActiveChanged = {},
+            )
+        }
     }
 }
 
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun RouteSearchBarPreviewDark() {
-    RouteSearchBarPreview()
+    if (BuildConfig.DEBUG) {
+        RouteSearchBarPreview()
+    }
 }

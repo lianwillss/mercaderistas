@@ -23,6 +23,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.res.stringResource
+import com.rutamercaderistas.R
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -93,6 +97,7 @@ fun IosModal(
                                     }
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
+                                val cerrarCd = stringResource(R.string.cerrar_cd)
                                 Box(
                                     modifier = Modifier
                                         .size(40.dp)
@@ -105,6 +110,7 @@ fun IosModal(
                                         text = "\u2715",
                                         style = MaterialTheme.typography.labelLarge,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.semantics { contentDescription = cerrarCd },
                                     )
                                 }
                             }

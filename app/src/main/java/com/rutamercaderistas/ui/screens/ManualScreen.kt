@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.res.stringResource
+import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.R
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -369,7 +370,9 @@ private fun ChainColorRow(name: String, color: Color, softColor: Color) {
 @Preview(showBackground = true)
 @Composable
 private fun ManualScreenPreview() {
-    com.rutamercaderistas.ui.theme.MercaderistasTheme {
-        ManualScreen(onClose = {})
+    if (BuildConfig.DEBUG) {
+        com.rutamercaderistas.ui.theme.MercaderistasTheme {
+            ManualScreen(onClose = {})
+        }
     }
 }

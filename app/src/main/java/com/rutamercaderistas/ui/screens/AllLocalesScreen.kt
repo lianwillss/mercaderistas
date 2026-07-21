@@ -46,6 +46,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
+import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.R
 import com.rutamercaderistas.models.LocalDelDia
 import com.rutamercaderistas.ui.theme.AccentBlue
@@ -226,11 +227,13 @@ fun AllLocalesScreen(
 @Preview(showBackground = true)
 @Composable
 private fun AllLocalesScreenPreview() {
-    com.rutamercaderistas.ui.theme.MercaderistasTheme {
-        AllLocalesScreen(
-            locales = emptyList(),
-            onClose = {},
-            onAddressClick = {},
-        )
+    if (BuildConfig.DEBUG) {
+        com.rutamercaderistas.ui.theme.MercaderistasTheme {
+            AllLocalesScreen(
+                locales = emptyList(),
+                onClose = {},
+                onAddressClick = {},
+            )
+        }
     }
 }

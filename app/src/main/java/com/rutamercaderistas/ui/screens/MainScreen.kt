@@ -38,6 +38,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
@@ -346,6 +348,7 @@ private fun MainRoute(
                                             .padding(horizontal = 24.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
+                                        val sinConexionCd = stringResource(R.string.sin_conexion_cd)
                                         Box(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(8.dp))
@@ -356,6 +359,7 @@ private fun MainRoute(
                                                 text = "\uD83D\uDCE6 " + stringResource(R.string.sin_conexion_datos),
                                                 style = MaterialTheme.typography.labelLarge,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.semantics { contentDescription = sinConexionCd },
                                             )
                                         }
                                     }

@@ -184,4 +184,10 @@
     <string name="frecuencia_cd">Frecuencia</string>
     <string name="store_icon_cd">Icono tienda</string>
     <string name="promo_icon_cd">Icono promoción</string>
+    <string name="por_vencer_cd">Próximas a vencer</string>
+    <string name="promociones_cd">Tiene promociones</string>
+    <string name="cerrar_cd">Cerrar</string>
+    <string name="expandido_cd">Expandido</string>
+    <string name="sin_conexion_cd">Sin conexión</string>
+    <string name="todas_cd">Todas</string>
 </resources>

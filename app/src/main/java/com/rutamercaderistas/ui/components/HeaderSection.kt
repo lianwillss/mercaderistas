@@ -7,16 +7,16 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -26,7 +26,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.BugReport
+import com.rutamercaderistas.BuildConfig
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Refresh
@@ -219,10 +219,12 @@ fun HeaderSection(
                                     .padding(horizontal = 10.dp, vertical = 5.dp),
                                 contentAlignment = Alignment.Center,
                             ) {
+                                val porVencerCd = stringResource(R.string.por_vencer_cd)
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
                                         text = "\u26A0\uFE0F",
                                         style = MaterialTheme.typography.labelSmall,
+                                        modifier = Modifier.semantics { contentDescription = porVencerCd },
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
@@ -331,31 +333,37 @@ fun HeaderSection(
 @Preview(showBackground = true)
 @Composable
 private fun HeaderSectionPreview() {
-    com.rutamercaderistas.ui.theme.MercaderistasTheme {
-        HeaderSection(
-            isOnline = true,
-            lastSyncRelative = "hace 2 min",
-            onRefresh = {},
-            onOpenManual = {},
-        )
+    if (BuildConfig.DEBUG) {
+        com.rutamercaderistas.ui.theme.MercaderistasTheme {
+            HeaderSection(
+                isOnline = true,
+                lastSyncRelative = "hace 2 min",
+                onRefresh = {},
+                onOpenManual = {},
+            )
+        }
     }
 }
 
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun HeaderSectionPreviewDark() {
-    HeaderSectionPreview()
+    if (BuildConfig.DEBUG) {
+        HeaderSectionPreview()
+    }
 }
 
 @Preview(showBackground = true)
 @Composable
 private fun HeaderSectionPreviewOffline() {
-    com.rutamercaderistas.ui.theme.MercaderistasTheme {
-        HeaderSection(
-            isOnline = false,
-            lastSyncRelative = "sin conexión",
-            onRefresh = {},
-            onOpenManual = {},
-        )
+    if (BuildConfig.DEBUG) {
+        com.rutamercaderistas.ui.theme.MercaderistasTheme {
+            HeaderSection(
+                isOnline = false,
+                lastSyncRelative = "sin conexión",
+                onRefresh = {},
+                onOpenManual = {},
+            )
+        }
     }
 }

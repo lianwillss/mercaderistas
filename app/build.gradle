@@ -17,6 +17,8 @@ android {
         versionCode 11031
         versionName "11.31"
         resConfigs "es"
+        // TODO: Replace with real Sentry DSN from https://sentry.io/settings/projects/
+        buildConfigField "String", "SENTRY_DSN", '"https://placeholder@o0.ingest.sentry.io/0"'
     }
 
     // ── Local keystore properties (dev machine only, gitignored) ──
@@ -181,6 +183,11 @@ dependencies {
 
     // ── Timber para logging consistente ────────────────────────
     implementation 'com.jakewharton.timber:timber:5.0.1'
+
+    // ── Sentry (error tracking) ──────────────────────────────
+    implementation platform('io.sentry:sentry-bom:8.33.0')
+    implementation 'io.sentry:sentry-android'
+    implementation 'io.sentry:sentry-android-timber'
 
     // ── Tests ────────────────────────────────────────────────
     testImplementation 'junit:junit:4.13.2'
