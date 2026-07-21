@@ -18,15 +18,11 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,9 +30,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -63,6 +56,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -73,12 +67,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.github.barteksc.pdfviewer.PDFView
+import com.rutamercaderistas.R
+import com.rutamercaderistas.ui.components.PdfGridModal
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -119,14 +116,19 @@ fun PdfViewerScreen(
     var dragAccumulator by remember { mutableFloatStateOf(0f) }
     var showGrid by remember { mutableStateOf(false) }
     var pdfRenderer by remember { mutableStateOf<PdfRenderer?>(null) }
-    val thumbnailCache = remember { mutableMapOf<Int, Bitmap>() }
+    val thumbnailCache = remember {
+        object : LinkedHashMap<Int, Bitmap>(0, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, Bitmap>?): Boolean = size > 40
+        }
+    }
 
     val pageRange = pageStart..pageEnd.coerceAtLeast(pageStart)
     val pageCount = pageRange.count()
     val view = LocalView.current
+    val ctx = LocalContext.current
 
     if (pdfFile == null || !pdfFile.exists()) {
-        errorMessage = if (pdfFile == null) "PDF no disponible" else "Archivo no encontrado"
+        errorMessage = if (pdfFile == null) stringResource(R.string.pdf_no_disponible) else stringResource(R.string.pdf_archivo_no_encontrado)
     }
 
     LaunchedEffect(currentPage) {
@@ -169,7 +171,7 @@ fun PdfViewerScreen(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(
                                 imageVector = Icons.Outlined.PictureAsPdf,
-                                contentDescription = null,
+                                contentDescription = stringResource(R.string.pdf_no_disponible),
                                 modifier = Modifier.size(64.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                             )
@@ -203,7 +205,7 @@ fun PdfViewerScreen(
                                         currentPage = page
                                         resetChromeTimer()
                                     }
-                                    .onError { isLoading = false; errorMessage = "Error al cargar el PDF" }
+                                    .onError { isLoading = false; errorMessage = ctx.getString(R.string.pdf_error_carga) }
                                     .load()
                                 pdfViewRef = this
                                 setMinZoom(1f)
@@ -228,14 +230,14 @@ fun PdfViewerScreen(
                                 title = {
                                     Column {
                                         Text(
-                                            text = brandName ?: "Manual de marcas",
+                                            text = brandName ?: stringResource(R.string.pdf_manual_marcas),
                                             style = MaterialTheme.typography.titleLarge,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                         )
                                         if (totalPages > 0) {
                                             Text(
-                                                text = "P\u00E1gina ${currentPage + 1} de $totalPages",
+                                                text = stringResource(R.string.pdf_pagina_formato, currentPage + 1, totalPages),
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
@@ -246,7 +248,7 @@ fun PdfViewerScreen(
                                     IconButton(onClick = onClose) {
                                         Icon(
                                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                            contentDescription = "Cerrar",
+                                            contentDescription = stringResource(R.string.cerrar),
                                         )
                                     }
                                 },
@@ -261,7 +263,7 @@ fun PdfViewerScreen(
                                     ) {
                                         Icon(
                                             imageVector = Icons.Filled.Apps,
-                                            contentDescription = "Vista en cuadr\u00EDcula",
+                                            contentDescription = stringResource(R.string.pdf_vista_cuadricula_cd),
                                         )
                                     }
                                 },
@@ -357,13 +359,12 @@ fun PdfViewerScreen(
         enter = scaleIn(initialScale = 0.9f) + fadeIn(),
         exit = scaleOut(targetScale = 0.9f) + fadeOut(),
     ) {
-        ThumbnailGrid(
+        PdfGridModal(
             brandName = brandName,
+            renderer = pdfRenderer,
             pageRange = pageRange,
             currentPage = currentPage,
-            pdfRenderer = pdfRenderer,
-            pdfViewRef = pdfViewRef,
-            thumbnailCache = thumbnailCache,
+            cache = thumbnailCache,
             onPageSelected = { page ->
                 pdfViewRef?.jumpTo(page, true)
                 currentPage = page
@@ -375,7 +376,7 @@ fun PdfViewerScreen(
     }
 }
 
-private fun renderThumbnail(renderer: PdfRenderer, pageIndex: Int): Bitmap {
+fun renderThumbnail(renderer: PdfRenderer, pageIndex: Int): Bitmap {
     val page = renderer.openPage(pageIndex)
     val w = 150
     val h = (w * page.height / page.width).coerceAtLeast(100)
@@ -385,155 +386,4 @@ private fun renderThumbnail(renderer: PdfRenderer, pageIndex: Int): Bitmap {
     return bmp
 }
 
-@Composable
-private fun ThumbnailGrid(
-    brandName: String?,
-    pageRange: IntRange,
-    currentPage: Int,
-    pdfRenderer: PdfRenderer?,
-    pdfViewRef: PDFView?,
-    thumbnailCache: MutableMap<Int, Bitmap>,
-    onPageSelected: (Int) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.5f))
-            .clickable(onClick = onDismiss),
-    ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.92f)
-                .fillMaxHeight(0.7f)
-                .align(Alignment.Center)
-                .clayHighlight(RoundedCornerShape(20.dp)),
-            shape = RoundedCornerShape(20.dp),
-            color = ClaySurface,
-            shadowElevation = 0.dp,
-            tonalElevation = 0.dp,
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = brandName ?: "Seleccionar p\u00E1gina",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.weight(1f),
-                    )
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            imageVector = Icons.Filled.Close,
-                            contentDescription = "Cerrar",
-                        )
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 100.dp),
-                    contentPadding = PaddingValues(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    itemsIndexed(pageRange.toList()) { index, pageNum ->
-                        ThumbnailItem(
-                            pageNum = pageNum,
-                            renderer = pdfRenderer,
-                            cache = thumbnailCache,
-                            isCurrent = pageNum == currentPage,
-                            onTap = { onPageSelected(pageNum) },
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
 
-@Composable
-private fun ThumbnailItem(
-    pageNum: Int,
-    renderer: PdfRenderer?,
-    cache: MutableMap<Int, Bitmap>,
-    isCurrent: Boolean,
-    onTap: () -> Unit,
-) {
-    var bitmapState by remember { mutableStateOf<Bitmap?>(cache[pageNum]) }
-    val bmp = bitmapState
-
-    LaunchedEffect(renderer, pageNum) {
-        if (bmp != null || renderer == null) return@LaunchedEffect
-        val result = withContext(Dispatchers.IO) {
-            cache.getOrPut(pageNum) { renderThumbnail(renderer, pageNum) }
-        }
-        bitmapState = result
-    }
-
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clayHighlight(RoundedCornerShape(8.dp))
-            .clickable(onClick = onTap),
-        shape = RoundedCornerShape(8.dp),
-        color = if (isCurrent) ClaySurface else MaterialTheme.colorScheme.surfaceVariant,
-        shadowElevation = 0.dp,
-    ) {
-        Box {
-            if (bmp != null) {
-                Image(
-                    bitmap = bmp.asImageBitmap(),
-                    contentDescription = "P\u00E1gina ${pageNum + 1}",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(bmp.width.toFloat() / bmp.height.toFloat()),
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(0.7f)
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                    )
-                }
-            }
-            if (isCurrent) {
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                        ),
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                MaterialTheme.colorScheme.scrim.copy(alpha = 0.7f),
-                            ),
-                        ),
-                    )
-                    .padding(vertical = 4.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "${pageNum + 1}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Color.White,
-                )
-            }
-        }
-    }
-}

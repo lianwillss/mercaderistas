@@ -86,12 +86,13 @@ class SyncViewModel @Inject constructor(
                 )
             }
         }
+        val cb = networkCallback ?: return
         try {
             connectivityManager.registerNetworkCallback(
                 NetworkRequest.Builder()
                     .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                     .build(),
-                networkCallback!!
+                cb,
             )
         } catch (_: Exception) {
             Timber.w("connectivityManager.registerNetworkCallback failed")

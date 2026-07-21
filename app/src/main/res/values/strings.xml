@@ -127,6 +127,51 @@
     <string name="vence_manana_label">Vence mañana</string>
     <string name="vence_en_dias">Vence en %d días</string>
 
+    <!-- PDF Viewer -->
+    <string name="pdf_no_disponible">PDF no disponible</string>
+    <string name="pdf_archivo_no_encontrado">Archivo no encontrado</string>
+    <string name="pdf_error_carga">Error al cargar el PDF</string>
+    <string name="pdf_manual_marcas">Manual de marcas</string>
+    <string name="pdf_pagina_formato">Página %1$d de %2$d</string>
+    <string name="pdf_seleccionar_pagina">Seleccionar página</string>
+    <string name="pdf_vista_cuadricula_cd">Vista en cuadrícula</string>
+    <string name="pdf_pagina_cd">Página %d</string>
+
+    <!-- Sync -->
+    <string name="sync_descargando">Descargando Excel…</string>
+    <string name="sync_procesando">Procesando archivo…</string>
+    <string name="sync_indexando">Indexando rutas…</string>
+    <string name="sync_actualizando_promos">Actualizando promociones…</string>
+    <string name="sync_datos_actualizados">Datos actualizados</string>
+    <string name="sync_sin_conexion">Sin conexión</string>
+    <string name="sync_sin_internet">Sin conexión a Internet</string>
+    <string name="sync_error_drive">Error de descarga desde Drive. Revisa tu conexión o inténtalo más tarde.</string>
+    <string name="sync_error_excel">No se pudo leer el Excel</string>
+    <string name="sync_error_general">Error de sincronización</string>
+
+    <!-- Route -->
+    <string name="ruta_selecciona_primero">Selecciona una ruta primero</string>
+    <string name="ruta_error_compartir">Error al compartir: %s</string>
+    <string name="ruta_error_exportar">Error al exportar: %s</string>
+    <string name="ruta_error_promos">No se pudieron descargar las promociones</string>
+    <string name="ruta_hoy">hoy</string>
+    <string name="ruta_ahora">ahora</string>
+    <string name="ruta_hace_min">hace %d min</string>
+    <string name="ruta_hace_h">hace %d h</string>
+    <string name="ruta_hace_d">hace %d d</string>
+
+    <!-- Promotions date -->
+    <string name="promo_desde">Desde </string>
+    <string name="promo_hasta">Hasta </string>
+    <string name="promo_separador"> → </string>
+
+    <!-- Promo expiring -->
+    <string name="promo_vencio">Venció</string>
+
+    <!-- Share text (StoreCard) -->
+    <string name="share_marcas_formato">Marcas (%d):</string>
+    <string name="share_promo_count">🔥 %d promo%s</string>
+
     <!-- Content descriptions -->
     <string name="volver_cd">Volver</string>
     <string name="buscar_cd">Buscar</string>

@@ -93,10 +93,11 @@ object PdfBrandScanner {
     }
 
     private fun getRecognizer(): TextRecognizer {
-        if (recognizer == null) {
-            recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        val existing = recognizer
+        if (existing != null) return existing
+        return TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS).also {
+            recognizer = it
         }
-        return recognizer!!
     }
 
     fun release() {

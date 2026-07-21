@@ -32,9 +32,9 @@ val chainColorsHex: Map<String, Long> = ALL_CHAINS
     .associate { it.name to it.colorHex }
 
 internal val holdingToChains: Map<String, Set<String>> = ALL_CHAINS
-    .filter { it.holding != null }
-    .groupBy { it.holding!! }
-    .mapValues { (_, chains) -> chains.map { it.name }.toSet() }
+    .mapNotNull { chain -> chain.holding?.let { holding -> holding to chain } }
+    .groupBy { (holding, _) -> holding }
+    .mapValues { (_, pairs) -> pairs.map { (_, chain) -> chain.name }.toSet() }
 
 private val chainPrefixIndex: List<Pair<String, String>> = ALL_CHAINS
     .flatMap { chain -> chain.prefixes.map { it to chain.name } }
