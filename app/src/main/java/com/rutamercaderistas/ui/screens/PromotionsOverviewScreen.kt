@@ -351,13 +351,15 @@ fun PromotionsOverviewScreen(
                         items = filteredEntries,
                         key = { _, entry -> entry.first },
                     ) { index, (brand, promos) ->
-                        BrandCard(
-                            brand = brand,
-                            promos = promos,
-                            chainToLocales = chainToLocales,
-                            onPromoClick = onPromoClick,
-                            onSharePromo = onSharePromo,
-                        )
+                        Box(modifier = Modifier.animateItem()) {
+                            BrandCard(
+                                brand = brand,
+                                promos = promos,
+                                chainToLocales = chainToLocales,
+                                onPromoClick = onPromoClick,
+                                onSharePromo = onSharePromo,
+                            )
+                        }
                     }
                 }
             }

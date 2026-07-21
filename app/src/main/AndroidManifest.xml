@@ -18,6 +18,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.RutaMercaderistas">
 
+        <meta-data
+            android:name="io.sentry.auto-init"
+            android:value="false"
+            tools:node="replace" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

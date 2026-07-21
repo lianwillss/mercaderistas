@@ -10,6 +10,7 @@ import com.rutamercaderistas.data.preferences.BrandPagesRepository
 import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.viewmodel.UpdateViewModel
 import dagger.hilt.android.HiltAndroidApp
+import io.sentry.android.core.SentryAndroid
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -34,12 +35,27 @@ class MercaderistasApp : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        initSentry()
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         }
         createNotificationChannels()
         cleanTempApk()
         runUpgradeCleanup()
+    }
+
+    private fun initSentry() {
+        val dsn = BuildConfig.SENTRY_DSN
+        if (dsn.isBlank()) return
+        try {
+            SentryAndroid.init(this) { options ->
+                options.dsn = dsn
+                options.tracesSampleRate = 0.2
+                options.environment = BuildConfig.BUILD_TYPE
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "Sentry initialization failed")
+        }
     }
 
     private fun cleanTempApk() {

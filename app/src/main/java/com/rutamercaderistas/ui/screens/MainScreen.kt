@@ -377,7 +377,7 @@ private fun MainRoute(
                     onBrandClick = onBrandClick,
                     onAddressClick = onAddressClick,
                     onShareLocal = onShareLocal,
-                    modifier = Modifier.padding(horizontal = 20.dp),
+                    modifier = Modifier.animateItem().padding(horizontal = 20.dp),
                 )
             }
                         }

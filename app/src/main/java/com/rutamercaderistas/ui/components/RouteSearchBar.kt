@@ -220,16 +220,18 @@ fun RouteSearchBar(
                                     )
                             }
                             items(items = recentRoutes, key = { it }) { route ->
-                                SuggestionItem(
-                                    text = route,
-                                    query = "",
-                                    onClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        text = route
-                                        onRouteSelected(route)
-                                        focusManager.clearFocus()
-                                    }
-                                )
+                                Box(modifier = Modifier.animateItem()) {
+                                    SuggestionItem(
+                                        text = route,
+                                        query = "",
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            text = route
+                                            onRouteSelected(route)
+                                            focusManager.clearFocus()
+                                        }
+                                    )
+                                }
                             }
                         } else if (text.isNotBlank() && suggestions.isEmpty()) {
                             item(key = "empty") {
@@ -242,7 +244,7 @@ fun RouteSearchBar(
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                         Icon(
                                             imageVector = Icons.Outlined.Search,
-                                            contentDescription = null,
+                                            contentDescription = stringResource(R.string.buscar_cd),
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                                             modifier = Modifier.size(40.dp)
                                         )
@@ -257,16 +259,18 @@ fun RouteSearchBar(
                             }
                         } else {
                             items(items = suggestions, key = { it }) { route ->
-                                SuggestionItem(
-                                    text = route,
-                                    query = text,
-                                    onClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        text = route
-                                        onRouteSelected(route)
-                                        focusManager.clearFocus()
-                                    }
-                                )
+                                Box(modifier = Modifier.animateItem()) {
+                                    SuggestionItem(
+                                        text = route,
+                                        query = text,
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            text = route
+                                            onRouteSelected(route)
+                                            focusManager.clearFocus()
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -291,7 +295,7 @@ private fun SuggestionItem(
     ) {
         Icon(
             imageVector = Icons.Outlined.Search,
-            contentDescription = null,
+            contentDescription = stringResource(R.string.buscar_cd),
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
             modifier = Modifier.size(18.dp)
         )

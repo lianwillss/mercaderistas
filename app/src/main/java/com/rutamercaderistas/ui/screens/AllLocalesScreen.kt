@@ -145,7 +145,7 @@ fun AllLocalesScreen(
                 key = { _, local -> local.codigo + local.local }
             ) { _, local ->
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.animateItem().fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
