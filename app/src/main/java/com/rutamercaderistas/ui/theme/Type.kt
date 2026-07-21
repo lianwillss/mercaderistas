@@ -48,6 +48,7 @@ val AppTypography = Typography(
         fontSize = 28.sp,
         lineHeight = 34.sp,
         letterSpacing = (-0.25).sp,
+        fontFeatureSettings = "tnum",
     ),
     headlineSmall = TextStyle(
         fontFamily = InterFont,
@@ -55,6 +56,7 @@ val AppTypography = Typography(
         fontSize = 24.sp,
         lineHeight = 30.sp,
         letterSpacing = (-0.25).sp,
+        fontFeatureSettings = "tnum",
     ),
     titleLarge = TextStyle(
         fontFamily = InterFont,
@@ -92,7 +94,7 @@ val AppTypography = Typography(
     ),
     bodySmall = TextStyle(
         fontFamily = InterFont,
-        fontWeight = FontWeight.Medium,
+        fontWeight = FontWeight.Normal,
         fontSize = 13.sp,
         lineHeight = 18.sp,
         letterSpacing = 0.4.sp,

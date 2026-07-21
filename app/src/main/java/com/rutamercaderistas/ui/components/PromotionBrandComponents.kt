@@ -52,6 +52,7 @@ import com.rutamercaderistas.ui.theme.PromoGradientEnd
 import com.rutamercaderistas.ui.theme.PromoGradientStart
 import com.rutamercaderistas.ui.theme.UrgencyBadgeSoft
 import com.rutamercaderistas.ui.theme.UrgencyOrange
+import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.UrgencyOrangeSoft
 import com.rutamercaderistas.ui.theme.UrgencyTomorrowSoft
 import timber.log.Timber
@@ -110,7 +111,7 @@ fun BrandCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = ComponentShapes.card,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
     ) {
