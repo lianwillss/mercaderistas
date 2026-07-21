@@ -17,8 +17,8 @@ import com.rutamercaderistas.services.PromotionRepository
 import com.rutamercaderistas.services.RecentRoutesStore
 import com.rutamercaderistas.services.RuteroManager
 import com.rutamercaderistas.services.RuteroRepository
-import com.rutamercaderistas.ui.components.effectiveChain
-import com.rutamercaderistas.ui.components.normalizeChain
+import com.rutamercaderistas.domain.model.effectiveChain
+import com.rutamercaderistas.domain.model.normalizeChain
 import com.rutamercaderistas.utils.cleanBrand
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -67,6 +67,7 @@ data class RouteUiState(
     val promotions: PromotionsState = PromotionsState.Idle,
     val chainToLocales: Map<String, String> = emptyMap(),
     val routeBrands: Set<String> = emptySet(),
+    val routeChains: Set<String> = emptySet(),
     val lastSyncRelative: String = "",
     val snackbarMessage: String? = null,
     val needsInitialLoad: Boolean = false,
@@ -139,6 +140,9 @@ class RouteViewModel @Inject constructor(
                     val allLocales = repository.getAllLocales()
                     val selectedRoute = repository.getActiveRuteroName()
                     val routeBrands = computeRouteBrands(allLocales)
+                    val routeChains = allLocales.mapNotNull { locale ->
+                        effectiveChain(locale.cadena, locale.formato).takeIf { it.isNotBlank() }
+                    }.map { normalizeChain(it) }.toSet()
                     val chainToLocales = computeChainToLocales(allLocales)
 
                     _uiState.update { state ->
@@ -154,6 +158,7 @@ class RouteViewModel @Inject constructor(
                             ),
                             chainToLocales = chainToLocales,
                             routeBrands = routeBrands,
+                            routeChains = routeChains,
                             needsInitialLoad = false,
                         )
                     }

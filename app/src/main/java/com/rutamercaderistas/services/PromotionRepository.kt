@@ -30,10 +30,6 @@ class PromotionRepository @Inject constructor(
 ) {
     private val refreshing = AtomicBoolean(false)
 
-    suspend fun getPromotions(brand: String, chain: String): List<PromotionEntity> {
-        return promotionDao.getPromotions(brand, chain)
-    }
-
     suspend fun refresh(): Boolean {
         if (!refreshing.compareAndSet(false, true)) {
             Timber.d("Promociones: refresh ya en curso — salteando")

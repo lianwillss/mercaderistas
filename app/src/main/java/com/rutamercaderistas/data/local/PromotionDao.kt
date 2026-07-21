@@ -8,12 +8,6 @@ import androidx.room.Query
 @Dao
 interface PromotionDao {
 
-    @Query("SELECT * FROM promotions WHERE LOWER(brand) = LOWER(:brand) AND LOWER(chain) = LOWER(:chain)")
-    suspend fun getPromotions(brand: String, chain: String): List<PromotionEntity>
-
-    @Query("SELECT * FROM promotions WHERE LOWER(brand) = LOWER(:brand)")
-    suspend fun getPromotionsByBrand(brand: String): List<PromotionEntity>
-
     @Query("DELETE FROM promotions")
     suspend fun deleteAll()
 

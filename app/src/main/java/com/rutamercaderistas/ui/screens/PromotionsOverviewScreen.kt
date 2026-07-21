@@ -68,8 +68,8 @@ import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.ui.DateFormatters
 import com.rutamercaderistas.ui.components.ShimmerPromotionsContent
+import com.rutamercaderistas.domain.model.normalizeChain
 import com.rutamercaderistas.ui.components.chainColor
-import com.rutamercaderistas.ui.components.normalizeChain
 import com.rutamercaderistas.ui.theme.DiscountRed
 import com.rutamercaderistas.ui.theme.DiscountSoft
 import com.rutamercaderistas.ui.theme.PromoGradientEnd
@@ -125,6 +125,7 @@ fun PromotionsOverviewScreen(
     promotionErrorMessage: String? = null,
     onDismissError: () -> Unit = {},
     routeBrands: Set<String> = emptySet(),
+    routeChains: Set<String> = emptySet(),
 ) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var soloMisMarcas by rememberSaveable { mutableStateOf(false) }
@@ -159,11 +160,15 @@ fun PromotionsOverviewScreen(
                 .thenBy { (brand, _) -> brand })
     }
 
-    val brandFiltered = remember(sortedEntries, soloMisMarcas, routeBrands) {
+    val brandFiltered = remember(sortedEntries, soloMisMarcas, routeBrands, routeChains) {
         if (soloMisMarcas && routeBrands.isNotEmpty()) {
-            sortedEntries.filter { (brand, _) ->
+            sortedEntries.map { (brand, promos) ->
+                brand to if (routeChains.isNotEmpty()) {
+                    promos.filter { normalizeChain(it.chain) in routeChains }
+                } else promos
+            }.filter { (brand, _) ->
                 brand.lowercase() in routeBrands.map { it.lowercase() }
-            }
+            }.filter { (_, promos) -> promos.isNotEmpty() }
         } else sortedEntries
     }
 

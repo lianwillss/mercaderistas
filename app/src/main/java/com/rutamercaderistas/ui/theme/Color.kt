@@ -1,7 +1,7 @@
 package com.rutamercaderistas.ui.theme
 
 import androidx.compose.ui.graphics.Color
-import com.rutamercaderistas.ui.components.normalizeChain
+import com.rutamercaderistas.domain.model.normalizeChain
 
 val Background = Color(0xFFF8F9FA)
 val Surface = Color(0xFFFFFFFF)

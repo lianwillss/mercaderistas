@@ -157,6 +157,7 @@ fun MainScreen(
                 promotionErrorMessage = routeUiState.promotionErrorMessage,
                 onDismissError = onClearPromotionError,
                 routeBrands = routeUiState.routeBrands,
+                routeChains = routeUiState.routeChains,
                 onSharePromo = onSharePromo,
             )
         }

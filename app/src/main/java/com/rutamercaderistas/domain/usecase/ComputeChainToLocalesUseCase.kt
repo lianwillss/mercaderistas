@@ -1,7 +1,7 @@
 package com.rutamercaderistas.domain.usecase
 
 import com.rutamercaderistas.models.LocalDelDia
-import com.rutamercaderistas.ui.components.effectiveChain
+import com.rutamercaderistas.domain.model.effectiveChain
 import javax.inject.Inject
 
 class ComputeChainToLocalesUseCase @Inject constructor() {

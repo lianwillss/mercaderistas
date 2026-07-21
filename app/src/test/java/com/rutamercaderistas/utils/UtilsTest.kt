@@ -1,7 +1,11 @@
 package com.rutamercaderistas.utils
 
-import com.rutamercaderistas.ui.components.normalizeChain
+import com.rutamercaderistas.domain.model.effectiveChain
+import com.rutamercaderistas.domain.model.matchesChain
+import com.rutamercaderistas.domain.model.normalizeChain
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
 
@@ -64,6 +68,45 @@ class UtilsTest {
     @Test
     fun `normalizeChain trims whitespace`() {
         assertEquals("LIDER", normalizeChain("  LIDER  "))
+    }
+
+    // ── effectiveChain ──
+
+    @Test
+    fun `effectiveChain returns formato when present`() {
+        assertEquals("JUMBO", effectiveChain("CENCOSUD", "JUMBO"))
+    }
+
+    @Test
+    fun `effectiveChain returns cadena when formato blank`() {
+        assertEquals("CENCOSUD", effectiveChain("CENCOSUD", ""))
+    }
+
+    // ── matchesChain ──
+
+    @Test
+    fun `matchesChain matches by store name`() {
+        assertTrue(matchesChain("JUMBO", "Jumbo Centro", "CENCOSUD", ""))
+    }
+
+    @Test
+    fun `matchesChain matches by formato`() {
+        assertTrue(matchesChain("JUMBO", "Centro", "CENCOSUD", "JUMBO"))
+    }
+
+    @Test
+    fun `matchesChain rejects different chain same holding`() {
+        assertFalse(matchesChain("SANTA ISABEL", "Jumbo Centro", "CENCOSUD", ""))
+    }
+
+    @Test
+    fun `matchesChain rejects unrecognizable store with no formato`() {
+        assertFalse(matchesChain("JUMBO", "Almacen Don Pepe", "CENCOSUD", ""))
+    }
+
+    @Test
+    fun `matchesChain is case insensitive`() {
+        assertTrue(matchesChain("jumbo", "JUMBO CENTRO", "CENCOSUD", ""))
     }
 
     // ── countExpiringToday (pure logic) ──
