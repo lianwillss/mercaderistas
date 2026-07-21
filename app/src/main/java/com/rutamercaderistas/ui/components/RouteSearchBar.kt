@@ -1,8 +1,11 @@
 package com.rutamercaderistas.ui.components
 
+import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.ui.res.stringResource
+import com.rutamercaderistas.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -51,6 +54,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
 private fun normalizar(s: String): String {
@@ -119,7 +123,7 @@ fun RouteSearchBar(
                 onValueChange = { text = it },
                 placeholder = {
                     Text(
-                        "Buscar ruta…",
+                        stringResource(R.string.buscar_ruta),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
@@ -127,7 +131,7 @@ fun RouteSearchBar(
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Outlined.Search,
-                        contentDescription = "Buscar",
+                        contentDescription = stringResource(R.string.buscar_cd),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 },
@@ -135,8 +139,8 @@ fun RouteSearchBar(
                     if (text.isNotEmpty()) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(18.dp))
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(20.dp))
                                 .clickable {
                                     text = ""
                                 },
@@ -144,7 +148,7 @@ fun RouteSearchBar(
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Close,
-                                contentDescription = "Limpiar",
+                                contentDescription = stringResource(R.string.limpiar_cd),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -183,8 +187,8 @@ fun RouteSearchBar(
                     .onFocusChanged { state ->
                         isFocused = state.isFocused
                     }
-                    .shadow(if (isFocused) 4.dp else 1.dp, RoundedCornerShape(28.dp))
                     .clip(RoundedCornerShape(28.dp))
+                    .shadow(if (isFocused) 4.dp else 1.dp, RoundedCornerShape(28.dp))
             )
 
             AnimatedVisibility(
@@ -209,7 +213,7 @@ fun RouteSearchBar(
                         if (showRecent) {
                             item(key = "recent_header") {
                                     Text(
-                                        text = "Recientes",
+                                        text = stringResource(R.string.recientes),
                                         style = MaterialTheme.typography.labelLarge,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp)
@@ -244,7 +248,7 @@ fun RouteSearchBar(
                                         )
                                         Spacer(modifier = Modifier.height(12.dp))
                                         Text(
-                                            text = "No se encontraron rutas",
+                                            text = stringResource(R.string.sin_rutas),
                                             style = MaterialTheme.typography.bodyMedium,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                         )
@@ -332,4 +336,24 @@ private fun findMatchRange(original: String, query: String): IntRange? {
         origIdx++
     }
     return matchStart until origIdx
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun RouteSearchBarPreview() {
+    com.rutamercaderistas.ui.theme.MercaderistasTheme {
+        RouteSearchBar(
+            routes = listOf("Ruta Norte", "Ruta Sur", "Ruta Centro"),
+            recentRoutes = listOf("Ruta Norte"),
+            selectedRoute = null,
+            onRouteSelected = {},
+            onSearchActiveChanged = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun RouteSearchBarPreviewDark() {
+    RouteSearchBarPreview()
 }

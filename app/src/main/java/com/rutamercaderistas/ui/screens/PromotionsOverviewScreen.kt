@@ -1,10 +1,6 @@
 package com.rutamercaderistas.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -53,6 +49,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -66,11 +63,21 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.ui.DateFormatters
 import com.rutamercaderistas.ui.components.ShimmerPromotionsContent
 import com.rutamercaderistas.ui.components.chainColor
 import com.rutamercaderistas.ui.components.normalizeChain
+import com.rutamercaderistas.ui.theme.DiscountRed
+import com.rutamercaderistas.ui.theme.DiscountSoft
+import com.rutamercaderistas.ui.theme.PromoGradientEnd
+import com.rutamercaderistas.ui.theme.PromoGradientStart
+import com.rutamercaderistas.ui.theme.UrgencyBadgeSoft
+import com.rutamercaderistas.ui.theme.UrgencyOrange
+import com.rutamercaderistas.ui.theme.UrgencyOrangeSoft
+import com.rutamercaderistas.ui.theme.UrgencyTomorrowSoft
 import java.time.LocalDate
 import timber.log.Timber
 
@@ -217,12 +224,12 @@ fun PromotionsOverviewScreen(
             IconButton(onClick = onClose) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Volver",
+                    contentDescription = stringResource(R.string.volver_cd),
                     tint = MaterialTheme.colorScheme.primary,
                 )
             }
             Text(
-                text = "Promociones",
+                text = stringResource(R.string.promociones_title),
                 style = MaterialTheme.typography.headlineLarge,
                 color = MaterialTheme.colorScheme.onSurface,
             )
@@ -238,7 +245,7 @@ fun PromotionsOverviewScreen(
                 onValueChange = { searchQuery = it },
                 placeholder = {
                     Text(
-                        "Buscar marca, producto\u2026",
+                        stringResource(R.string.buscar_marca_producto),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -246,7 +253,7 @@ fun PromotionsOverviewScreen(
                 leadingIcon = {
                     Icon(
                         Icons.Outlined.Search,
-                        contentDescription = "Buscar",
+                        contentDescription = stringResource(R.string.buscar_cd),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp),
                     )
@@ -259,7 +266,7 @@ fun PromotionsOverviewScreen(
                         }) {
                             Icon(
                                 Icons.Outlined.Close,
-                                contentDescription = "Limpiar",
+                                contentDescription = stringResource(R.string.limpiar_cd),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(18.dp),
                             )
@@ -284,7 +291,7 @@ fun PromotionsOverviewScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "${filteredEntries.size} marcas con promociones",
+                text = stringResource(R.string.marcas_con_promociones, filteredEntries.size),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 4.dp),
@@ -302,14 +309,14 @@ fun PromotionsOverviewScreen(
                     FilterChip(
                         selected = soloMisMarcas,
                         onClick = { soloMisMarcas = !soloMisMarcas },
-                        label = { Text("Solo mis marcas", style = MaterialTheme.typography.labelMedium) },
+                        label = { Text(stringResource(R.string.solo_mis_marcas), style = MaterialTheme.typography.labelMedium) },
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                 }
                 FilterChip(
                     selected = soloHoy,
                     onClick = { soloHoy = !soloHoy },
-                    label = { Text("Solo hoy", style = MaterialTheme.typography.labelMedium) },
+                    label = { Text(stringResource(R.string.solo_hoy), style = MaterialTheme.typography.labelMedium) },
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 allChains.forEach { chain ->
@@ -343,13 +350,13 @@ fun PromotionsOverviewScreen(
                     text = msg,
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFFD97706),
+                    color = UrgencyOrange,
                 )
                 IconButton(onClick = onDismissError) {
                     Icon(
                         Icons.Outlined.Close,
-                        contentDescription = "Descartar",
-                        tint = Color(0xFFD97706),
+                        contentDescription = stringResource(R.string.descartar_cd),
+                        tint = UrgencyOrange,
                         modifier = Modifier.size(18.dp),
                     )
                 }
@@ -364,11 +371,11 @@ fun PromotionsOverviewScreen(
             if (isRefreshing && promotionsByBrand.isEmpty()) {
                 ShimmerPromotionsContent(modifier = Modifier.padding(top = 4.dp))
             } else if (filteredEntries.isEmpty()) {
-                val emptyMsg = when {
-                    searchQuery.isNotBlank() -> "Sin resultados para \"$searchQuery\""
-                    selectedChain != "Todas" -> "Sin promociones para $selectedChain"
-                    else -> "Sin promociones activas"
-                }
+                    val emptyMsg = when {
+                        searchQuery.isNotBlank() -> stringResource(R.string.sin_resultados_para, searchQuery)
+                        selectedChain != "Todas" -> stringResource(R.string.sin_promociones_para, selectedChain)
+                        else -> stringResource(R.string.sin_promociones_activas)
+                    }
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -414,23 +421,13 @@ private fun AnimatedBrandItem(
     onPromoClick: (String) -> Unit,
     onSharePromo: (PromotionEntity) -> Unit,
 ) {
-    AnimatedVisibility(
-        visible = true,
-        enter = fadeIn(
-            animationSpec = tween(300, delayMillis = index * 60),
-        ) + slideInVertically(
-            animationSpec = tween(300, delayMillis = index * 60),
-            initialOffsetY = { it / 3 },
-        ),
-    ) {
-        BrandCard(
-            brand = brand,
-            promos = promos,
-            chainToLocales = chainToLocales,
-            onPromoClick = onPromoClick,
-            onSharePromo = onSharePromo,
-        )
-    }
+    BrandCard(
+        brand = brand,
+        promos = promos,
+        chainToLocales = chainToLocales,
+        onPromoClick = onPromoClick,
+        onSharePromo = onSharePromo,
+    )
 }
 
 @Composable
@@ -478,7 +475,7 @@ private fun BrandCard(
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.ShoppingBag,
-                        contentDescription = "Marca",
+                        contentDescription = stringResource(R.string.marca_cd),
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp),
                     )
@@ -502,7 +499,7 @@ private fun BrandCard(
                         .clip(RoundedCornerShape(50))
                         .background(
                             Brush.horizontalGradient(
-                                listOf(Color(0xFFF97316), Color(0xFFEF4444))
+                                listOf(PromoGradientStart, PromoGradientEnd)
                             )
                         )
                         .padding(horizontal = 12.dp, vertical = 6.dp),
@@ -514,7 +511,7 @@ private fun BrandCard(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "${promos.size} promo${if (promos.size != 1) "s" else ""}",
+                            text = stringResource(R.string.promos_count, promos.size, if (promos.size != 1) "s" else ""),
                             style = MaterialTheme.typography.labelMedium,
                             color = Color.White,
                         )
@@ -567,7 +564,7 @@ private fun BrandCard(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "Ver ${promos.size - 3} más",
+                        text = stringResource(R.string.ver_mas, promos.size - 3),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -632,8 +629,8 @@ private fun ProductItem(
             .clip(MaterialTheme.shapes.small)
             .background(
                 when (urg) {
-                    Urgency.TODAY -> Color(0xFFFFF0E0)
-                    Urgency.TOMORROW -> Color(0xFFFFF8F0)
+                    Urgency.TODAY -> UrgencyOrangeSoft
+                    Urgency.TOMORROW -> UrgencyTomorrowSoft
                     Urgency.NORMAL -> Color.Transparent
                 }
             )
@@ -662,9 +659,9 @@ private fun ProductItem(
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = if (urg == Urgency.TODAY) "VENCE HOY" else "TERMINA MA\u00D1ANA",
+                    text = if (urg == Urgency.TODAY) stringResource(R.string.vence_hoy) else stringResource(R.string.termina_manana),
                     style = MaterialTheme.typography.labelLarge,
-                    color = Color(0xFFD97706),
+                    color = UrgencyOrange,
                 )
             }
         }
@@ -685,7 +682,7 @@ private fun ProductItem(
                 Text(
                     text = promo.price,
                     style = MaterialTheme.typography.headlineSmall,
-                    color = if (urg != Urgency.NORMAL) Color(0xFFD97706) else MaterialTheme.colorScheme.primary,
+                    color = if (urg != Urgency.NORMAL) UrgencyOrange else MaterialTheme.colorScheme.primary,
                 )
                 if (promo.price.startsWith("$")) {
                     Spacer(modifier = Modifier.width(8.dp))
@@ -693,15 +690,15 @@ private fun ProductItem(
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
                             .background(
-                                if (urg != Urgency.NORMAL) Color(0xFFFEF3C7)
-                                else Color(0xFFFEE2E2)
+                                if (urg != Urgency.NORMAL) UrgencyBadgeSoft
+                                else DiscountSoft
                             )
                             .padding(horizontal = 6.dp, vertical = 2.dp),
                     ) {
                         Text(
-                            text = "DESCUENTO",
+                            text = stringResource(R.string.descuento),
                             style = MaterialTheme.typography.labelSmall,
-                            color = if (urg != Urgency.NORMAL) Color(0xFFD97706) else Color(0xFFDC2626),
+                            color = if (urg != Urgency.NORMAL) UrgencyOrange else DiscountRed,
                         )
                     }
                 }

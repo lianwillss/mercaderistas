@@ -23,16 +23,18 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
-data class UpdateUiState(
-    val showDialog: Boolean = false,
-    val versionName: String = "",
-    val versionCode: Int = 0,
-    val apkUrl: String = "",
-    val downloading: Boolean = false,
-    val downloadProgress: Int = 0,
-    val isChecking: Boolean = false,
-    val snackbarMessage: String? = null,
-)
+sealed interface UpdateUiState {
+    data object Idle : UpdateUiState
+    data object Checking : UpdateUiState
+    data class Dialog(
+        val versionName: String,
+        val versionCode: Int,
+        val apkUrl: String,
+        val downloading: Boolean = false,
+        val downloadProgress: Int = 0,
+    ) : UpdateUiState
+    data class Message(val text: String) : UpdateUiState
+}
 
 @HiltViewModel
 class UpdateViewModel @Inject constructor(
@@ -46,8 +48,12 @@ class UpdateViewModel @Inject constructor(
         const val EXTRA_SHOW_UPDATE = "show_update"
     }
 
-    private val _state = MutableStateFlow(UpdateUiState())
+    private val _state = MutableStateFlow<UpdateUiState>(UpdateUiState.Idle)
     val state: StateFlow<UpdateUiState> = _state.asStateFlow()
+
+    private var pendingVersionName = ""
+    private var pendingVersionCode = 0
+    private var pendingApkUrl = ""
 
     fun checkForUpdate(force: Boolean = false, showFeedback: Boolean = true) {
         viewModelScope.launch {
@@ -58,69 +64,79 @@ class UpdateViewModel @Inject constructor(
                 if (System.currentTimeMillis() < suprimidoHasta) return@launch
             }
 
-            _state.value = _state.value.copy(isChecking = true)
+            _state.value = UpdateUiState.Checking
             try {
                 val info = withContext(Dispatchers.IO) { UpdateChecker.check(BuildConfig.VERSION_CODE) }
                 if (info.available) {
-                    _state.value = _state.value.copy(
-                        isChecking = false,
-                        showDialog = true,
+                    pendingVersionName = info.versionName
+                    pendingVersionCode = info.versionCode
+                    pendingApkUrl = info.apkUrl
+                    _state.value = UpdateUiState.Dialog(
                         versionName = info.versionName,
                         versionCode = info.versionCode,
                         apkUrl = info.apkUrl,
                     )
                     postUpdateNotification(info.versionName)
                 } else if (showFeedback) {
-                    _state.value = _state.value.copy(
-                        isChecking = false,
-                        snackbarMessage = "Sin actualizaciones disponibles",
-                    )
+                    _state.value = UpdateUiState.Message("Sin actualizaciones disponibles")
                 } else {
-                    _state.value = _state.value.copy(isChecking = false)
+                    _state.value = UpdateUiState.Idle
                 }
             } catch (_: Exception) {
-                _state.value = _state.value.copy(
-                    isChecking = false,
-                    snackbarMessage = if (showFeedback) "Error al buscar actualización" else null,
-                )
+                _state.value = if (showFeedback) {
+                    UpdateUiState.Message("Error al buscar actualización")
+                } else {
+                    UpdateUiState.Idle
+                }
             }
         }
     }
 
     fun downloadAndInstall() {
         val context = getApplication<Application>()
-        _state.value = _state.value.copy(downloading = true, downloadProgress = 0)
+        _state.value = UpdateUiState.Dialog(
+            versionName = pendingVersionName,
+            versionCode = pendingVersionCode,
+            apkUrl = pendingApkUrl,
+            downloading = true,
+        )
         viewModelScope.launch {
             val ok = ApkDownloader.downloadAndInstall(
                 context,
-                _state.value.apkUrl,
-            ) { pct -> _state.value = _state.value.copy(downloadProgress = pct) }
+                pendingApkUrl,
+            ) { pct -> _state.value = UpdateUiState.Dialog(
+                versionName = pendingVersionName,
+                versionCode = pendingVersionCode,
+                apkUrl = pendingApkUrl,
+                downloading = true,
+                downloadProgress = pct,
+            ) }
             if (ok) {
-                _state.value = _state.value.copy(showDialog = false, downloading = false)
+                _state.value = UpdateUiState.Idle
             } else {
-                _state.value = _state.value.copy(
-                    downloading = false,
-                    snackbarMessage = "Error al descargar la actualización",
-                )
+                _state.value = UpdateUiState.Message("Error al descargar la actualización")
             }
         }
     }
 
     fun clearSnackbar() {
-        _state.value = _state.value.copy(snackbarMessage = null)
+        _state.value = UpdateUiState.Idle
     }
 
     fun suppressUntilTomorrow() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             val manana = System.currentTimeMillis() + Constants.UPDATE_SUPPRESS_DAYS_MS
-            preferencesRepository.setUpdateSuppressedUntil(manana)
-            _state.value = _state.value.copy(showDialog = false)
+            withContext(Dispatchers.IO) {
+                preferencesRepository.setUpdateSuppressedUntil(manana)
+            }
+            _state.value = UpdateUiState.Idle
         }
     }
 
     fun dismissDialog() {
-        if (!_state.value.downloading) {
-            _state.value = _state.value.copy(showDialog = false)
+        val current = _state.value
+        if (current is UpdateUiState.Dialog && !current.downloading) {
+            _state.value = UpdateUiState.Idle
         }
     }
 

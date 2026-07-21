@@ -46,6 +46,28 @@ fun storeColor(name: String): Color {
     }
 }
 
+// ── Semantic tokens ──────────────────────────────────
+val OnlineGreen = Color(0xFF34C759)
+val OfflineRed = Color(0xFFFF3B30)
+val UrgencyOrange = Color(0xFFD97706)
+val UrgencyOrangeSoft = Color(0xFFFFF0E0)
+val UrgencyTomorrowSoft = Color(0xFFFFF8F0)
+val ErrorRed = Color(0xFFD32F2F)
+val DiscountRed = Color(0xFFDC2626)
+val DiscountSoft = Color(0xFFFEE2E2)
+val UrgencyBadgeSoft = Color(0xFFFEF3C7)
+val PromoGradientStart = Color(0xFFF97316)
+val PromoGradientEnd = Color(0xFFEF4444)
+
+// HeaderSection gradient blues
+val HeaderDeepBlue = Color(0xFF0A2E5A)
+val HeaderMidDarkBlue = Color(0xFF0D4F8B)
+val HeaderMidBlue = Color(0xFF1A7BB5)
+val HeaderLightBlue = Color(0xFFB8DCF0)
+val Wave1Blue = Color(0xFF1A7BB5)
+val Wave2Blue = Color(0xFF2D9CDB)
+val Wave3Blue = Color(0xFF4DB8E8)
+
 fun storeSoftColor(name: String): Color {
     return when (normalizeChain(name)) {
         "JUMBO" -> AccentGreenSoft

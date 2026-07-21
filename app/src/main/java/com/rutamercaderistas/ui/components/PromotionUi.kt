@@ -18,11 +18,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.ui.DateFormatters
 import com.rutamercaderistas.ui.theme.AccentBlue
@@ -49,7 +50,7 @@ fun PromotionBadge(
         ) {
             Text(text = "\uD83D\uDD25", style = MaterialTheme.typography.labelSmall)
             Text(
-                text = "${count} promo${if (count != 1) "s" else ""}",
+                text = stringResource(R.string.promos_count, count, if (count != 1) "s" else ""),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.error,
             )

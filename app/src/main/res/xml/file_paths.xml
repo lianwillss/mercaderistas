@@ -4,5 +4,5 @@
     <files-path name="pdfs" path="manual_marcas.pdf"/>
     <files-path name="manual" path="manual.pdf"/>
     <cache-path name="apk" path="update.apk"/>
-    <cache-path name="exports" path=""/>
+    <cache-path name="exports" path="route_exports/"/>
 </paths>

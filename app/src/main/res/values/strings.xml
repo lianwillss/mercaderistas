@@ -40,4 +40,103 @@
     <string name="cargar">Cargar</string>
     <string name="cerrar_busqueda">Cerrar búsqueda</string>
     <string name="buscar_locales">Buscar locales</string>
+
+    <!-- Header -->
+    <string name="header_rutero">RUTERO</string>
+    <string name="header_en_linea">En línea · Actualizado %s</string>
+    <string name="header_sin_conexion">Sin conexión</string>
+    <string name="header_por_vencer">Por vencer (%d)</string>
+    <string name="header_forzar_sincronizacion">Forzar sincronización</string>
+    <string name="header_manual_usuario">Manual de usuario</string>
+    <string name="header_compartir_ruta">Compartir ruta</string>
+    <string name="header_buscar_actualizacion">Buscar actualización</string>
+    <string name="header_actualizar_cd">Actualizar</string>
+    <string name="header_menu_cd">Menú</string>
+
+    <!-- Stats -->
+    <string name="stats_locales_label">Locales</string>
+    <string name="stats_marcas_label">Marcas</string>
+    <string name="stats_visitas_label">Visitas</string>
+    <string name="stats_con_promo">%d con promo</string>
+
+    <!-- Search -->
+    <string name="buscar_ruta">Buscar ruta…</string>
+    <string name="sin_rutas">No se encontraron rutas</string>
+    <string name="buscar_marca_producto">Buscar marca, producto…</string>
+    <string name="buscar_local_placeholder">Buscar local…</string>
+
+    <!-- Promotions -->
+    <string name="promociones_title">Promociones</string>
+    <string name="marcas_con_promociones">%d marcas con promociones</string>
+    <string name="solo_mis_marcas">Solo mis marcas</string>
+    <string name="solo_hoy">Solo hoy</string>
+    <string name="sin_resultados_para">Sin resultados para \"%s\"</string>
+    <string name="sin_promociones_para">Sin promociones para \"%s\"</string>
+    <string name="sin_promociones_activas">Sin promociones activas</string>
+    <string name="ver_mas">Ver %d más</string>
+    <string name="vence_hoy">VENCE HOY</string>
+    <string name="termina_manana">TERMINA MAÑANA</string>
+    <string name="descuento">DESCUENTO</string>
+    <string name="promos_count">%1$d promo%2$s</string>
+
+    <!-- All Locales -->
+    <string name="todos_locales">Todos los locales</string>
+    <string name="locales_count">%d locales</string>
+    <string name="sin_numero">S/N</string>
+
+    <!-- Manual -->
+    <string name="manual_usuario_title">Manual de usuario</string>
+
+    <!-- Main Screen -->
+    <string name="sin_visitas_dia">Sin visitas este día</string>
+    <string name="sin_conexion_datos">Sin conexión · datos locales</string>
+    <string name="compartir_local">Compartir local</string>
+    <string name="compartir_promocion">Compartir promoción</string>
+
+    <!-- Store Card -->
+    <string name="storecard_marcas">marcas</string>
+    <string name="storecard_marcas_count">Marcas (%d):</string>
+
+    <!-- Update dialog -->
+    <string name="actualizacion_disponible">Actualización disponible</string>
+    <string name="actualizar_btn">Actualizar</string>
+    <string name="mas_tarde">Más tarde</string>
+    <string name="descargando_version">Descargando versión %s…</string>
+    <string name="version_disponible">Versión %s disponible. ¿Quieres actualizar ahora?</string>
+    <string name="download_progress_percent">%d%%</string>
+
+    <!-- Manual screen -->
+    <string name="manual_que_es">¿Qué es Mercaderistas?</string>
+    <string name="manual_funciona_sin_conexion">Funciona sin conexión después de la primera sincronización.</string>
+    <string name="manual_sincronizar">Sincronizar datos</string>
+    <string name="manual_seleccionar_ruta">Seleccionar una ruta</string>
+    <string name="manual_navegar_dias">Navegar entre días</string>
+    <string name="manual_colores_cadena">Colores de cada cadena</string>
+    <string name="manual_tarjeta_local">La tarjeta de local</string>
+    <string name="manual_marcas">Marcas prioritarias y normales</string>
+    <string name="manual_abrir_pdf">Abrir PDF de una marca</string>
+    <string name="manual_ver_locales">Ver todos los locales</string>
+    <string name="manual_check_datos">La app verifica automáticamente si hay nuevos datos cada vez que abres la aplicación.</string>
+    <string name="manual_sin_visitas_selector">Los días sin visitas no aparecen en el selector.</string>
+    <string name="manual_navegacion_pdf">La navegación a la página exacta funciona gracias a un mapa interno de marcas con sus números de página correspondientes.</string>
+
+    <!-- Promo Expiring -->
+    <string name="por_vencer_title">Por vencer</string>
+    <string name="vencio">Venció</string>
+    <string name="vence_hoy_label">Vence hoy</string>
+    <string name="vence_manana_label">Vence mañana</string>
+    <string name="vence_en_dias">Vence en %d días</string>
+
+    <!-- Content descriptions -->
+    <string name="volver_cd">Volver</string>
+    <string name="buscar_cd">Buscar</string>
+    <string name="limpiar_cd">Limpiar</string>
+    <string name="descartar_cd">Descartar</string>
+    <string name="marca_cd">Marca</string>
+    <string name="direccion_cd">Dirección</string>
+    <string name="cadena_cd">Cadena</string>
+    <string name="prioritaria_cd">Prioritaria</string>
+    <string name="frecuencia_cd">Frecuencia</string>
+    <string name="store_icon_cd">Icono tienda</string>
+    <string name="promo_icon_cd">Icono promoción</string>
 </resources>

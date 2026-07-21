@@ -34,13 +34,6 @@ class PromotionRepository @Inject constructor(
         return promotionDao.getPromotions(brand, chain)
     }
 
-    suspend fun refreshIfNeeded() {
-        val lastUpdated = promotionDao.getLastUpdated() ?: 0L
-        if (System.currentTimeMillis() - lastUpdated > Constants.PROMOTION_REFRESH_INTERVAL_MS) {
-            refresh()
-        }
-    }
-
     suspend fun refresh(): Boolean {
         if (!refreshing.compareAndSet(false, true)) {
             Timber.d("Promociones: refresh ya en curso — salteando")
@@ -147,10 +140,6 @@ class PromotionRepository @Inject constructor(
 
     suspend fun getLastUpdated(): Long {
         return promotionDao.getLastUpdated() ?: 0L
-    }
-
-    suspend fun hasPromotions(brand: String): Boolean {
-        return promotionDao.getPromotionsByBrand(brand).isNotEmpty()
     }
 
     fun schedulePeriodicRefresh() {

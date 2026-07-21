@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.rutamercaderistas.ui.theme.ComponentShapes
 
 @Composable
 fun IosModal(
@@ -60,7 +61,7 @@ fun IosModal(
                         .padding(horizontal = 24.dp)
                         .fillMaxWidth()
                         .clickable(enabled = false) {},
-                    shape = RoundedCornerShape(28.dp),
+                    shape = ComponentShapes.card,
                     elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surface,
@@ -80,7 +81,6 @@ fun IosModal(
                                     Text(
                                         text = title,
                                         style = MaterialTheme.typography.headlineSmall,
-                                        fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface,
                                     )
                                     if (subtitle != null) {
@@ -95,7 +95,7 @@ fun IosModal(
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Box(
                                     modifier = Modifier
-                                        .size(32.dp)
+                                        .size(40.dp)
                                         .clip(CircleShape)
                                         .background(MaterialTheme.colorScheme.surfaceVariant)
                                         .clickable(onClick = onDismiss),
@@ -124,7 +124,7 @@ fun IosModal(
                                     Box(
                                         modifier = Modifier
                                             .weight(1f)
-                                            .clip(RoundedCornerShape(14.dp))
+                                            .clip(ComponentShapes.button)
                                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
                                             .clickable(onClick = onClickDismiss)
                                             .padding(vertical = 14.dp),
@@ -133,7 +133,6 @@ fun IosModal(
                                         Text(
                                             text = dismissText,
                                             style = MaterialTheme.typography.labelLarge,
-                                            fontWeight = FontWeight.Medium,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
@@ -142,7 +141,7 @@ fun IosModal(
                                     Box(
                                         modifier = Modifier
                                             .weight(if (dismissText != null) 1f else 0f)
-                                            .clip(RoundedCornerShape(14.dp))
+                                            .clip(ComponentShapes.button)
                                             .background(MaterialTheme.colorScheme.primary)
                                             .clickable(onClick = onConfirm ?: onDismiss)
                                             .padding(vertical = 14.dp),
@@ -151,7 +150,6 @@ fun IosModal(
                                         Text(
                                             text = confirmText,
                                             style = MaterialTheme.typography.labelLarge,
-                                            fontWeight = FontWeight.SemiBold,
                                             color = MaterialTheme.colorScheme.onPrimary,
                                         )
                                     }
@@ -161,38 +159,6 @@ fun IosModal(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun IosModalSimple(
-    visible: Boolean,
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier,
-    title: String? = null,
-    message: String? = null,
-    confirmText: String? = null,
-    onConfirm: (() -> Unit)? = null,
-    dismissText: String? = null,
-    onDismissAction: (() -> Unit)? = null,
-) {
-    IosModal(
-        visible = visible,
-        onDismiss = onDismiss,
-        modifier = modifier,
-        title = title,
-        confirmText = confirmText,
-        onConfirm = onConfirm,
-        dismissText = dismissText,
-        onDismissAction = onDismissAction,
-    ) {
-        if (message != null) {
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }

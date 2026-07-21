@@ -22,8 +22,6 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -31,7 +29,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,16 +38,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
-import com.rutamercaderistas.data.preferences.PreferencesRepository
-import com.rutamercaderistas.models.BrandReference
+import androidx.navigation.toRoute
+import com.rutamercaderistas.R
+import com.rutamercaderistas.data.local.PromotionEntity
+import com.rutamercaderistas.ui.navigation.AllLocalesRoute
+import com.rutamercaderistas.ui.navigation.MainRoute
+import com.rutamercaderistas.ui.navigation.ManualRoute
+import com.rutamercaderistas.ui.navigation.PromotionsRoute
 import com.rutamercaderistas.models.DiaSemana
 import com.rutamercaderistas.ui.components.DaySelector
 import com.rutamercaderistas.ui.components.HeaderSection
@@ -61,126 +60,107 @@ import com.rutamercaderistas.ui.components.ShimmerStatsCards
 import com.rutamercaderistas.ui.components.StatsCards
 import com.rutamercaderistas.ui.components.StoreCard
 import com.rutamercaderistas.ui.components.PromoExpiringSoonModal
-import com.rutamercaderistas.util.openMaps
 import com.rutamercaderistas.viewmodel.RouteUiState
-import com.rutamercaderistas.viewmodel.RouteViewModel
 import com.rutamercaderistas.viewmodel.SyncUiState
-import com.rutamercaderistas.viewmodel.SyncViewModel
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 @Composable
 fun MainScreen(
-    routeViewModel: RouteViewModel,
-    syncViewModel: SyncViewModel,
-    brandReference: BrandReference,
-    preferencesRepository: PreferencesRepository,
+    routeUiState: RouteUiState,
+    syncUiState: SyncUiState,
     modifier: Modifier = Modifier,
     onCheckUpdate: () -> Unit = {},
+    onSetCurrentDay: (DiaSemana?) -> Unit,
+    onSelectRoute: (String) -> Unit,
+    onInitialSync: () -> Unit,
+    onHeaderRefresh: () -> Unit,
+    onPullRefresh: () -> Unit,
+    onRefreshPromotions: () -> Unit,
+    onExportRoute: () -> Unit,
+    onClearPromotionError: () -> Unit,
+    onBrandClick: (String) -> Unit,
+    onAddressClick: (String) -> Unit,
+    onShareLocal: (String) -> Unit,
+    onSharePromo: (PromotionEntity) -> Unit,
 ) {
-    val routeState by routeViewModel.uiState.collectAsState()
-    val syncState by syncViewModel.state.collectAsState()
-    val ctx = LocalContext.current
     val navController = rememberNavController()
-
-    var transportMode by remember { mutableStateOf("transit") }
-    LaunchedEffect(Unit) {
-        transportMode = preferencesRepository.getTransportMode() ?: "transit"
-    }
 
     NavHost(
         navController = navController,
-        startDestination = "main",
+        startDestination = MainRoute,
         modifier = modifier.fillMaxSize(),
     ) {
-        composable("main") {
+        composable<MainRoute> {
             MainRoute(
-                routeState = routeState,
-                syncState = syncState,
-                routeViewModel = routeViewModel,
-                syncViewModel = syncViewModel,
-                brandReference = brandReference,
-                transportMode = transportMode,
+                routeState = routeUiState,
+                syncState = syncUiState,
                 onCheckUpdate = onCheckUpdate,
                 onNavigateToAllLocales = {
-                    navController.navigate("all_locales") {
+                    navController.navigate(AllLocalesRoute()) {
                         launchSingleTop = true
                     }
                 },
                 onNavigateToPromotions = {
-                    navController.navigate("promotions") {
+                    navController.navigate(PromotionsRoute) {
                         launchSingleTop = true
                     }
                 },
                 onNavigateToManual = {
-                    navController.navigate("manual") {
+                    navController.navigate(ManualRoute) {
                         launchSingleTop = true
                     }
                 },
+                onSetCurrentDay = onSetCurrentDay,
+                onSelectRoute = onSelectRoute,
+                onInitialSync = onInitialSync,
+                onHeaderRefresh = onHeaderRefresh,
+                onPullRefresh = onPullRefresh,
+                onExportRoute = onExportRoute,
+                onClearPromotionError = onClearPromotionError,
+                onBrandClick = onBrandClick,
+                onAddressClick = onAddressClick,
+                onShareLocal = onShareLocal,
             )
         }
-        composable(
-            "all_locales?brand={brand}",
-            arguments = listOf(navArgument("brand") { defaultValue = ""; type = NavType.StringType }),
+        composable<AllLocalesRoute>(
             enterTransition = { slideInVertically { it } },
             exitTransition = { slideOutVertically { it } },
             popEnterTransition = { slideInVertically { -it } },
             popExitTransition = { slideOutVertically { it } },
         ) { backStackEntry ->
-            val brand = backStackEntry.arguments?.getString("brand") ?: ""
+            val args: AllLocalesRoute = backStackEntry.toRoute()
             AllLocalesScreen(
-                locales = routeState.allLocales,
+                locales = routeUiState.allLocales,
                 onClose = { navController.popBackStack() },
-                onAddressClick = { address -> openMaps(ctx, address, transportMode) },
-                initialSearch = brand,
+                onAddressClick = onAddressClick,
+                initialSearch = args.brand,
             )
         }
-        composable(
-            "promotions",
+        composable<PromotionsRoute>(
             enterTransition = { slideInVertically { it } },
             exitTransition = { slideOutVertically { it } },
             popEnterTransition = { slideInVertically { -it } },
             popExitTransition = { slideOutVertically { it } },
         ) {
             PromotionsOverviewScreen(
-                promotionsByBrand = routeState.promotionsByBrand,
-                chainToLocales = routeState.chainToLocales,
+                promotionsByBrand = routeUiState.promotionsByBrand,
+                chainToLocales = routeUiState.chainToLocales,
                 onClose = { navController.popBackStack() },
-                onRefresh = {
-                    routeViewModel.refreshPromotions()
-                    syncViewModel.syncFromDriveWithRouteReload(routeState.selectedRoute)
-                },
-                isRefreshing = routeState.isPromotionsLoading,
+                onRefresh = onRefreshPromotions,
+                isRefreshing = routeUiState.isPromotionsLoading,
                 onPromoClick = { brandName ->
-                    navController.navigate("all_locales?brand=$brandName") {
-                        popUpTo("main") { inclusive = false }
+                    navController.navigate(AllLocalesRoute(brand = brandName)) {
+                        popUpTo<MainRoute> { inclusive = false }
                     }
                 },
-                promotionErrorMessage = routeState.promotionErrorMessage,
-                onDismissError = { routeViewModel.clearPromotionError() },
-                routeBrands = routeState.routeBrands,
-                onSharePromo = { promo ->
-                    val text = buildString {
-                        appendLine("\uD83D\uDCE3 ${promo.productName}")
-                        if (promo.price.isNotBlank()) appendLine("\uD83D\uDCB0 ${promo.price}")
-                        if (promo.chain.isNotBlank()) appendLine("\uD83C\uDFEA ${promo.chain}")
-                        if (promo.brand.isNotBlank()) appendLine("\uD83C\uDFF7 ${promo.brand}")
-                        if (promo.startDate.isNotBlank() || promo.endDate.isNotBlank()) {
-                            append("\uD83D\uDCC5 ")
-                            if (promo.startDate.isNotBlank()) append("${promo.startDate} → ")
-                            appendLine(promo.endDate)
-                        }
-                    }
-                    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                        type = "text/plain"
-                        putExtra(android.content.Intent.EXTRA_TEXT, text.trimEnd())
-                    }
-                    ctx.startActivity(android.content.Intent.createChooser(intent, "Compartir promoción"))
-                },
+                promotionErrorMessage = routeUiState.promotionErrorMessage,
+                onDismissError = onClearPromotionError,
+                routeBrands = routeUiState.routeBrands,
+                onSharePromo = onSharePromo,
             )
         }
-        composable(
-            "manual",
+        composable<ManualRoute>(
             enterTransition = { slideInVertically { it } },
             exitTransition = { slideOutVertically { it } },
             popEnterTransition = { slideInVertically { -it } },
@@ -196,14 +176,20 @@ fun MainScreen(
 private fun MainRoute(
     routeState: RouteUiState,
     syncState: SyncUiState,
-    routeViewModel: RouteViewModel,
-    syncViewModel: SyncViewModel,
-    brandReference: BrandReference,
-    transportMode: String,
     onCheckUpdate: () -> Unit,
     onNavigateToAllLocales: () -> Unit,
     onNavigateToPromotions: () -> Unit,
     onNavigateToManual: () -> Unit,
+    onSetCurrentDay: (DiaSemana?) -> Unit,
+    onSelectRoute: (String) -> Unit,
+    onInitialSync: () -> Unit,
+    onHeaderRefresh: () -> Unit,
+    onPullRefresh: () -> Unit,
+    onExportRoute: () -> Unit,
+    onClearPromotionError: () -> Unit,
+    onBrandClick: (String) -> Unit,
+    onAddressClick: (String) -> Unit,
+    onShareLocal: (String) -> Unit,
 ) {
     val entries = routeState.entries
     val selectedRoute = routeState.selectedRoute
@@ -213,7 +199,6 @@ private fun MainRoute(
     val recentRoutes = routeState.recentRoutes
     val isDataLoaded = routeState.isDataLoaded
     val isSyncing = syncState.isSyncing
-    val ctx = LocalContext.current
 
     var searchActive by remember { mutableStateOf(false) }
     var showExpiringSoon by remember { mutableStateOf(false) }
@@ -227,19 +212,19 @@ private fun MainRoute(
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(currentDay) {
-        routeViewModel.setCurrentDay(currentDay)
+        onSetCurrentDay(currentDay)
     }
 
     LaunchedEffect(entries) {
         if (entries.isNotEmpty() && routeState.selectedRoute == null) {
             val lastRoute = routeState.routes.firstOrNull()
-            if (lastRoute != null) routeViewModel.selectRoute(lastRoute)
+            if (lastRoute != null) onSelectRoute(lastRoute)
         }
     }
 
     LaunchedEffect(routeState.needsInitialLoad) {
         if (routeState.needsInitialLoad) {
-            syncViewModel.syncFromDriveWithRouteReload(null)
+            onInitialSync()
         }
     }
 
@@ -252,13 +237,9 @@ private fun MainRoute(
             HeaderSection(
                 isOnline = syncState.isOnline,
                 lastSyncRelative = routeState.lastSyncRelative,
-                onRefresh = {
-                    routeViewModel.updateSyncLabel()
-                    syncViewModel.syncFromDriveWithRouteReload(selectedRoute)
-                    onCheckUpdate()
-                },
+                onRefresh = onHeaderRefresh,
                 onOpenManual = onNavigateToManual,
-                onShare = { routeViewModel.exportRoute() },
+                onShare = onExportRoute,
                 onCheckUpdate = onCheckUpdate,
                 promosExpiringSoon = routeState.promosExpiringSoon,
                 onExpiringSoonClick = { showExpiringSoon = true },
@@ -287,7 +268,7 @@ private fun MainRoute(
                 routes = routes,
                 recentRoutes = recentRoutes,
                 selectedRoute = selectedRoute,
-                onRouteSelected = { route -> routeViewModel.selectRoute(route) },
+                onRouteSelected = onSelectRoute,
                 onSearchActiveChanged = { searchActive = it },
             )
 
@@ -295,7 +276,7 @@ private fun MainRoute(
                 RecentRoutesRow(
                     routes = recentRoutes.take(5),
                     selectedRoute = selectedRoute,
-                    onRouteSelected = { route -> routeViewModel.selectRoute(route) },
+                    onRouteSelected = onSelectRoute,
                 )
             }
 
@@ -329,15 +310,11 @@ private fun MainRoute(
             HorizontalPager(
                 state = pagerState,
                 beyondViewportPageCount = 1,
-                modifier = Modifier.fillMaxSize().weight(1f),
+                modifier = Modifier.weight(1f),
             ) {
                 PullToRefreshBox(
                     isRefreshing = isSyncing,
-                    onRefresh = {
-                        routeViewModel.refreshPromotions()
-                        syncViewModel.syncFromDriveWithRouteReload(selectedRoute)
-                        onCheckUpdate()
-                    },
+                    onRefresh = onPullRefresh,
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     LazyColumn(
@@ -353,7 +330,7 @@ private fun MainRoute(
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Text(
-                                        text = "Sin visitas este día",
+                                        text = stringResource(R.string.sin_visitas_dia),
                                         style = MaterialTheme.typography.bodyLarge,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -375,7 +352,7 @@ private fun MainRoute(
                                                 .padding(horizontal = 10.dp, vertical = 5.dp),
                                         ) {
                                             Text(
-                                                text = "\uD83D\uDCE6 Sin conexi\u00F3n \u00B7 datos locales",
+                                                text = "\uD83D\uDCE6 " + stringResource(R.string.sin_conexion_datos),
                                                 style = MaterialTheme.typography.labelLarge,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
@@ -392,17 +369,9 @@ private fun MainRoute(
                     index = index,
                     marcaResaltada = null,
                     promotionsByBrand = routeState.promotionsByBrand,
-                    onBrandClick = { brandName ->
-                        brandReference.openPdfForBrand(ctx, brandName)
-                    },
-                    onAddressClick = { address -> openMaps(ctx, address, transportMode) },
-                    onShareLocal = { text ->
-                        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(android.content.Intent.EXTRA_TEXT, text)
-                        }
-                        ctx.startActivity(android.content.Intent.createChooser(intent, "Compartir local"))
-                    },
+                    onBrandClick = onBrandClick,
+                    onAddressClick = onAddressClick,
+                    onShareLocal = onShareLocal,
                     modifier = Modifier.padding(horizontal = 20.dp),
                 )
             }
@@ -411,7 +380,7 @@ private fun MainRoute(
                 }
             }
         } else if (!isDataLoaded) {
-            Box(modifier = Modifier.fillMaxSize().weight(1f)) {
+            Box(modifier = Modifier.weight(1f)) {
                 LazyColumn(
                     contentPadding = PaddingValues(bottom = 96.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),

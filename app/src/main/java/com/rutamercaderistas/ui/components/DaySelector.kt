@@ -1,5 +1,6 @@
 package com.rutamercaderistas.ui.components
 
+import android.content.res.Configuration
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.rutamercaderistas.ui.theme.ComponentShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -56,8 +58,8 @@ fun DaySelector(
             Box(
                 modifier = Modifier
                     .height(44.dp)
-                    .shadow(elevation, RoundedCornerShape(22.dp))
-                    .clip(RoundedCornerShape(22.dp))
+                    .shadow(elevation, ComponentShapes.pill)
+                    .clip(ComponentShapes.pill)
                     .background(bgColor)
                     .clickable {
                         onDaySelected(index)
@@ -97,4 +99,10 @@ fun DaySelectorPreview() {
             onDaySelected = {},
         )
     }
+}
+
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+fun DaySelectorPreviewDark() {
+    DaySelectorPreview()
 }

@@ -1,7 +1,7 @@
 # ProGuard rules for Rutas Mercaderistas
 
-# Disable R8 optimizations — POI/XMLBeans use heavy reflection that breaks with inlining
--dontoptimize
+# Keep R8 optimizations enabled — POI/XMLBeans reflection is handled by specific keep rules below
+-optimizations !code/simplification/arithmetic
 
 # Apache POI — keep ALL classes, methods, reflection targets, and schemas
 -keep class org.apache.poi.** { *; }

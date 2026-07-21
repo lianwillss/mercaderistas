@@ -20,7 +20,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.PromotionEntity
+import com.rutamercaderistas.ui.theme.UrgencyOrange
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -34,7 +37,7 @@ fun PromoExpiringSoonModal(
     IosModal(
         visible = true,
         onDismiss = onDismiss,
-        title = "Por vencer",
+        title = stringResource(R.string.por_vencer_title),
         subtitle = "${promos.size} promo${if (promos.size != 1) "s" else ""} próxima${if (promos.size != 1) "s" else ""} a vencer",
     ) {
         LazyColumn(
@@ -115,12 +118,18 @@ private fun ExpiringPromoRow(promo: PromotionEntity) {
         if (endDate.parsed) {
             val daysColor = when {
                 endDate.daysRemaining < 0 -> MaterialTheme.colorScheme.error
-                endDate.daysRemaining <= 1 -> Color(0xFFD97706)
+                endDate.daysRemaining <= 1 -> UrgencyOrange
                 else -> MaterialTheme.colorScheme.primary
+            }
+            val daysText = when {
+                endDate.daysRemaining < 0 -> stringResource(R.string.vencio)
+                endDate.daysRemaining == 0L -> stringResource(R.string.vence_hoy_label)
+                endDate.daysRemaining == 1L -> stringResource(R.string.vence_manana_label)
+                else -> stringResource(R.string.vence_en_dias, endDate.daysRemaining)
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = endDate.daysText,
+                text = daysText,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = if (endDate.daysRemaining <= 1) FontWeight.Bold else FontWeight.Medium,
                 color = daysColor,

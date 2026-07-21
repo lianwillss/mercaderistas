@@ -126,8 +126,4 @@ class RuteroManager(
         emptyList()
     }
 
-    suspend fun invalidateAllCaches() {
-        routeEntryDao.deleteAll()
-        Timber.d("CACHE_CLEARED: Toda la data en Room ha sido eliminada")
-    }
 }

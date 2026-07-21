@@ -13,5 +13,4 @@ object DateFormatters {
         LocalDate.parse(iso).format(full)
     } catch (_: Exception) { iso }
 
-    fun formatShort(date: LocalDate): String = date.format(short)
 }

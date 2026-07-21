@@ -34,15 +34,19 @@ suspend fun downloadBytes(
                 status == HttpURLConnection.HTTP_SEE_OTHER ||
                 status == 307 || status == 308
             ) {
-                currentUrl = conn.getHeaderField("Location")
+                val location = conn.getHeaderField("Location")
                     ?: return@withContext Result.failure(Exception("Redirect sin Location"))
-                if (!currentUrl.startsWith("http://") && !currentUrl.startsWith("https://")) {
+                if (!location.startsWith("http://") && !location.startsWith("https://")) {
                     try {
-                        currentUrl = URI(url).resolve(currentUrl).toString()
+                        currentUrl = URI(currentUrl).resolve(location).toString()
                     } catch (_: Exception) {
-                        return@withContext Result.failure(Exception("Redirect inválido: $currentUrl"))
+                        return@withContext Result.failure(Exception("Redirect inválido: $location"))
                     }
+                } else {
+                    currentUrl = location
                 }
+                conn.disconnect()
+                conn = null
                 limit--
                 continue
             }

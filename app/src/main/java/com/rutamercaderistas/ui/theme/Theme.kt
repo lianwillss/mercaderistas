@@ -29,10 +29,10 @@ private val LightColorScheme = lightColorScheme(
     onSurfaceVariant = TextSecondary,
     outline = Outline,
     outlineVariant = OutlineVariant,
-    error = Color(0xFFD32F2F),
+    error = ErrorRed,
     onError = Color.White,
     errorContainer = RedSoft,
-    onErrorContainer = Color(0xFFD32F2F),
+    onErrorContainer = ErrorRed,
     scrim = Scrim
 )
 
@@ -45,9 +45,7 @@ private val AppShapes = Shapes(
 )
 
 @Composable
-fun MercaderistasTheme(
-    content: @Composable () -> Unit
-) {
+fun MercaderistasTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = LightColorScheme,
         typography = AppTypography,

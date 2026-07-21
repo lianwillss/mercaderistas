@@ -1,5 +1,6 @@
 package com.rutamercaderistas.ui.components
 
+import android.content.res.Configuration
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -36,6 +37,8 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.ui.res.stringResource
+import com.rutamercaderistas.R
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +57,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
 import com.rutamercaderistas.data.local.PromotionEntity
+import com.rutamercaderistas.ui.theme.Background
+import com.rutamercaderistas.ui.theme.HeaderDeepBlue
+import com.rutamercaderistas.ui.theme.HeaderLightBlue
+import com.rutamercaderistas.ui.theme.HeaderMidBlue
+import com.rutamercaderistas.ui.theme.HeaderMidDarkBlue
+import com.rutamercaderistas.ui.theme.OfflineRed
+import com.rutamercaderistas.ui.theme.OnlineGreen
+import com.rutamercaderistas.ui.theme.UrgencyOrange
+import com.rutamercaderistas.ui.theme.UrgencyOrangeSoft
+import com.rutamercaderistas.ui.theme.Wave1Blue
+import com.rutamercaderistas.ui.theme.Wave2Blue
+import com.rutamercaderistas.ui.theme.Wave3Blue
 import kotlin.math.PI
 import kotlin.math.sin
 
@@ -94,11 +109,11 @@ fun HeaderSection(
 
             drawRect(
                 brush = Brush.verticalGradient(
-                    0.0f to Color(0xFF0A2E5A),
-                    0.35f to Color(0xFF0D4F8B),
-                    0.65f to Color(0xFF1A7BB5),
-                    0.85f to Color(0xFFB8DCF0),
-                    1.0f to Color(0xFFF8F9FA),
+                    0.0f to HeaderDeepBlue,
+                    0.35f to HeaderMidDarkBlue,
+                    0.65f to HeaderMidBlue,
+                    0.85f to HeaderLightBlue,
+                    1.0f to Background,
                 ),
             )
 
@@ -112,7 +127,7 @@ fun HeaderSection(
                 lineTo(0f, h)
                 close()
             }
-            drawPath(path1, Color(0xFF1A7BB5).copy(alpha = 0.35f))
+            drawPath(path1, Wave1Blue.copy(alpha = 0.35f))
 
             val path2 = Path().apply {
                 moveTo(0f, h * 0.82f)
@@ -124,7 +139,7 @@ fun HeaderSection(
                 lineTo(0f, h)
                 close()
             }
-            drawPath(path2, Color(0xFF2D9CDB).copy(alpha = 0.25f))
+            drawPath(path2, Wave2Blue.copy(alpha = 0.25f))
 
             val path3 = Path().apply {
                 moveTo(0f, h * 0.62f)
@@ -136,7 +151,7 @@ fun HeaderSection(
                 lineTo(0f, h * 0.9f)
                 close()
             }
-            drawPath(path3, Color(0xFF4DB8E8).copy(alpha = 0.15f))
+            drawPath(path3, Wave3Blue.copy(alpha = 0.15f))
 
             val dotPositions = (0..10).map { i ->
                 val x = w * (i + 1) / 12f
@@ -169,7 +184,7 @@ fun HeaderSection(
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "RUTERO",
+                            text = stringResource(R.string.header_rutero),
                             style = MaterialTheme.typography.headlineLarge,
                             color = Color.White,
                         )
@@ -178,15 +193,15 @@ fun HeaderSection(
                             modifier = Modifier
                                 .size(8.dp)
                                 .clip(CircleShape)
-                                .background(if (isOnline) Color(0xFF34C759) else Color(0xFFFF3B30))
+                                .background(if (isOnline) OnlineGreen else OfflineRed)
                         )
                     }
                     Spacer(modifier = Modifier.height(6.dp))
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = if (isOnline) "En l\u00EDnea \u00B7 Actualizado $lastSyncRelative"
-                                       else "Sin conexi\u00F3n",
+                                text = if (isOnline) stringResource(R.string.header_en_linea, lastSyncRelative)
+                                       else stringResource(R.string.header_sin_conexion),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = Color.White.copy(alpha = 0.75f),
                                 maxLines = 1,
@@ -199,7 +214,7 @@ fun HeaderSection(
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0xFFFFF0E0).copy(alpha = 0.9f))
+                                    .background(UrgencyOrangeSoft.copy(alpha = 0.9f))
                                     .clickable { onExpiringSoonClick() }
                                     .padding(horizontal = 10.dp, vertical = 5.dp),
                                 contentAlignment = Alignment.Center,
@@ -211,9 +226,9 @@ fun HeaderSection(
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = "Por vencer (${promosExpiringSoon.size})",
+                                        text = stringResource(R.string.header_por_vencer, promosExpiringSoon.size),
                                         style = MaterialTheme.typography.labelLarge,
-                                        color = Color(0xFFD97706),
+                                        color = UrgencyOrange,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
@@ -238,7 +253,7 @@ fun HeaderSection(
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Refresh,
-                        contentDescription = "Actualizar",
+                        contentDescription = stringResource(R.string.header_actualizar_cd),
                         tint = Color.White,
                         modifier = Modifier.size(22.dp),
                     )
@@ -256,7 +271,7 @@ fun HeaderSection(
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.MoreVert,
-                        contentDescription = "Men\u00FA",
+                        contentDescription = stringResource(R.string.header_menu_cd),
                         tint = Color.White,
                         modifier = Modifier.size(22.dp),
                     )
@@ -267,44 +282,44 @@ fun HeaderSection(
                     onDismissRequest = { expanded = false }
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Forzar sincronizaci\u00F3n") },
+                        text = { Text(stringResource(R.string.header_forzar_sincronizacion)) },
                         onClick = {
                             expanded = false
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             onRefresh()
                         },
                         leadingIcon = {
-                            Icon(Icons.Outlined.Refresh, contentDescription = "Sincronizar")
+                            Icon(Icons.Outlined.Refresh, contentDescription = stringResource(R.string.header_actualizar_cd))
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text("Manual de usuario") },
+                        text = { Text(stringResource(R.string.header_manual_usuario)) },
                         onClick = {
                             expanded = false
                             onOpenManual()
                         },
                         leadingIcon = {
-                            Icon(Icons.Outlined.Description, contentDescription = "Manual de usuario")
+                            Icon(Icons.Outlined.Description, contentDescription = stringResource(R.string.header_manual_usuario))
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text("Compartir ruta") },
+                        text = { Text(stringResource(R.string.header_compartir_ruta)) },
                         onClick = {
                             expanded = false
                             onShare()
                         },
                         leadingIcon = {
-                            Icon(Icons.Outlined.Share, contentDescription = "Compartir ruta")
+                            Icon(Icons.Outlined.Share, contentDescription = stringResource(R.string.header_compartir_ruta))
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text("Buscar actualización") },
+                        text = { Text(stringResource(R.string.header_buscar_actualizacion)) },
                         onClick = {
                             expanded = false
                             onCheckUpdate()
                         },
                         leadingIcon = {
-                            Icon(Icons.Outlined.SystemUpdate, contentDescription = "Buscar actualización")
+                            Icon(Icons.Outlined.SystemUpdate, contentDescription = stringResource(R.string.header_buscar_actualizacion))
                         }
                     )
                 }
@@ -320,6 +335,25 @@ private fun HeaderSectionPreview() {
         HeaderSection(
             isOnline = true,
             lastSyncRelative = "hace 2 min",
+            onRefresh = {},
+            onOpenManual = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun HeaderSectionPreviewDark() {
+    HeaderSectionPreview()
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun HeaderSectionPreviewOffline() {
+    com.rutamercaderistas.ui.theme.MercaderistasTheme {
+        HeaderSection(
+            isOnline = false,
+            lastSyncRelative = "sin conexión",
             onRefresh = {},
             onOpenManual = {},
         )

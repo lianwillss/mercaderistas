@@ -1,5 +1,6 @@
 package com.rutamercaderistas.viewmodel
 
+import androidx.compose.runtime.Stable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rutamercaderistas.data.local.PromotionEntity
@@ -18,7 +19,6 @@ import com.rutamercaderistas.services.RuteroManager
 import com.rutamercaderistas.services.RuteroRepository
 import com.rutamercaderistas.ui.components.effectiveChain
 import com.rutamercaderistas.ui.components.normalizeChain
-import com.rutamercaderistas.utils.normalizeBrand
 import com.rutamercaderistas.utils.cleanBrand
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -32,15 +32,6 @@ import timber.log.Timber
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
-
-data class PromotionDiagnostic(
-    val lastUpdated: String = "",
-    val totalPromos: Int = 0,
-    val distinctBrands: Int = 0,
-    val first20: String = "",
-    val chainCatalog: String = "",
-    val currentLocaleResult: String = "",
-)
 
 sealed interface RouteDataState {
     data object Initial : RouteDataState
@@ -68,6 +59,7 @@ sealed interface PromotionsState {
     ) : PromotionsState
 }
 
+@Stable
 data class RouteUiState(
     val routes: List<String> = emptyList(),
     val recentRoutes: List<String> = emptyList(),
@@ -78,7 +70,6 @@ data class RouteUiState(
     val lastSyncRelative: String = "",
     val snackbarMessage: String? = null,
     val needsInitialLoad: Boolean = false,
-    val promotionDiagnostic: PromotionDiagnostic? = null,
 ) {
     val isDataLoaded: Boolean get() = route is RouteDataState.Loaded
     val selectedRoute: String? get() = (route as? RouteDataState.Loaded)?.selectedRoute
@@ -139,31 +130,33 @@ class RouteViewModel @Inject constructor(
     private fun observeEntries() {
         viewModelScope.launch {
             repository.entriesFlow.collect { entries ->
-                val activeDays = if (entries.isNotEmpty()) {
-                    DiaSemana.todos().filter { repository.hasAnyVisitOnDay(it) }
-                } else emptyList()
+                withContext(Dispatchers.Default) {
+                    val activeDays = if (entries.isNotEmpty()) {
+                        DiaSemana.todos().filter { repository.hasAnyVisitOnDay(it) }
+                    } else emptyList()
 
-                val stats = repository.getStats()
-                val allLocales = repository.getAllLocales()
-                val selectedRoute = repository.getActiveRuteroName()
-                val routeBrands = computeRouteBrands(allLocales)
-                val chainToLocales = computeChainToLocales(allLocales)
+                    val stats = repository.getStats()
+                    val allLocales = repository.getAllLocales()
+                    val selectedRoute = repository.getActiveRuteroName()
+                    val routeBrands = computeRouteBrands(allLocales)
+                    val chainToLocales = computeChainToLocales(allLocales)
 
-                _uiState.update { state ->
-                    val previousCurrentDayLocales = (state.route as? RouteDataState.Loaded)?.currentDayLocales ?: emptyList()
-                    state.copy(
-                        route = RouteDataState.Loaded(
-                            selectedRoute = selectedRoute,
-                            entries = entries,
-                            activeDays = activeDays,
-                            currentDayLocales = previousCurrentDayLocales,
-                            allLocales = allLocales,
-                            stats = stats,
-                        ),
-                        chainToLocales = chainToLocales,
-                        routeBrands = routeBrands,
-                        needsInitialLoad = false,
-                    )
+                    _uiState.update { state ->
+                        val previousCurrentDayLocales = (state.route as? RouteDataState.Loaded)?.currentDayLocales ?: emptyList()
+                        state.copy(
+                            route = RouteDataState.Loaded(
+                                selectedRoute = selectedRoute,
+                                entries = entries,
+                                activeDays = activeDays,
+                                currentDayLocales = previousCurrentDayLocales,
+                                allLocales = allLocales,
+                                stats = stats,
+                            ),
+                            chainToLocales = chainToLocales,
+                            routeBrands = routeBrands,
+                            needsInitialLoad = false,
+                        )
+                    }
                 }
 
                 loadCachedPromotions()
@@ -172,7 +165,7 @@ class RouteViewModel @Inject constructor(
     }
 
     private fun loadCachedPromotions() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             val cached = promotionRepository.getAllPromotions()
             if (cached.isEmpty()) return@launch
             val result = groupPromotions(cached)
@@ -221,7 +214,7 @@ class RouteViewModel @Inject constructor(
     }
 
     private fun loadPromotions() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             try {
                 val cached = promotionRepository.getAllPromotions()
                 if (cached.isNotEmpty()) {
@@ -285,12 +278,14 @@ class RouteViewModel @Inject constructor(
 
     fun setCurrentDay(dia: DiaSemana?) {
         if (dia == null) return
-        val locales = repository.getLocalesForDay(dia)
-        _uiState.update { state ->
-            val currentRoute = state.route
-            if (currentRoute is RouteDataState.Loaded) {
-                state.copy(route = currentRoute.copy(currentDayLocales = locales))
-            } else state
+        viewModelScope.launch {
+            val locales = withContext(Dispatchers.Default) { repository.getLocalesForDay(dia) }
+            _uiState.update { state ->
+                val currentRoute = state.route
+                if (currentRoute is RouteDataState.Loaded) {
+                    state.copy(route = currentRoute.copy(currentDayLocales = locales))
+                } else state
+            }
         }
     }
 
@@ -310,23 +305,6 @@ class RouteViewModel @Inject constructor(
             }
         }
         _uiState.update { it.copy(lastSyncRelative = label) }
-    }
-
-    fun getShareText(): String {
-        val s = _uiState.value
-        val routeName = s.selectedRoute ?: "Ruta"
-        val lines = mutableListOf<String>()
-        lines.add("\uD83D\uDCCB Ruta: $routeName")
-        lines.add("")
-        s.currentDayLocales.forEach { local ->
-            val brands = local.clientes.take(3).joinToString(", ") { it.nombre }
-            lines.add("\uD83D\uDCCD ${local.codigo} - ${local.local}")
-            if (local.direccion.isNotBlank()) lines.add("   ${local.direccion}")
-            if (brands.isNotBlank()) lines.add("   \uD83C\uDFF7 $brands")
-            lines.add("")
-        }
-        lines.add("Mercaderistas app")
-        return lines.joinToString("\n")
     }
 
     fun exportRoute() {
@@ -353,75 +331,8 @@ class RouteViewModel @Inject constructor(
         _uiState.update { it.copy(snackbarMessage = null) }
     }
 
-    fun loadPromotionDiagnostic() {
-        viewModelScope.launch(Dispatchers.IO) {
-            Timber.d("=== DIAG: Cargando diagnóstico ===")
-            val allPromos = promotionRepository.getAllPromotions()
-            val lastUpdated = promotionRepository.getLastUpdated()
-            val distinctBrands = allPromos.map { it.brand.cleanBrand() }.distinct().size
-            val first20 = allPromos.take(20).joinToString("\n") { p ->
-                "  [${p.brand}] ${p.productName} — ${p.price} (${p.startDate} → ${p.endDate})"
-            }
-
-            val chainCatalog = allPromos
-                .groupBy { normalizeChain(it.chain) }
-                .map { (chain, promos) ->
-                    val byBrand = promos.groupBy { it.brand.cleanBrand() }
-                    buildString {
-                        appendLine("═══ $chain (${promos.size} promo${if (promos.size != 1) "nes" else ""}) ═══")
-                        byBrand.forEach { (brand, bp) ->
-                            appendLine("    $brand → ${bp.size} promo${if (bp.size != 1) "nes" else ""}:")
-                            bp.forEach { p -> appendLine("      - ${p.productName} (${p.price})") }
-                        }
-                    }
-                }.joinToString("\n")
-
-            val s = _uiState.value
-            val currentLocaleResult = s.currentDayLocales.joinToString("\n\n") { local ->
-                val localChain = effectiveChain(local.cadena, local.formato)
-                val norm = normalizeChain(localChain)
-                val lines = mutableListOf("• ${local.local} (cadena: \"${local.cadena}\", formato: \"${local.formato}\" → \"$norm\")")
-                local.clientes.forEach { cliente ->
-                    val clean = normalizeBrand(cliente.nombre).cleanBrand()
-                    val promos = s.promotionsByBrand[clean].orEmpty()
-                        .filter { localChain.isBlank() || normalizeChain(it.chain) == norm }
-                    lines.add("    ${cliente.nombre} → ${promos.size} promo${if (promos.size != 1) "nes" else ""}")
-                    promos.forEach { p ->
-                        lines.add("      - ${p.productName} (${p.price})")
-                    }
-                }
-                lines.joinToString("\n")
-            }
-
-            val lastUpdatedStr = if (lastUpdated > 0) {
-                val modified = Instant.ofEpochMilli(lastUpdated)
-                val now = Instant.now()
-                val minutes = ChronoUnit.MINUTES.between(modified, now)
-                val hours = ChronoUnit.HOURS.between(modified, now)
-                val days = ChronoUnit.DAYS.between(modified, now)
-                when {
-                    minutes < 1 -> "ahora"
-                    minutes < 60 -> "hace $minutes min"
-                    hours < 24 -> "hace $hours h"
-                    else -> "hace $days d"
-                }
-            } else "Nunca"
-
-            _uiState.update {
-                it.copy(promotionDiagnostic = PromotionDiagnostic(
-                    lastUpdated = lastUpdatedStr,
-                    totalPromos = allPromos.size,
-                    distinctBrands = distinctBrands,
-                    first20 = first20,
-                    chainCatalog = chainCatalog,
-                    currentLocaleResult = currentLocaleResult,
-                ))
-            }
-        }
-    }
-
     fun refreshPromotions() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             try {
                 val cached = promotionRepository.getAllPromotions()
                 if (cached.isNotEmpty()) {
@@ -453,10 +364,6 @@ class RouteViewModel @Inject constructor(
                 }
             }
         }
-    }
-
-    fun clearDiagnostic() {
-        _uiState.update { it.copy(promotionDiagnostic = null) }
     }
 
     fun clearPromotionError() {

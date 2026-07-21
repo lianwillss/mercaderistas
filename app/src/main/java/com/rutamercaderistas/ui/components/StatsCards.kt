@@ -1,5 +1,6 @@
 package com.rutamercaderistas.ui.components
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,8 +27,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.rutamercaderistas.R
 import com.rutamercaderistas.services.RuteroRepository
-import com.rutamercaderistas.ui.theme.StoreColorRed
+import com.rutamercaderistas.ui.theme.ComponentShapes
 
 @Composable
 fun StatsCards(
@@ -46,7 +49,7 @@ fun StatsCards(
         StatCard(
             icon = Icons.Rounded.Store,
             value = stats.totalLocales,
-            label = "Locales",
+            label = stringResource(R.string.stats_locales_label),
             containerColor = MaterialTheme.colorScheme.primaryContainer,
             iconColor = MaterialTheme.colorScheme.primary,
             onClick = onLocalesClick,
@@ -55,7 +58,7 @@ fun StatsCards(
         StatCard(
             icon = Icons.Rounded.ShoppingBag,
             value = stats.totalMarcas,
-            label = "Marcas",
+            label = stringResource(R.string.stats_marcas_label),
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
             iconColor = MaterialTheme.colorScheme.secondary,
             onClick = onMarcasClick,
@@ -63,9 +66,9 @@ fun StatsCards(
             badge = if (marcasConPromo > 0) {
                 {
                     Text(
-                        text = "$marcasConPromo con promo",
+                        text = stringResource(R.string.stats_con_promo, marcasConPromo),
                         style = MaterialTheme.typography.bodySmall,
-                        color = StoreColorRed,
+                        color = MaterialTheme.colorScheme.error,
                     )
                 }
             } else null
@@ -73,7 +76,7 @@ fun StatsCards(
         StatCard(
             icon = Icons.Rounded.Visibility,
             value = stats.visitasTotales,
-            label = "Visitas",
+            label = stringResource(R.string.stats_visitas_label),
             containerColor = MaterialTheme.colorScheme.tertiaryContainer,
             iconColor = MaterialTheme.colorScheme.tertiary,
             modifier = Modifier.weight(1f)
@@ -95,7 +98,7 @@ private fun StatCard(
     Card(
         onClick = onClick,
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
+        shape = ComponentShapes.cardSmall,
         colors = CardDefaults.cardColors(containerColor = containerColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
@@ -114,7 +117,7 @@ private fun StatCard(
             Spacer(modifier = Modifier.height(3.dp))
             Text(
                 text = "$value",
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
             if (badge != null) {
@@ -139,6 +142,25 @@ private fun StatsCardsPreview() {
             onLocalesClick = {},
             onMarcasClick = {},
             marcasConPromo = 3,
+        )
+    }
+}
+
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun StatsCardsPreviewDark() {
+    StatsCardsPreview()
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun StatsCardsPreviewNoPromos() {
+    com.rutamercaderistas.ui.theme.MercaderistasTheme {
+        StatsCards(
+            stats = RuteroRepository.Stats(8, 20, 30),
+            onLocalesClick = {},
+            onMarcasClick = {},
+            marcasConPromo = 0,
         )
     }
 }

@@ -10,6 +10,8 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.res.stringResource
+import com.rutamercaderistas.R
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -46,11 +48,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import android.content.res.Configuration
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.models.ClienteInfo
 import com.rutamercaderistas.models.LocalDelDia
@@ -60,12 +62,10 @@ import com.rutamercaderistas.ui.theme.AccentGreen
 import com.rutamercaderistas.ui.theme.AccentGreenSoft
 import com.rutamercaderistas.ui.theme.AccentOrange
 import com.rutamercaderistas.ui.theme.AccentOrangeSoft
-import com.rutamercaderistas.ui.theme.Outline
 import com.rutamercaderistas.ui.components.normalizeChain
 import com.rutamercaderistas.ui.theme.storeColor
 import com.rutamercaderistas.ui.theme.storeSoftColor
 import com.rutamercaderistas.utils.cleanBrand
-import com.rutamercaderistas.utils.normalizeBrand
 import kotlin.math.abs
 import timber.log.Timber
 
@@ -91,19 +91,19 @@ fun StoreCard(
     )
 
     val brandCleanCache = remember(local) {
-        local.clientes.associate { it.nombre to normalizeBrand(it.nombre).cleanBrand() }
+        local.clientes.associate { it.nombre to it.nombre.cleanBrand() }
     }
 
     val hasPromos = remember(local, promotionsByBrand) {
         local.clientes.any { cliente ->
-            val cleanName = brandCleanCache[cliente.nombre] ?: normalizeBrand(cliente.nombre).cleanBrand()
+            val cleanName = brandCleanCache[cliente.nombre] ?: cliente.nombre.cleanBrand()
             val promos = promotionsByBrand[cleanName].orEmpty()
                 .filter { matchesChain(it.chain, local.local, local.cadena, local.formato) }
             promos.isNotEmpty()
         }
     }
 
-    LaunchedEffect(local) { visible = true }
+    LaunchedEffect(Unit) { visible = true }
 
     Card(
         modifier = modifier
@@ -136,7 +136,7 @@ fun StoreCard(
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Store,
-                        contentDescription = "Local",
+                        contentDescription = stringResource(R.string.store_icon_cd),
                         tint = storeColor(local.local),
                         modifier = Modifier.size(18.dp)
                     )
@@ -147,7 +147,7 @@ fun StoreCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = local.local.ifBlank { "S/N" },
+                            text = local.local.ifBlank { stringResource(R.string.sin_numero) },
                             style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
@@ -183,7 +183,7 @@ fun StoreCard(
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.LocationOn,
-                                contentDescription = "Dirección",
+                                contentDescription = stringResource(R.string.direccion_cd),
                                 tint = AccentBlue,
                                 modifier = Modifier.size(13.dp)
                             )
@@ -216,7 +216,7 @@ fun StoreCard(
 
                 Box(
                     modifier = Modifier
-                        .size(34.dp)
+                        .size(40.dp)
                         .clip(CircleShape)
                         .clickable { onShareLocal(buildStoreShareText(local, promotionsByBrand, brandCleanCache)) }
                         .background(MaterialTheme.colorScheme.surfaceVariant),
@@ -224,9 +224,9 @@ fun StoreCard(
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Share,
-                        contentDescription = "Compartir",
+                        contentDescription = stringResource(R.string.compartir),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(18.dp),
                     )
                 }
 
@@ -248,7 +248,7 @@ fun StoreCard(
                             color = AccentBlue,
                         )
                         Text(
-                            text = "marcas",
+                            text = stringResource(R.string.storecard_marcas),
                             style = MaterialTheme.typography.bodySmall,
                             color = AccentBlue,
                         )
@@ -269,13 +269,13 @@ fun StoreCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(1.dp)
-                    .background(Outline)
+                    .background(MaterialTheme.colorScheme.outlineVariant)
             )
             Spacer(modifier = Modifier.height(14.dp))
 
             // ── Brands ──
             local.clientes.forEach { cliente ->
-                val cleanBrandName = brandCleanCache[cliente.nombre] ?: normalizeBrand(cliente.nombre).cleanBrand()
+                val cleanBrandName = brandCleanCache[cliente.nombre] ?: cliente.nombre.cleanBrand()
                 val promos = promotionsByBrand[cleanBrandName]
                     .orEmpty()
                     .filter { matchesChain(it.chain, local.local, local.cadena, local.formato) }
@@ -395,7 +395,7 @@ private fun PriorityBrandCard(
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Star,
-                            contentDescription = "Prioritaria",
+                            contentDescription = stringResource(R.string.prioritaria_cd),
                             tint = AccentOrange,
                             modifier = Modifier.size(10.dp)
                         )
@@ -569,7 +569,7 @@ private fun buildStoreShareText(
         if (local.clientes.isNotEmpty()) {
             appendLine("Marcas (${local.totalClientes}):")
             local.clientes.forEach { c ->
-                val clean = brandCleanCache[c.nombre] ?: normalizeBrand(c.nombre).cleanBrand()
+                val clean = brandCleanCache[c.nombre] ?: c.nombre.cleanBrand()
                 val promos = promotionsByBrand[clean].orEmpty()
                     .filter { matchesChain(it.chain, local.local, local.cadena, local.formato) }
                 append("  \u2022 ${c.nombre}")
@@ -606,7 +606,7 @@ private fun FrequencyChip(text: String) {
             )
             Icon(
                 imageVector = Icons.Outlined.DateRange,
-                contentDescription = "Frecuencia",
+                contentDescription = stringResource(R.string.frecuencia_cd),
                 tint = AccentGreen,
                 modifier = Modifier.size(8.dp)
             )
@@ -619,18 +619,43 @@ private fun FrequencyChip(text: String) {
 @Preview(showBackground = true)
 @Composable
 private fun StoreCardPreview() {
-    val testPromos = mapOf(
-        "marca a" to listOf(
-            PromotionEntity(
-                brand = "Marca A",
-                chain = "Jumbo",
-                productName = "Producto de prueba 1 kg",
-                price = "$1.990",
-                startDate = "2026-01-01",
-                endDate = "2026-12-31",
-            ),
-        ),
+    StoreCardPreviewContent()
+}
+
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun StoreCardPreviewDark() {
+    StoreCardPreviewContent()
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun StoreCardPreviewEmpty() {
+    StoreCardPreviewContent(
+        marcasConPromo = false,
+        withPromotions = false,
     )
+}
+
+@Composable
+private fun StoreCardPreviewContent(
+    marcasConPromo: Boolean = true,
+    withPromotions: Boolean = true,
+) {
+    val testPromos = if (withPromotions) {
+        mapOf(
+            "marca a" to listOf(
+                PromotionEntity(
+                    brand = "Marca A",
+                    chain = "Jumbo",
+                    productName = "Producto de prueba 1 kg",
+                    price = "$1.990",
+                    startDate = "2026-01-01",
+                    endDate = "2026-12-31",
+                ),
+            ),
+        )
+    } else emptyMap()
     com.rutamercaderistas.ui.theme.MercaderistasTheme {
         StoreCard(
             local = LocalDelDia(
@@ -642,7 +667,7 @@ private fun StoreCardPreview() {
                 region = "",
                 comuna = "Santiago",
                 clientes = listOf(
-                    ClienteInfo("Marca A", true, 3),
+                    ClienteInfo("Marca A", marcasConPromo, 3),
                     ClienteInfo("Marca B", false, 0),
                 ),
             ),

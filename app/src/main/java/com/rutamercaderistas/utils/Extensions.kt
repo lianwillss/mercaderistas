@@ -48,4 +48,3 @@ fun normalizeBrand(name: String): String {
     return if (firstSpace > 0) c.substring(0, firstSpace) else c
 }
 
-fun dpToPx(dp: Int): Int = (dp * Resources.getSystem().displayMetrics.density).toInt()

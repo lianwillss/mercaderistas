@@ -69,9 +69,16 @@ class RouteExporter @Inject constructor(
         val byDay = groupByDay(entries)
 
         val totalH = measureHeight(contentW, routeName, stats, byDay)
-        val maxH = 12000
+        val maxH = 6000
         val finalH = minOf(totalH, maxH)
-        val bitmap = Bitmap.createBitmap(w, finalH, Bitmap.Config.ARGB_8888)
+        if (totalH > maxH) {
+            Timber.w("Route too tall for export (%d > %dpx), truncating", totalH, maxH)
+        }
+        val bitmap = try {
+            Bitmap.createBitmap(w, finalH, Bitmap.Config.ARGB_8888)
+        } catch (e: OutOfMemoryError) {
+            throw RuntimeException("Memoria insuficiente para exportar ruta", e)
+        }
         try {
             val c = Canvas(bitmap)
             c.drawColor(WHITE)
@@ -96,7 +103,8 @@ class RouteExporter @Inject constructor(
 
             cleanupOldExports()
 
-            val file = File(context.cacheDir, "ruta_${sanitize(routeName)}.png")
+            val exportDir = File(context.cacheDir, "route_exports").also { it.mkdirs() }
+            val file = File(exportDir, "ruta_${sanitize(routeName)}.png")
             file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
             Timber.d("Export done: %s (%dx%d)", file.absolutePath, w, totalH)
             file
@@ -121,7 +129,9 @@ class RouteExporter @Inject constructor(
     private fun sanitize(name: String) = name.replace(Regex("[^a-zA-Z0-9_\\-]"), "_").trim('_')
 
     private fun cleanupOldExports() {
-        context.cacheDir.listFiles()
+        File(context.cacheDir, "route_exports")
+            .takeIf { it.isDirectory }
+            ?.listFiles()
             ?.filter { it.name.startsWith("ruta_") && it.name.endsWith(".png") }
             ?.forEach { it.delete() }
     }

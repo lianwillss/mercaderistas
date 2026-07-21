@@ -1,13 +1,12 @@
 package com.rutamercaderistas.viewmodel
 
+import androidx.compose.runtime.Stable
 import android.app.Application
-import android.content.ClipboardManager
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
-import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.rutamercaderistas.Constants
@@ -33,6 +32,7 @@ sealed interface SyncState {
     data class Syncing(val phase: String? = null) : SyncState
 }
 
+@Stable
 data class SyncUiState(
     val isOnline: Boolean = false,
     val state: SyncState = SyncState.Idle,
@@ -101,13 +101,13 @@ class SyncViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         syncJob?.cancel()
-        networkCallback?.let {
-            connectivityManager.unregisterNetworkCallback(it)
+        networkCallback?.let { cb ->
+            try {
+                connectivityManager.unregisterNetworkCallback(cb)
+            } catch (_: Exception) {
+                Timber.w("unregisterNetworkCallback failed in onCleared")
+            }
         }
-    }
-
-    fun refresh() {
-        syncFromDrive()
     }
 
     fun syncFromDrive() {
@@ -203,74 +203,6 @@ class SyncViewModel @Inject constructor(
                     )
                 }
             }
-        }
-    }
-
-    fun loadLocalFile(uri: Uri) {
-        viewModelScope.launch {
-            try {
-                _state.value = _state.value.copy(state = SyncState.Syncing())
-                val success = withContext(Dispatchers.IO) {
-                    getApplication<Application>().contentResolver.openInputStream(uri)?.use { stream ->
-                        ruteroManager.saveMasterExcel(stream.readBytes())
-                    } ?: false
-                }
-                if (success) {
-                    val indexOk = ruteroManager.createIndex()
-                    if (indexOk) {
-                        repository.clear()
-                        val index = ruteroManager.loadIndex()
-                        val firstRoute = index.firstOrNull()
-                        if (firstRoute != null) {
-                            val entries = ruteroManager.loadRoute(firstRoute)
-                            if (entries.isNotEmpty()) {
-                                repository.setEntries(entries, firstRoute)
-                            }
-                        }
-                        _state.value = _state.value.copy(
-                            state = SyncState.Idle,
-                            snackbarMessage = "Archivo cargado correctamente",
-                        )
-                    } else {
-                        _state.value = _state.value.copy(
-                            state = SyncState.Idle,
-                            snackbarMessage = "No se pudo leer el archivo Excel",
-                        )
-                    }
-                } else {
-                    _state.value = _state.value.copy(
-                        state = SyncState.Idle,
-                        snackbarMessage = "No se pudo guardar el archivo",
-                    )
-                }
-            } catch (e: Exception) {
-                _state.value = _state.value.copy(
-                    state = SyncState.Idle,
-                    snackbarMessage = "Error: ${e.message}",
-                )
-            }
-        }
-    }
-
-    fun pasteLink() {
-        val clipboard = getApplication<Application>().getSystemService(ClipboardManager::class.java)
-        val clip = clipboard?.primaryClip
-        if (clip != null && clip.itemCount > 0) {
-            val text = clip.getItemAt(0).text?.toString() ?: ""
-            if (text.contains("drive.google.com") || text.contains("docs.google.com")) {
-                val url = convertDriveUrl(text)
-                syncFromDrive()
-            } else {
-                _state.value = _state.value.copy(
-                    snackbarMessage = "Copia primero el link de Google Drive"
-                )
-            }
-        }
-    }
-
-    fun downloadPdf() {
-        viewModelScope.launch {
-            brandReference.descargarPdf(getApplication<Application>())
         }
     }
 

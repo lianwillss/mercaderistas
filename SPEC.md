@@ -10,11 +10,11 @@
 |------|------|--------|---------|
 | Título principal | 34sp | Bold | headlineLarge |
 | Números (stats) | 28sp | Bold | headlineMedium |
-| Nombre de tarjetas | 20sp | Bold | headlineSmall |
+| Nombre de tarjetas | 24sp | Bold | headlineSmall |
 | Nombre del local / Subtítulos | 22sp | SemiBold | titleLarge |
 | Texto importante | 17sp | SemiBold | titleMedium |
 | Encabezados menores | 15sp | SemiBold | titleSmall |
-| Texto normal | 15sp | Regular | bodyLarge |
+| Texto normal | 16sp | Regular | bodyLarge |
 | Info secundaria | 14sp | Regular | bodyMedium |
 | Texto secundario | 13sp | Medium | bodySmall |
 | Etiquetas grandes | 14sp | Medium | labelLarge |

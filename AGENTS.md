@@ -8,11 +8,11 @@ See `SPEC.md` for full mapping.
 
 | Role | M3 Slot | Size | Weight |
 |------|---------|------|--------|
-| Título principal | headlineLarge | 34sp | SemiBold |
-| Número stats | headlineMedium | 28sp | SemiBold |
+| Título principal | headlineLarge | 34sp | Bold |
+| Número stats | headlineMedium | 28sp | Bold |
 | Título tarjeta | headlineSmall | 24sp | Bold |
 | Nombre local | titleLarge | 22sp | SemiBold |
-| Subtítulo | titleMedium | 17sp | Medium |
+| Subtítulo | titleMedium | 17sp | SemiBold |
 | Texto normal | bodyLarge | 16sp | Regular |
 | Info secundaria | bodyMedium | 14sp | Regular |
 | Etiqueta pequeña | labelMedium | 12sp | Medium |

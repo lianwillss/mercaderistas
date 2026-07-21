@@ -2,14 +2,11 @@ package com.rutamercaderistas.models
 
 import android.content.Context
 import android.content.Intent
-import android.widget.Toast
+import com.rutamercaderistas.R
 import com.rutamercaderistas.data.preferences.BrandPagesRepository
 import timber.log.Timber
-import androidx.appcompat.app.AppCompatActivity
-import com.google.android.material.snackbar.Snackbar
 import com.rutamercaderistas.PdfViewerActivity
 import com.rutamercaderistas.utils.normalizeMarca
-import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,6 +14,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileOutputStream
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -76,9 +74,8 @@ class BrandReference @Inject constructor(
     }
 
     private val detectedPages = ConcurrentHashMap<String, Int>()
-    private val lastTapTime = ConcurrentHashMap<String, Long>()
 
-    private val fallbackScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val fallbackScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     init {
         fallbackScope.launch(Dispatchers.IO) {
@@ -86,43 +83,34 @@ class BrandReference @Inject constructor(
             if (all.isNotEmpty()) {
                 detectedPages.putAll(all)
             }
+            copyPdfFromRaw()
         }
     }
 
-    private fun scope(context: Context): CoroutineScope {
-        return (context as? AppCompatActivity)?.lifecycleScope ?: fallbackScope
-    }
+    private fun copyPdfFromRaw() {
+        try {
+            val pdfFile = File(appContext.filesDir, PDF_FILE_NAME)
+            if (pdfFile.exists()) return
 
-    private fun Context.snackbar(msg: String) {
-        if (this is AppCompatActivity) {
-            findViewById<android.view.View>(android.R.id.content)?.let { root ->
-                Snackbar.make(root, msg, Snackbar.LENGTH_SHORT).show()
-                return
+            appContext.resources.openRawResource(R.raw.manual_marcas).use { input ->
+                FileOutputStream(pdfFile).use { output ->
+                    input.copyTo(output)
+                }
             }
-        }
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
-    }
+            Timber.d("PDF copiado desde raw: %d bytes", pdfFile.length())
 
-    private fun isDebounced(brandName: String): Boolean {
-        val now = System.currentTimeMillis()
-        val last = lastTapTime[brandName.normalizeMarca()] ?: 0L
-        if (now - last < 2000) return true
-        lastTapTime[brandName.normalizeMarca()] = now
-        return false
+            fallbackScope.launch {
+                PdfBrandScanner.prescan(pdfFile)
+                Timber.d("Pre-escaneo completo: %d páginas", PdfBrandScanner.cachedPageCount)
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error copiando PDF desde raw")
+        }
     }
 
     private suspend fun saveDetectedPage(normalizedName: String, page: Int) {
         detectedPages[normalizedName] = page
         brandPagesRepository.set(normalizedName, page)
-    }
-
-    fun getThumbnailFile(context: Context, brandName: String): File? {
-        val clean = brandName.normalizeMarca()
-        val page = getPageForBrand(brandName)
-        val file = if (page != null) {
-            File(File(context.filesDir, "thumbnails"), "${clean}_p${page}.png")
-        } else null
-        return if (file?.exists() == true) file else null
     }
 
     fun getPageForBrand(brandName: String): Int? {
@@ -138,45 +126,11 @@ class BrandReference @Inject constructor(
         return null
     }
 
-    fun descargarPdf(context: Context, callback: ((Boolean) -> Unit)? = null, onProgress: ((Int) -> Unit)? = null) {
-        scope(context).launch(Dispatchers.IO) {
-            try {
-                val success = PdfDownloader.downloadPdf(context, onProgress)
-                if (!success) {
-                    withContext(Dispatchers.Main) { callback?.invoke(false) }
-                    return@launch
-                }
-
-                val pdfFile = File(context.filesDir, PdfDownloader.PDF_FILE_NAME)
-                try {
-                    PdfBrandScanner.prescan(pdfFile)
-                    Timber.d("Pre-escaneo completo: %d páginas", PdfBrandScanner.cachedPageCount)
-                } catch (e: Exception) {
-                    Timber.w(e, "Error en pre-escaneo del PDF")
-                }
-
-                withContext(Dispatchers.Main) { callback?.invoke(true) }
-            } catch (e: Exception) {
-                Timber.e(e, "Error descargando PDF")
-                withContext(Dispatchers.Main) { callback?.invoke(false) }
-            }
-        }
-    }
-
     fun openPdfForBrand(context: Context, brandName: String) {
-        if (isDebounced(brandName)) return
-
         val pdfFile = File(context.filesDir, PDF_FILE_NAME)
-        if (!PdfDownloader.isPdfValid(pdfFile)) {
-            context.snackbar("Descargando manual... presiona de nuevo")
-            descargarPdf(context, callback = { success ->
-                if (success) {
-                    context.snackbar("✅ Manual descargado, tócala de nuevo")
-                } else {
-                    context.snackbar("Error al descargar el manual")
-                }
-            })
-            return
+        if (!pdfFile.exists()) {
+            copyPdfFromRaw()
+            if (!pdfFile.exists()) return
         }
 
         val page = getPageForBrand(brandName)
@@ -190,9 +144,17 @@ class BrandReference @Inject constructor(
     private fun abrirPdf(context: Context, pdfFile: File, brandName: String, page: Int) {
         try {
             val range = getPageRange(brandName)
+            val norm = brandName.normalizeMarca()
+            val lastDocPage = context.getSharedPreferences("pdf_viewer_prefs", Context.MODE_PRIVATE)
+                .getInt("last_page_$brandName", -1)
+            val startPage = if (lastDocPage >= 0 && range != null && lastDocPage in range) {
+                lastDocPage
+            } else {
+                range?.first ?: page
+            }
             val intent = Intent(context, PdfViewerActivity::class.java).apply {
                 putExtra("pdf_path", pdfFile.absolutePath)
-                putExtra("page_start", range?.first ?: page)
+                putExtra("page_start", startPage)
                 putExtra("page_end", range?.last ?: page)
                 putExtra("page_num", range?.first ?: page)
                 putExtra("brand_name", brandName)
@@ -201,12 +163,11 @@ class BrandReference @Inject constructor(
             context.startActivity(intent)
         } catch (e: Exception) {
             Timber.e(e, "Error abriendo PDF")
-            context.snackbar("Error al abrir el manual")
         }
     }
 
     private fun escanearYabrir(context: Context, pdfFile: File, brandName: String) {
-        scope(context).launch(Dispatchers.IO) {
+        fallbackScope.launch(Dispatchers.IO) {
             try {
                 val foundPage = PdfBrandScanner.findBrand(pdfFile, brandName)
                 if (foundPage != null) {
@@ -215,11 +176,9 @@ class BrandReference @Inject constructor(
                     withContext(Dispatchers.Main) { abrirPdf(context, pdfFile, brandName, foundPage) }
                 } else {
                     Timber.w("Marca \"%s\" no encontrada en el PDF", brandName)
-                    withContext(Dispatchers.Main) { context.snackbar("Marca no encontrada") }
                 }
             } catch (e: Exception) {
                 Timber.e(e, "Error escaneando PDF")
-                withContext(Dispatchers.Main) { context.snackbar("Error al buscar \"$brandName\"") }
             }
         }
     }

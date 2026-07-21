@@ -42,10 +42,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.rutamercaderistas.R
 import com.rutamercaderistas.models.LocalDelDia
 import com.rutamercaderistas.ui.theme.AccentBlue
 import com.rutamercaderistas.ui.theme.storeColor
@@ -95,12 +96,12 @@ fun AllLocalesScreen(
             IconButton(onClick = onClose) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Volver",
+                    contentDescription = stringResource(R.string.volver_cd),
                     tint = MaterialTheme.colorScheme.primary,
                 )
             }
             Text(
-                text = "Todos los locales",
+                text = stringResource(R.string.todos_locales),
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -109,14 +110,14 @@ fun AllLocalesScreen(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text("Buscar local\u2026") },
+            placeholder = { Text(stringResource(R.string.buscar_local_placeholder)) },
             leadingIcon = {
-                Icon(Icons.Outlined.Search, contentDescription = "Buscar", modifier = Modifier.size(18.dp))
+                Icon(Icons.Outlined.Search, contentDescription = stringResource(R.string.buscar_cd), modifier = Modifier.size(18.dp))
             },
             trailingIcon = {
                 if (searchQuery.isNotEmpty()) {
                     IconButton(onClick = { searchQuery = "" }) {
-                        Icon(Icons.Outlined.Close, contentDescription = "Limpiar", modifier = Modifier.size(18.dp))
+                        Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.limpiar_cd), modifier = Modifier.size(18.dp))
                     }
                 }
             },
@@ -128,7 +129,7 @@ fun AllLocalesScreen(
         )
 
         Text(
-            text = "${filteredLocales.size} locales",
+            text = stringResource(R.string.locales_count, filteredLocales.size),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
@@ -163,7 +164,7 @@ fun AllLocalesScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Store,
-                                contentDescription = "Cadena",
+                                contentDescription = stringResource(R.string.cadena_cd),
                                 tint = storeColor(local.local),
                                 modifier = Modifier.size(14.dp)
                             )
@@ -173,7 +174,7 @@ fun AllLocalesScreen(
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = local.local.ifBlank { "S/N" },
+                                text = local.local.ifBlank { stringResource(R.string.sin_numero) },
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1,
@@ -192,7 +193,7 @@ fun AllLocalesScreen(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
                                         imageVector = Icons.Outlined.LocationOn,
-                                        contentDescription = "Dirección",
+                                        contentDescription = stringResource(R.string.direccion_cd),
                                         tint = AccentBlue,
                                         modifier = Modifier.size(12.dp)
                                     )
