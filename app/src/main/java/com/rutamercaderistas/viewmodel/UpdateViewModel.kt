@@ -119,10 +119,14 @@ class UpdateViewModel @Inject constructor(
                 }
                 is DownloadResult.Success -> {
                     postReadyNotification(pendingVersionName)
-                    withContext(Dispatchers.Main) {
+                    val installError = withContext(Dispatchers.Main) {
                         ApkDownloader.installApk(context, result.file)
                     }
-                    _state.value = UpdateUiState.Idle
+                    if (installError != null) {
+                        _state.value = UpdateUiState.Message(installError)
+                    } else {
+                        _state.value = UpdateUiState.Idle
+                    }
                 }
             }
         }
