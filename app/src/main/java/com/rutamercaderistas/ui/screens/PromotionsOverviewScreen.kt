@@ -55,7 +55,6 @@ import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.ui.components.BrandCard
 import com.rutamercaderistas.ui.theme.UrgencyOrange
-import io.sentry.Sentry
 import timber.log.Timber
 import com.rutamercaderistas.ui.components.ShimmerPromotionsContent
 import com.rutamercaderistas.ui.components.urgency
@@ -140,7 +139,7 @@ fun PromotionsOverviewScreen(
             brand to promos.filter { promo ->
                 try { promo.endDate.isNotBlank() && LocalDate.parse(promo.endDate) == today }
                 catch (_: Exception) {
-                    Sentry.captureMessage("Error parseando endDate '${promo.endDate}' en filtro hoy")
+                    Timber.w("Error parseando endDate '%s' en filtro hoy", promo.endDate)
                     false
                 }
             }

@@ -34,7 +34,7 @@
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
 -keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
 
-# kotlinx.serialization — keep generated serializers and companion objects
+# kotlinx.serialization
 -keep,includedescriptorclasses class com.rutamercaderistas.**$$serializer { *; }
 -keepclassmembers class com.rutamercaderistas.** {
     *** Companion;
@@ -43,7 +43,7 @@
     kotlinx.serialization.KSerializer serializer(...);
 }
 
-# Room entities — keep fields accessed via reflection
+# Room entities
 -keep class * extends androidx.room.RoomDatabase { *; }
 -dontwarn androidx.room.paging.**
 
