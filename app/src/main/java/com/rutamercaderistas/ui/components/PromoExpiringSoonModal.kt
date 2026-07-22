@@ -49,9 +49,9 @@ fun PromoExpiringSoonModal(
                 ExpiringPromoRow(promo = promo)
                 if (index < promos.lastIndex) {
                     HorizontalDivider(
-                        modifier = Modifier.padding(vertical = 2.dp),
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        thickness = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant,
                     )
                 }
             }
@@ -83,7 +83,7 @@ private fun ExpiringPromoRow(promo: PromotionEntity) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = promo.brand,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

@@ -28,7 +28,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
 import com.rutamercaderistas.R
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -56,7 +55,7 @@ fun IosModal(
             Box(
                 modifier = modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.3f))
+                    .background(MaterialTheme.colorScheme.scrim)
                     .clickable(onClick = onDismiss),
                 contentAlignment = Alignment.Center,
             ) {

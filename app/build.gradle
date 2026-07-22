@@ -14,8 +14,8 @@ android {
         applicationId "com.rutamercaderistas"
         minSdk 26
         targetSdk 35
-        versionCode 11040
-        versionName "11.40"
+        versionCode 11041
+        versionName "11.41"
         resConfigs "es"
         buildConfigField "String", "SENTRY_DSN", '""'
     }

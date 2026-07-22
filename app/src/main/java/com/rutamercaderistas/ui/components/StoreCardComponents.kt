@@ -45,10 +45,7 @@ import androidx.compose.ui.unit.dp
 import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.models.ClienteInfo
-import com.rutamercaderistas.ui.theme.AccentGreen
-import com.rutamercaderistas.ui.theme.AccentGreenSoft
-import com.rutamercaderistas.ui.theme.AccentOrange
-import com.rutamercaderistas.ui.theme.AccentOrangeSoft
+import com.rutamercaderistas.ui.theme.ComponentShapes
 import kotlin.math.abs
 
 @Composable
@@ -94,7 +91,7 @@ private fun PriorityBrandCard(
             .fillMaxWidth()
             .animateContentSize(animationSpec = tween(250)),
         onClick = onClick,
-        shape = RoundedCornerShape(11.dp),
+        shape = ComponentShapes.cardSmall,
         colors = CardDefaults.cardColors(
             containerColor = if (isHighlighted)
                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.18f)
@@ -112,8 +109,8 @@ private fun PriorityBrandCard(
                         .width(3.dp)
                         .fillMaxHeight()
                         .background(
-                            AccentOrange,
-                            RoundedCornerShape(topStart = 11.dp, bottomStart = 11.dp)
+                            MaterialTheme.colorScheme.tertiary,
+                            RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
                         )
                 )
 
@@ -127,13 +124,13 @@ private fun PriorityBrandCard(
                         modifier = Modifier
                             .size(17.dp)
                             .clip(CircleShape)
-                            .background(AccentOrangeSoft),
+                            .background(MaterialTheme.colorScheme.tertiaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Star,
                             contentDescription = stringResource(R.string.prioritaria_cd),
-                            tint = AccentOrange,
+                            tint = MaterialTheme.colorScheme.tertiary,
                             modifier = Modifier.size(10.dp)
                         )
                     }
@@ -220,7 +217,7 @@ private fun NormalBrandRow(
 
             Text(
                 text = cliente.nombre,
-                style = if (isHighlighted) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f),
                 maxLines = 1,
@@ -294,7 +291,7 @@ fun FrequencyChip(text: String) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
-            .background(AccentGreenSoft)
+            .background(MaterialTheme.colorScheme.secondaryContainer)
             .padding(horizontal = 5.dp, vertical = 2.dp)
     ) {
         Row(
@@ -304,12 +301,12 @@ fun FrequencyChip(text: String) {
             Text(
                 text = text,
                 style = MaterialTheme.typography.labelSmall,
-                color = AccentGreen,
+                color = MaterialTheme.colorScheme.secondary,
             )
             Icon(
                 imageVector = Icons.Outlined.DateRange,
                 contentDescription = stringResource(R.string.frecuencia_cd),
-                tint = AccentGreen,
+                tint = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.size(8.dp)
             )
         }

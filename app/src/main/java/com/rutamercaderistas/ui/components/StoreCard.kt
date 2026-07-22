@@ -49,8 +49,6 @@ import android.content.res.Configuration
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.models.ClienteInfo
 import com.rutamercaderistas.models.LocalDelDia
-import com.rutamercaderistas.ui.theme.AccentBlue
-import com.rutamercaderistas.ui.theme.AccentBlueSoft
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.domain.model.effectiveChain
 import com.rutamercaderistas.domain.model.matchesChain
@@ -121,7 +119,7 @@ fun StoreCard(
                 Box(
                     modifier = Modifier
                         .size(36.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(ComponentShapes.cardSmall)
                         .background(storeSoftColor(local.local)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -159,7 +157,7 @@ fun StoreCard(
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = local.codigo,
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -177,7 +175,7 @@ fun StoreCard(
                             Icon(
                                 imageVector = Icons.Outlined.LocationOn,
                                 contentDescription = stringResource(R.string.direccion_cd),
-                                tint = AccentBlue,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(13.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
@@ -185,8 +183,8 @@ fun StoreCard(
                                 if (local.direccion.isNotBlank()) {
                                     Text(
                                         text = local.direccion,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = AccentBlue,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -194,8 +192,8 @@ fun StoreCard(
                                 if (local.comuna.isNotBlank()) {
                                     Text(
                                         text = local.comuna,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = AccentBlue,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -229,7 +227,7 @@ fun StoreCard(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(AccentBlueSoft),
+                        .background(MaterialTheme.colorScheme.primaryContainer),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
@@ -238,12 +236,12 @@ fun StoreCard(
                         Text(
                             text = "${local.totalClientes}",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = AccentBlue,
+                            color = MaterialTheme.colorScheme.primary,
                         )
                         Text(
                             text = stringResource(R.string.storecard_marcas),
                             style = MaterialTheme.typography.bodySmall,
-                            color = AccentBlue,
+                            color = MaterialTheme.colorScheme.primary,
                         )
                     }
                 }

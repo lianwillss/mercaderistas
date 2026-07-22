@@ -21,7 +21,6 @@ import androidx.compose.ui.res.stringResource
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.R
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LocationOn
@@ -30,7 +29,6 @@ import androidx.compose.material.icons.outlined.Store
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,11 +39,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.rutamercaderistas.ui.components.ScreenHeader
 import com.rutamercaderistas.ui.theme.AccentBlue
 import com.rutamercaderistas.ui.theme.AccentBlueSoft
 import com.rutamercaderistas.ui.theme.AccentGreen
 import com.rutamercaderistas.ui.theme.AccentGreenSoft
-import com.rutamercaderistas.ui.theme.AccentOrange
+import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.StoreColorFuchsia
 import com.rutamercaderistas.ui.theme.StoreColorFuchsiaSoft
 import com.rutamercaderistas.ui.theme.StoreColorPurple
@@ -65,25 +64,10 @@ fun ManualScreen(
             .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onClose) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(R.string.volver_cd),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
-            Text(
-                text = stringResource(R.string.manual_usuario_title),
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
+        ScreenHeader(
+            onBack = onClose,
+            title = stringResource(R.string.manual_usuario_title),
+        )
 
         Column(
             modifier = Modifier
@@ -96,7 +80,7 @@ fun ManualScreen(
             SectionCard(
                 title = stringResource(R.string.manual_que_es),
                 icon = Icons.Outlined.Info,
-                color = AccentBlue
+                color = MaterialTheme.colorScheme.primary
             ) {
                     Text(
                         text = "Mercaderistas es una aplicación que te permite gestionar tus rutas de " +
@@ -111,7 +95,7 @@ fun ManualScreen(
                     Text(
                         text = stringResource(R.string.manual_funciona_sin_conexion),
                         style = MaterialTheme.typography.titleSmall,
-                        color = AccentBlue,
+                        color = MaterialTheme.colorScheme.primary,
                     )
             }
 
@@ -119,7 +103,7 @@ fun ManualScreen(
             SectionCard(
                 title = stringResource(R.string.manual_sincronizar),
                 icon = Icons.Outlined.Refresh,
-                color = AccentGreen
+                color = MaterialTheme.colorScheme.secondary
             ) {
                 NumberedStep("Toca el botón ⋮ (tres puntos) en la esquina superior derecha.")
                 NumberedStep("Selecciona \"Forzar sincronización\".")
@@ -137,7 +121,7 @@ fun ManualScreen(
             SectionCard(
                 title = stringResource(R.string.manual_seleccionar_ruta),
                 icon = Icons.Outlined.Store,
-                color = AccentOrange
+                color = MaterialTheme.colorScheme.tertiary
             ) {
                 NumberedStep("Toca el campo \"Buscar ruta…\" en la parte superior.")
                 NumberedStep("Escribe el nombre de la ruta (ej. \"RUTA 1\").")
@@ -149,7 +133,7 @@ fun ManualScreen(
             SectionCard(
                 title = stringResource(R.string.manual_navegar_dias),
                 icon = Icons.Outlined.Info,
-                color = StoreColorPurple
+                color = MaterialTheme.colorScheme.tertiary
             ) {
                 Text(
                     text = "Usa el selector de días (LUN, MAR, MIÉ, etc.) para cambiar de día. " +
@@ -169,7 +153,7 @@ fun ManualScreen(
             SectionCard(
                 title = stringResource(R.string.manual_colores_cadena),
                 icon = Icons.Outlined.Store,
-                color = AccentBlue
+                color = MaterialTheme.colorScheme.primary
             ) {
                 ChainColorRow("Jumbo", AccentGreen, AccentGreenSoft)
                 ChainColorRow("Lider", AccentBlue, AccentBlueSoft)
@@ -183,7 +167,7 @@ fun ManualScreen(
             SectionCard(
                 title = stringResource(R.string.manual_tarjeta_local),
                 icon = Icons.Outlined.Store,
-                color = AccentBlue
+                color = MaterialTheme.colorScheme.primary
             ) {
                 Text(
                     text = "Cada local se muestra como una tarjeta blanca con bordes redondeados " +
@@ -203,7 +187,7 @@ fun ManualScreen(
             SectionCard(
                 title = stringResource(R.string.manual_marcas),
                 icon = Icons.Outlined.Description,
-                color = AccentOrange
+                color = MaterialTheme.colorScheme.tertiary
             ) {
                 Text(
                     text = "Marcas prioritarias:",
@@ -228,7 +212,7 @@ fun ManualScreen(
             SectionCard(
                 title = stringResource(R.string.manual_abrir_pdf),
                 icon = Icons.Outlined.Description,
-                color = StoreColorFuchsia
+                color = MaterialTheme.colorScheme.tertiary
             ) {
                 NumberedStep("Toca cualquier marca dentro de un local.")
                 NumberedStep("La aplicación abre el PDF del catalogador en la página exacta de esa marca.")
@@ -245,7 +229,7 @@ fun ManualScreen(
             SectionCard(
                 title = stringResource(R.string.manual_ver_locales),
                 icon = Icons.Outlined.LocationOn,
-                color = AccentBlue
+                color = MaterialTheme.colorScheme.primary
             ) {
                 NumberedStep("Toca la tarjeta \"Locales\" en la sección de estadísticas (arriba, junto a Marcas y Visitas).")
                 NumberedStep("Se abre una pantalla completa con todos los locales de la ruta.")
@@ -270,7 +254,7 @@ private fun SectionCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = ComponentShapes.cardSmall,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp)
     ) {

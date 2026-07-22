@@ -21,7 +21,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -62,6 +61,7 @@ import com.rutamercaderistas.ui.components.ShimmerStatsCards
 import com.rutamercaderistas.ui.components.StatsCards
 import com.rutamercaderistas.ui.components.StoreCard
 import com.rutamercaderistas.ui.components.PromoExpiringSoonModal
+import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.viewmodel.RouteUiState
 import com.rutamercaderistas.viewmodel.SyncUiState
 import kotlinx.coroutines.launch
@@ -351,9 +351,9 @@ private fun MainRoute(
                                         val sinConexionCd = stringResource(R.string.sin_conexion_cd)
                                         Box(
                                             modifier = Modifier
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(MaterialTheme.colorScheme.surfaceVariant)
-                                                .padding(horizontal = 10.dp, vertical = 5.dp),
+                .clip(ComponentShapes.badge)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(horizontal = 10.dp, vertical = 5.dp),
                                         ) {
                                             Text(
                                                 text = "\uD83D\uDCE6 " + stringResource(R.string.sin_conexion_datos),
@@ -420,24 +420,24 @@ private fun RecentRoutesRow(
     ) {
         routes.forEach { route ->
             val isSelected = route == selectedRoute
-            val bg = if (isSelected) MaterialTheme.colorScheme.errorContainer
+            val bg = if (isSelected) MaterialTheme.colorScheme.primaryContainer
                 else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-            val textColor = if (isSelected) MaterialTheme.colorScheme.onErrorContainer
+            val textColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
                 else MaterialTheme.colorScheme.onSurfaceVariant
-            val borderColor = if (isSelected) MaterialTheme.colorScheme.error.copy(alpha = 0.3f)
+            val borderColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
                 else MaterialTheme.colorScheme.outline
 
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
+                    .clip(ComponentShapes.pill)
                     .background(bg)
-                    .border(1.dp, borderColor, RoundedCornerShape(20.dp))
+                    .border(1.dp, borderColor, ComponentShapes.pill)
                     .clickable { onRouteSelected(route) }
                     .padding(horizontal = 14.dp, vertical = 8.dp),
             ) {
                 Text(
-                    text = route,
-                    style = MaterialTheme.typography.labelMedium,
+                text = route,
+                style = MaterialTheme.typography.bodyLarge,
                     color = textColor,
                 )
             }

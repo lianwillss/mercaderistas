@@ -42,7 +42,7 @@ fun PromotionBadge(
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
-            .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f))
+            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f))
             .clickable(onClick = onClick)
             .padding(horizontal = 5.dp, vertical = 2.dp)
     ) {
@@ -57,13 +57,13 @@ fun PromotionBadge(
             Text(
                 text = stringResource(R.string.promos_count, count, if (count != 1) "s" else ""),
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.error,
+                    color = MaterialTheme.colorScheme.primary,
             )
             if (expanded) {
                 Text(
                     text = "▲",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.error,
+                color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.semantics { contentDescription = expandidoCd },
                 )
             }
@@ -134,7 +134,7 @@ fun PromotionList(
                             .padding(horizontal = 8.dp, vertical = 3.dp),
                     ) {
                         Text(
-                            text = promo.chain.uppercase(),
+                            text = promo.chain,
                             style = MaterialTheme.typography.labelMedium,
                             color = chainColor(promo.chain),
                         )

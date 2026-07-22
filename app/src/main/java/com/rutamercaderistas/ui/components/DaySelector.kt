@@ -23,8 +23,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.models.DiaSemana
 
@@ -64,6 +66,7 @@ fun DaySelector(
                     .clickable {
                         onDaySelected(index)
                     }
+                    .semantics { contentDescription = dia.nombreCompleto }
                     .padding(horizontal = 12.dp),
                 contentAlignment = Alignment.Center
             ) {

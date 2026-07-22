@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Search
@@ -29,8 +28,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -49,7 +48,8 @@ import androidx.compose.ui.res.stringResource
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.R
 import com.rutamercaderistas.models.LocalDelDia
-import com.rutamercaderistas.ui.theme.AccentBlue
+import com.rutamercaderistas.ui.components.ScreenHeader
+import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.storeColor
 import com.rutamercaderistas.ui.theme.storeSoftColor
 
@@ -88,27 +88,12 @@ fun AllLocalesScreen(
             .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onClose) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(R.string.volver_cd),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
-            Text(
-                text = stringResource(R.string.todos_locales),
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
+        ScreenHeader(
+            onBack = onClose,
+            title = stringResource(R.string.todos_locales),
+        )
 
-        OutlinedTextField(
+        TextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
             placeholder = { Text(stringResource(R.string.buscar_local_placeholder)) },
@@ -123,7 +108,7 @@ fun AllLocalesScreen(
                 }
             },
             singleLine = true,
-            shape = RoundedCornerShape(12.dp),
+            shape = ComponentShapes.textField,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 4.dp)
@@ -146,7 +131,7 @@ fun AllLocalesScreen(
             ) { _, local ->
                 Card(
                     modifier = Modifier.animateItem().fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = ComponentShapes.cardSmall,
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
@@ -195,7 +180,7 @@ fun AllLocalesScreen(
                                     Icon(
                                         imageVector = Icons.Outlined.LocationOn,
                                         contentDescription = stringResource(R.string.direccion_cd),
-                                        tint = AccentBlue,
+                                        tint = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(12.dp)
                                     )
                                     Spacer(modifier = Modifier.width(3.dp))
@@ -208,7 +193,7 @@ fun AllLocalesScreen(
                                             }
                                         },
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = AccentBlue,
+                                        color = MaterialTheme.colorScheme.primary,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.clickable { onAddressClick(local.direccion) }

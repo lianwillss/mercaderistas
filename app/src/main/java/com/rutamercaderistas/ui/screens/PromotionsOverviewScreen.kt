@@ -22,9 +22,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -54,6 +54,7 @@ import com.rutamercaderistas.R
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.ui.components.BrandCard
+import com.rutamercaderistas.ui.components.ScreenHeader
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.UrgencyOrange
 import timber.log.Timber
@@ -169,26 +170,12 @@ fun PromotionsOverviewScreen(
             .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.8f))
-                .padding(horizontal = 12.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onClose) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(R.string.volver_cd),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
-            Text(
-                text = stringResource(R.string.promociones_title),
-                style = MaterialTheme.typography.headlineLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
+        ScreenHeader(
+            onBack = onClose,
+            title = stringResource(R.string.promociones_title),
+            modifier = Modifier.background(MaterialTheme.colorScheme.surface),
+            verticalPadding = 16.dp,
+        )
 
         Column(
             modifier = Modifier
@@ -338,11 +325,20 @@ fun PromotionsOverviewScreen(
                         .padding(32.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        text = emptyMsg,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Outlined.SearchOff,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.size(56.dp),
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = emptyMsg,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             } else {
                 LazyColumn(
