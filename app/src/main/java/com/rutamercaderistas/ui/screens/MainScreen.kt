@@ -367,7 +367,7 @@ private fun MainRoute(
                             }
                             itemsIndexed(
                 items = locales,
-                key = { _, local -> local.codigo + local.local },
+                key = { _, local -> "${local.codigo}|${local.local}|${local.cadena}|${local.formato}" },
             ) { index, local ->
                 StoreCard(
                     local = local,
