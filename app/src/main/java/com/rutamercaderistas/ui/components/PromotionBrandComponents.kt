@@ -147,7 +147,7 @@ fun BrandCard(
 
                 Text(
                     text = brand,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
@@ -287,7 +287,7 @@ private fun ProductItem(
                 when (urg) {
                     Urgency.TODAY -> UrgencyOrangeSoft
                     Urgency.TOMORROW -> UrgencyTomorrowSoft
-                    Urgency.NORMAL -> Color.Transparent
+                    Urgency.NORMAL -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
                 }
             )
             .combinedClickable(
@@ -322,7 +322,7 @@ private fun ProductItem(
 
         Text(
             text = promo.productName,
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
