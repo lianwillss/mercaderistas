@@ -18,7 +18,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.ShoppingBag
+import androidx.compose.material.icons.outlined.Store
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -118,7 +121,7 @@ fun BrandCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp)
+                .padding(16.dp)
                 .animateContentSize(animationSpec = tween(300)),
         ) {
             Row(
@@ -144,7 +147,7 @@ fun BrandCard(
 
                 Text(
                     text = brand,
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
@@ -163,11 +166,13 @@ fun BrandCard(
                 ) {
                     val promocionesCd = stringResource(R.string.promociones_cd)
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "\uD83D\uDD25",
-                            modifier = Modifier.semantics { contentDescription = promocionesCd },
+                        Icon(
+                            imageVector = Icons.Outlined.LocalFireDepartment,
+                            contentDescription = promocionesCd,
+                            tint = Color.White,
+                            modifier = Modifier.size(14.dp),
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = stringResource(R.string.promos_count, promos.size, if (promos.size != 1) "s" else ""),
                             style = MaterialTheme.typography.labelMedium,
@@ -211,7 +216,7 @@ fun BrandCard(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
                         .clickable { expanded = true }
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                         .padding(vertical = 12.dp),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -233,9 +238,11 @@ private fun ChainHeader(chain: String, localName: String, count: Int) {
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = "\uD83C\uDFEA",
-            modifier = Modifier.semantics { contentDescription = cadenaCd },
+        Icon(
+            imageVector = Icons.Outlined.Store,
+            contentDescription = cadenaCd,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(18.dp),
         )
         Spacer(modifier = Modifier.width(6.dp))
         Text(
@@ -249,9 +256,9 @@ private fun ChainHeader(chain: String, localName: String, count: Int) {
         Spacer(modifier = Modifier.width(6.dp))
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(chainColor(chain).copy(alpha = 0.12f))
-                .padding(horizontal = 8.dp, vertical = 3.dp),
+                .clip(ComponentShapes.badge)
+                .background(chainColor(chain).copy(alpha = 0.15f))
+                .padding(horizontal = 10.dp, vertical = 4.dp),
         ) {
             Text(
                 text = chain,
@@ -290,12 +297,7 @@ private fun ProductItem(
                     onLongClick()
                 },
             )
-            .padding(
-                start = if (urg != Urgency.NORMAL) 10.dp else 0.dp,
-                end = if (urg != Urgency.NORMAL) 10.dp else 0.dp,
-                top = if (urg != Urgency.NORMAL) 10.dp else 0.dp,
-                bottom = if (urg != Urgency.NORMAL) 10.dp else 0.dp,
-            ),
+            .padding(10.dp),
     ) {
         if (urg != Urgency.NORMAL) {
             Row(
@@ -303,9 +305,11 @@ private fun ProductItem(
                 modifier = Modifier.padding(bottom = 4.dp),
             ) {
                 val emojiDesc = if (urg == Urgency.TODAY) stringResource(R.string.vence_hoy) else stringResource(R.string.termina_manana)
-                Text(
-                    text = if (urg == Urgency.TODAY) "\u26A0\uFE0F" else "\uD83D\uDD25",
-                    modifier = Modifier.semantics { contentDescription = emojiDesc },
+                Icon(
+                    imageVector = if (urg == Urgency.TODAY) Icons.Filled.Warning else Icons.Outlined.LocalFireDepartment,
+                    contentDescription = emojiDesc,
+                    tint = UrgencyOrange,
+                    modifier = Modifier.size(16.dp),
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(

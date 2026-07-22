@@ -54,6 +54,7 @@ import com.rutamercaderistas.R
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.ui.components.BrandCard
+import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.UrgencyOrange
 import timber.log.Timber
 import com.rutamercaderistas.ui.components.ShimmerPromotionsContent
@@ -235,7 +236,7 @@ fun PromotionsOverviewScreen(
                     }
                 },
                 singleLine = true,
-                shape = RoundedCornerShape(16.dp),
+                shape = ComponentShapes.textField,
                 colors = tfColors,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
@@ -264,14 +265,14 @@ fun PromotionsOverviewScreen(
                     FilterChip(
                         selected = soloMisMarcas,
                         onClick = { soloMisMarcas = !soloMisMarcas },
-                        label = { Text(stringResource(R.string.solo_mis_marcas), style = MaterialTheme.typography.labelMedium) },
+                        label = { Text(stringResource(R.string.solo_mis_marcas), style = MaterialTheme.typography.labelLarge) },
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                 }
                 FilterChip(
                     selected = soloHoy,
                     onClick = { soloHoy = !soloHoy },
-                    label = { Text(stringResource(R.string.solo_hoy), style = MaterialTheme.typography.labelMedium) },
+                    label = { Text(stringResource(R.string.solo_hoy), style = MaterialTheme.typography.labelLarge) },
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 allChains.forEach { chain ->
@@ -283,7 +284,7 @@ fun PromotionsOverviewScreen(
                         label = {
                             Text(
                                 text = chain,
-                                style = MaterialTheme.typography.labelMedium,
+                                style = MaterialTheme.typography.labelLarge,
                             )
                         },
                     )
@@ -345,7 +346,7 @@ fun PromotionsOverviewScreen(
                 }
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 96.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 96.dp),
                     verticalArrangement = Arrangement.spacedBy(24.dp),
                 ) {
                     itemsIndexed(

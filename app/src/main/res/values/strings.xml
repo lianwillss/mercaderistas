@@ -74,9 +74,9 @@
     <string name="sin_promociones_para">Sin promociones para \"%s\"</string>
     <string name="sin_promociones_activas">Sin promociones activas</string>
     <string name="ver_mas">Ver %d más</string>
-    <string name="vence_hoy">VENCE HOY</string>
-    <string name="termina_manana">TERMINA MAÑANA</string>
-    <string name="descuento">DESCUENTO</string>
+    <string name="vence_hoy">Vence hoy</string>
+    <string name="termina_manana">Termina mañana</string>
+    <string name="descuento">Descuento</string>
     <string name="promos_count">%1$d promo%2$s</string>
 
     <!-- All Locales -->
