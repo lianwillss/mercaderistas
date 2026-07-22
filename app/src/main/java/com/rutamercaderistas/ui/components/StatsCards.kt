@@ -101,7 +101,7 @@ private fun StatCard(
         modifier = modifier,
         shape = ComponentShapes.cardSmall,
         colors = CardDefaults.cardColors(containerColor = containerColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(
             modifier = Modifier

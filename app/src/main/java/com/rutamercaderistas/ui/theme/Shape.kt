@@ -9,4 +9,5 @@ object ComponentShapes {
     val button = RoundedCornerShape(14.dp)
     val pill = RoundedCornerShape(20.dp)
     val badge = RoundedCornerShape(8.dp)
+    val textField = RoundedCornerShape(28.dp)
 }

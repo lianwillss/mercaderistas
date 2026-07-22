@@ -51,6 +51,7 @@ import com.rutamercaderistas.models.ClienteInfo
 import com.rutamercaderistas.models.LocalDelDia
 import com.rutamercaderistas.ui.theme.AccentBlue
 import com.rutamercaderistas.ui.theme.AccentBlueSoft
+import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.domain.model.effectiveChain
 import com.rutamercaderistas.domain.model.matchesChain
 import com.rutamercaderistas.domain.model.normalizeChain
@@ -100,11 +101,11 @@ fun StoreCard(
             .fillMaxWidth()
             .graphicsLayer(alpha = animAlpha)
             .offset(y = animOffsetY),
-        shape = RoundedCornerShape(24.dp),
+        shape = ComponentShapes.card,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(
             modifier = Modifier

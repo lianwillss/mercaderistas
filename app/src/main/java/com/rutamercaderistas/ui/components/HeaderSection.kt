@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.ui.theme.Background
+import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.HeaderDeepBlue
 import com.rutamercaderistas.ui.theme.HeaderLightBlue
 import com.rutamercaderistas.ui.theme.HeaderMidBlue
@@ -213,7 +214,7 @@ fun HeaderSection(
                             Spacer(modifier = Modifier.height(6.dp))
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
+                                    .clip(ComponentShapes.badge)
                                     .background(UrgencyOrangeSoft.copy(alpha = 0.9f))
                                     .clickable { onExpiringSoonClick() }
                                     .padding(horizontal = 10.dp, vertical = 5.dp),

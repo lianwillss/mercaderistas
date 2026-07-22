@@ -94,7 +94,7 @@ val AppTypography = Typography(
     ),
     bodySmall = TextStyle(
         fontFamily = InterFont,
-        fontWeight = FontWeight.Normal,
+        fontWeight = FontWeight.Medium,
         fontSize = 13.sp,
         lineHeight = 18.sp,
         letterSpacing = 0.4.sp,

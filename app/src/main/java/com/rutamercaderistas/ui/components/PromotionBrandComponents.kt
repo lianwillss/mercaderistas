@@ -113,7 +113,7 @@ fun BrandCard(
         modifier = Modifier.fillMaxWidth(),
         shape = ComponentShapes.card,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
     ) {
         Column(
             modifier = Modifier
@@ -143,7 +143,7 @@ fun BrandCard(
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Text(
-                    text = brand.uppercase(),
+                    text = brand,
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f),
@@ -254,7 +254,7 @@ private fun ChainHeader(chain: String, localName: String, count: Int) {
                 .padding(horizontal = 8.dp, vertical = 3.dp),
         ) {
             Text(
-                text = chain.uppercase(),
+                text = chain,
                 style = MaterialTheme.typography.labelMedium,
                 color = chainColor(chain),
             )
@@ -317,7 +317,7 @@ private fun ProductItem(
         }
 
         Text(
-            text = promo.productName.uppercase(),
+            text = promo.productName,
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 2,

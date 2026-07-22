@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.ui.res.stringResource
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.R
+import com.rutamercaderistas.ui.theme.ComponentShapes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -155,7 +156,7 @@ fun RouteSearchBar(
                         }
                     }
                 },
-                shape = RoundedCornerShape(28.dp),
+                shape = ComponentShapes.textField,
                 colors = TextFieldDefaults.colors(
                     unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                     focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
@@ -187,8 +188,8 @@ fun RouteSearchBar(
                     .onFocusChanged { state ->
                         isFocused = state.isFocused
                     }
-                    .clip(RoundedCornerShape(28.dp))
-                    .shadow(if (isFocused) 4.dp else 1.dp, RoundedCornerShape(28.dp))
+                    .clip(ComponentShapes.textField)
+                    .shadow(if (isFocused) 4.dp else 1.dp, ComponentShapes.textField)
             )
 
             AnimatedVisibility(
