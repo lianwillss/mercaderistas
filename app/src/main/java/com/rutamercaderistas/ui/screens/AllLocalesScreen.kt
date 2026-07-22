@@ -127,7 +127,7 @@ fun AllLocalesScreen(
         ) {
             itemsIndexed(
                 items = filteredLocales,
-                key = { _, local -> "${local.codigo}|${local.local}|${local.cadena}|${local.formato}" }
+                key = { index, _ -> index }
             ) { _, local ->
                 Card(
                     modifier = Modifier.animateItem().fillMaxWidth(),
