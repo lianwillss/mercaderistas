@@ -50,6 +50,7 @@ import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.models.ClienteInfo
 import com.rutamercaderistas.models.LocalDelDia
 import com.rutamercaderistas.ui.theme.ComponentShapes
+import com.rutamercaderistas.ui.theme.rs
 import com.rutamercaderistas.domain.model.effectiveChain
 import com.rutamercaderistas.domain.model.matchesChain
 import com.rutamercaderistas.domain.model.normalizeChain
@@ -69,6 +70,7 @@ fun StoreCard(
     index: Int = 0,
     modifier: Modifier = Modifier
 ) {
+    val s = rs()
     var visible by remember { mutableStateOf(false) }
     val animAlpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
@@ -108,7 +110,7 @@ fun StoreCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(16.dp * s)
                 .animateContentSize(animationSpec = tween(250))
         ) {
             // ── Header row ──
@@ -118,7 +120,7 @@ fun StoreCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(36.dp * s)
                         .clip(ComponentShapes.cardSmall)
                         .background(storeSoftColor(local.local)),
                     contentAlignment = Alignment.Center
@@ -127,11 +129,11 @@ fun StoreCard(
                         imageVector = Icons.Outlined.Store,
                         contentDescription = stringResource(R.string.store_icon_cd),
                         tint = storeColor(local.local),
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(18.dp * s)
                     )
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(12.dp * s))
 
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -203,11 +205,11 @@ fun StoreCard(
                     }
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(8.dp * s))
 
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(40.dp * s)
                         .clip(CircleShape)
                         .clickable { onShareLocal(buildStoreShareText(local, promotionsByBrand, brandCleanCache)) }
                         .background(MaterialTheme.colorScheme.surfaceVariant),
@@ -217,15 +219,15 @@ fun StoreCard(
                         imageVector = Icons.Outlined.Share,
                         contentDescription = stringResource(R.string.compartir),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(18.dp * s),
                     )
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(8.dp * s))
 
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(36.dp * s)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primaryContainer),
                     contentAlignment = Alignment.Center
@@ -246,7 +248,7 @@ fun StoreCard(
                     }
                 }
 
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(6.dp * s))
 
                 Text(
                     text = "›",
@@ -255,14 +257,14 @@ fun StoreCard(
             }
 
             // ── Divider ──
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(14.dp * s))
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(1.dp)
                     .background(MaterialTheme.colorScheme.outlineVariant)
             )
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(14.dp * s))
 
             // ── Brands ──
             local.clientes.forEach { cliente ->
@@ -297,7 +299,7 @@ fun StoreCard(
                         cliente.nombre.equals(marcaResaltada, ignoreCase = true),
                     onClick = { onBrandClick(cliente.nombre) }
                 )
-                Spacer(modifier = Modifier.height(5.dp))
+                Spacer(modifier = Modifier.height(5.dp * s))
             }
         }
     }

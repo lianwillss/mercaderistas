@@ -54,6 +54,7 @@ import com.rutamercaderistas.R
 import com.rutamercaderistas.models.LocalDelDia
 import com.rutamercaderistas.ui.components.ScreenHeader
 import com.rutamercaderistas.ui.theme.ComponentShapes
+import com.rutamercaderistas.ui.theme.rs
 import com.rutamercaderistas.ui.theme.storeColor
 import com.rutamercaderistas.ui.theme.storeSoftColor
 
@@ -65,6 +66,7 @@ fun AllLocalesScreen(
     initialSearch: String = "",
 ) {
     var searchQuery by remember { mutableStateOf(initialSearch) }
+    val s = rs()
 
     LaunchedEffect(initialSearch) {
         if (initialSearch.isNotBlank()) searchQuery = initialSearch
@@ -95,6 +97,7 @@ fun AllLocalesScreen(
         ScreenHeader(
             onBack = onClose,
             title = stringResource(R.string.todos_locales),
+            verticalPadding = 12.dp * s,
         )
 
         TextField(
@@ -115,19 +118,19 @@ fun AllLocalesScreen(
             shape = ComponentShapes.textField,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 4.dp)
+                .padding(horizontal = 12.dp * s, vertical = 4.dp * s)
         )
 
         Text(
             text = stringResource(R.string.locales_count, filteredLocales.size),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            modifier = Modifier.padding(horizontal = 16.dp * s, vertical = 4.dp * s)
         )
 
         LazyColumn(
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            contentPadding = PaddingValues(horizontal = 12.dp * s, vertical = 4.dp * s),
+            verticalArrangement = Arrangement.spacedBy(10.dp * s)
         ) {
             itemsIndexed(
                 items = filteredLocales,
@@ -157,12 +160,12 @@ fun AllLocalesScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(12.dp),
+                            .padding(12.dp * s),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(28.dp)
+                                .size(28.dp * s)
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(storeSoftColor(local.local)),
                             contentAlignment = Alignment.Center
@@ -171,11 +174,11 @@ fun AllLocalesScreen(
                                 imageVector = Icons.Outlined.Store,
                                 contentDescription = stringResource(R.string.cadena_cd),
                                 tint = storeColor(local.local),
-                                modifier = Modifier.size(14.dp)
+                                modifier = Modifier.size(14.dp * s)
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(10.dp * s))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(

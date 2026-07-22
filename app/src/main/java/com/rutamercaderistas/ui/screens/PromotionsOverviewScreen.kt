@@ -62,13 +62,12 @@ import com.rutamercaderistas.ui.components.BrandCard
 import com.rutamercaderistas.ui.components.ScreenHeader
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.UrgencyOrange
+import com.rutamercaderistas.ui.theme.rs
 import timber.log.Timber
 import com.rutamercaderistas.ui.components.ShimmerPromotionsContent
 import com.rutamercaderistas.ui.components.urgency
 import com.rutamercaderistas.domain.model.normalizeChain
 import java.time.LocalDate
-
-private val BottomPadding = 96.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,6 +87,7 @@ fun PromotionsOverviewScreen(
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var soloMisMarcas by rememberSaveable { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
+    val s = rs()
 
     LaunchedEffect(promotionErrorMessage) {
         if (promotionErrorMessage != null) {
@@ -181,13 +181,13 @@ fun PromotionsOverviewScreen(
             onBack = onClose,
             title = stringResource(R.string.promociones_title),
             modifier = Modifier.background(MaterialTheme.colorScheme.surface),
-            verticalPadding = 16.dp,
+            verticalPadding = 16.dp * s,
         )
 
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = 20.dp * s)
         ) {
             val tfColors = TextFieldDefaults.colors(
                 unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -238,7 +238,7 @@ fun PromotionsOverviewScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp * s))
 
             Text(
                 text = stringResource(R.string.marcas_con_promociones, filteredEntries.size),
@@ -247,7 +247,7 @@ fun PromotionsOverviewScreen(
                 modifier = Modifier.padding(horizontal = 4.dp),
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp * s))
 
             Row(
                 modifier = Modifier
@@ -285,7 +285,7 @@ fun PromotionsOverviewScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp * s))
         }
 
         promotionErrorMessage?.let { msg ->
@@ -293,7 +293,7 @@ fun PromotionsOverviewScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f))
-                    .padding(start = 20.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
+                    .padding(start = 20.dp * s, end = 4.dp, top = 10.dp * s, bottom = 10.dp * s),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -321,15 +321,15 @@ fun PromotionsOverviewScreen(
             if (isRefreshing && promotionsByBrand.isEmpty()) {
                 ShimmerPromotionsContent(modifier = Modifier.padding(top = 4.dp))
             } else if (filteredEntries.isEmpty()) {
-                    val emptyMsg = when {
-                        searchQuery.isNotBlank() -> stringResource(R.string.sin_resultados_para, searchQuery)
-                        selectedChain != "Todas" -> stringResource(R.string.sin_promociones_para, selectedChain)
-                        else -> stringResource(R.string.sin_promociones_activas)
-                    }
+                val emptyMsg = when {
+                    searchQuery.isNotBlank() -> stringResource(R.string.sin_resultados_para, searchQuery)
+                    selectedChain != "Todas" -> stringResource(R.string.sin_promociones_para, selectedChain)
+                    else -> stringResource(R.string.sin_promociones_activas)
+                }
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(32.dp),
+                        .padding(32.dp * s),
                     contentAlignment = Alignment.Center,
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -337,9 +337,9 @@ fun PromotionsOverviewScreen(
                             imageVector = Icons.Outlined.SearchOff,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                            modifier = Modifier.size(56.dp),
+                            modifier = Modifier.size(56.dp * s),
                         )
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(16.dp * s))
                         Text(
                             text = emptyMsg,
                             style = MaterialTheme.typography.bodyLarge,
@@ -349,8 +349,8 @@ fun PromotionsOverviewScreen(
                 }
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = BottomPadding),
-                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                    contentPadding = PaddingValues(start = 16.dp * s, end = 16.dp * s, top = 4.dp * s, bottom = 96.dp * s),
+                    verticalArrangement = Arrangement.spacedBy(24.dp * s),
                 ) {
                     itemsIndexed(
                         items = filteredEntries,

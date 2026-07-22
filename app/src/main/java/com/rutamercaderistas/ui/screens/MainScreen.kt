@@ -62,12 +62,15 @@ import com.rutamercaderistas.ui.components.StatsCards
 import com.rutamercaderistas.ui.components.StoreCard
 import com.rutamercaderistas.ui.components.PromoExpiringSoonModal
 import com.rutamercaderistas.ui.theme.ComponentShapes
+import com.rutamercaderistas.ui.theme.rs
 import com.rutamercaderistas.viewmodel.RouteUiState
 import com.rutamercaderistas.viewmodel.SyncUiState
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
-private val BottomPadding = 96.dp
+private val SpacerSmall = 4.dp
+private val SpacerMedium = 12.dp
+private val SpacerLarge = 20.dp
 
 @Composable
 fun MainScreen(
@@ -215,6 +218,7 @@ private fun MainRoute(
     val pagerState = rememberPagerState(pageCount = { activeDays.size.coerceAtLeast(1) })
     val currentDay = activeDays.getOrNull(pagerState.currentPage) ?: activeDays.firstOrNull()
     val scope = rememberCoroutineScope()
+    val s = rs()
 
     LaunchedEffect(currentDay) {
         onSetCurrentDay(currentDay)
@@ -267,7 +271,7 @@ private fun MainRoute(
                 }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(SpacerSmall * s))
 
             RouteSearchBar(
                 routes = routes,
@@ -286,14 +290,14 @@ private fun MainRoute(
             }
 
             if (isDataLoaded) {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(SpacerMedium * s))
                 StatsCards(
                     stats = stats,
                     onLocalesClick = onNavigateToAllLocales,
                     onMarcasClick = onNavigateToPromotions,
                     marcasConPromo = routeState.marcasConPromo,
                 )
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(SpacerLarge * s))
                 if (activeDays.isNotEmpty()) {
                     DaySelector(
                         days = activeDays,
@@ -301,12 +305,12 @@ private fun MainRoute(
                         selectedIndex = pagerState.currentPage,
                         onDaySelected = { scope.launch { pagerState.animateScrollToPage(it) } },
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(8.dp * s))
                 }
             } else {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(SpacerMedium * s))
                 ShimmerStatsCards()
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(SpacerLarge * s))
                 ShimmerDaySelector()
             }
         }
@@ -323,15 +327,15 @@ private fun MainRoute(
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     LazyColumn(
-                        contentPadding = PaddingValues(bottom = BottomPadding),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        contentPadding = PaddingValues(bottom = 96.dp * s),
+                        verticalArrangement = Arrangement.spacedBy(16.dp * s),
                         modifier = Modifier.fillMaxSize(),
                     ) {
                         val locales = routeState.currentDayLocales
                         if (locales.isEmpty()) {
                             item {
                                 Box(
-                                    modifier = Modifier.fillMaxWidth().padding(32.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(32.dp * s),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Text(
@@ -347,8 +351,7 @@ private fun MainRoute(
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(horizontal = 24.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
+                                            .padding(horizontal = 24.dp * s),
                                     ) {
                                         val sinConexionCd = stringResource(R.string.sin_conexion_cd)
                                         Box(
@@ -379,7 +382,7 @@ private fun MainRoute(
                     onBrandClick = onBrandClick,
                     onAddressClick = onAddressClick,
                     onShareLocal = onShareLocal,
-                    modifier = Modifier.animateItem().padding(horizontal = 20.dp),
+                    modifier = Modifier.animateItem().padding(horizontal = 20.dp * s),
                 )
             }
                         }
@@ -389,8 +392,8 @@ private fun MainRoute(
         } else if (!isDataLoaded) {
             Box(modifier = Modifier.weight(1f)) {
                 LazyColumn(
-                        contentPadding = PaddingValues(bottom = BottomPadding),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                        contentPadding = PaddingValues(bottom = 96.dp * s),
+                    verticalArrangement = Arrangement.spacedBy(16.dp * s),
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     item { ShimmerLoadingContent() }
@@ -413,12 +416,13 @@ private fun RecentRoutesRow(
     selectedRoute: String?,
     onRouteSelected: (String) -> Unit,
 ) {
+    val s = rs()
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .padding(horizontal = 16.dp * s, vertical = 6.dp * s)
             .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp * s),
     ) {
         routes.forEach { route ->
             val isSelected = route == selectedRoute
@@ -435,7 +439,7 @@ private fun RecentRoutesRow(
                     .background(bg)
                     .border(1.dp, borderColor, ComponentShapes.pill)
                     .clickable { onRouteSelected(route) }
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                    .padding(horizontal = 14.dp * s, vertical = 8.dp * s),
             ) {
                 Text(
                 text = route,

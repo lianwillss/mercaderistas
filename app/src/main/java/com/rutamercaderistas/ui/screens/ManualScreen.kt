@@ -53,11 +53,13 @@ import com.rutamercaderistas.ui.theme.StoreColorRed
 import com.rutamercaderistas.ui.theme.StoreColorRedSoft
 import com.rutamercaderistas.ui.theme.StoreColorYellow
 import com.rutamercaderistas.ui.theme.StoreColorYellowSoft
+import com.rutamercaderistas.ui.theme.rs
 
 @Composable
 fun ManualScreen(
     onClose: () -> Unit
 ) {
+    val s = rs()
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -67,6 +69,7 @@ fun ManualScreen(
         ScreenHeader(
             onBack = onClose,
             title = stringResource(R.string.manual_usuario_title),
+            verticalPadding = 12.dp * s,
         )
 
         Column(

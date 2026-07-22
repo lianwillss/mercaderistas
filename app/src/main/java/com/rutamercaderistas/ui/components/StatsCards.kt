@@ -32,6 +32,7 @@ import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.R
 import com.rutamercaderistas.services.RuteroRepository
 import com.rutamercaderistas.ui.theme.ComponentShapes
+import com.rutamercaderistas.ui.theme.rs
 
 @Composable
 fun StatsCards(
@@ -41,11 +42,12 @@ fun StatsCards(
     onMarcasClick: () -> Unit = {},
     marcasConPromo: Int = 0,
 ) {
+    val s = rs()
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+            .padding(horizontal = 8.dp * s),
+        horizontalArrangement = Arrangement.spacedBy(6.dp * s)
     ) {
         StatCard(
             icon = Icons.Rounded.Store,
@@ -96,6 +98,7 @@ private fun StatCard(
     onClick: () -> Unit = {},
     badge: (@Composable () -> Unit)? = null,
 ) {
+    val s = rs()
     Card(
         onClick = onClick,
         modifier = modifier,
@@ -106,23 +109,23 @@ private fun StatCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp),
+                .padding(8.dp * s),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
                 tint = iconColor,
-                modifier = Modifier.size(12.dp)
+                modifier = Modifier.size(12.dp * s)
             )
-            Spacer(modifier = Modifier.height(3.dp))
+            Spacer(modifier = Modifier.height(3.dp * s))
             Text(
                 text = "$value",
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
             if (badge != null) {
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(2.dp * s))
                 badge()
             }
             Text(

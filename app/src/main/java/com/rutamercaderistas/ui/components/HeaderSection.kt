@@ -70,6 +70,7 @@ import com.rutamercaderistas.ui.theme.UrgencyOrangeSoft
 import com.rutamercaderistas.ui.theme.Wave1Blue
 import com.rutamercaderistas.ui.theme.Wave2Blue
 import com.rutamercaderistas.ui.theme.Wave3Blue
+import com.rutamercaderistas.ui.theme.rs
 import kotlin.math.PI
 import kotlin.math.sin
 
@@ -90,6 +91,7 @@ fun HeaderSection(
 ) {
     var expanded by remember { mutableStateOf(value = false) }
     val haptic = LocalHapticFeedback.current
+    val s = rs()
 
     val infiniteTransition = rememberInfiniteTransition()
     val phase by infiniteTransition.animateFloat(
@@ -176,7 +178,7 @@ fun HeaderSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 16.dp),
+                .padding(start = 24.dp * s, end = 24.dp * s, top = 8.dp, bottom = 16.dp * s),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),

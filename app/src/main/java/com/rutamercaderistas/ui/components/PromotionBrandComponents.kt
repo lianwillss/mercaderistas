@@ -57,6 +57,7 @@ import com.rutamercaderistas.ui.theme.UrgencyOrange
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.UrgencyOrangeSoft
 import com.rutamercaderistas.ui.theme.UrgencyTomorrowSoft
+import com.rutamercaderistas.ui.theme.rs
 import timber.log.Timber
 import java.time.LocalDate
 
@@ -99,6 +100,7 @@ fun BrandCard(
     onPromoClick: (String) -> Unit,
     onSharePromo: (PromotionEntity) -> Unit = {},
 ) {
+    val s = rs()
     var expanded by rememberSaveable { mutableStateOf(false) }
     val visible = if (expanded) promos else promos.take(3)
     val hasMore = promos.size > 3
@@ -120,7 +122,7 @@ fun BrandCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(16.dp * s)
                 .animateContentSize(animationSpec = tween(300)),
         ) {
             Row(
@@ -129,7 +131,7 @@ fun BrandCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(40.dp * s)
                         .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.primaryContainer),
                     contentAlignment = Alignment.Center,
@@ -141,7 +143,7 @@ fun BrandCard(
                     )
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(12.dp * s))
 
                 Text(
                     text = brand,
@@ -160,7 +162,7 @@ fun BrandCard(
                         .background(
                             Brush.horizontalGradient(listOf(PromoGradientStart, PromoGradientEnd))
                         )
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                        .padding(horizontal = 12.dp * s, vertical = 6.dp * s),
                 ) {
                     val promocionesCd = stringResource(R.string.promociones_cd)
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -180,24 +182,24 @@ fun BrandCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(24.dp * s))
 
             sortedGroupKeys.forEachIndexed { groupIndex, chainKey ->
                 val chainPromos = groupedByChain[chainKey] ?: return@forEachIndexed
 
                 if (groupIndex > 0) {
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(20.dp * s))
                 }
 
                 if (chainKey.isNotBlank()) {
                     val localName = chainToLocales[chainKey] ?: chainKey
                     ChainHeader(chain = chainKey, localName = localName, count = chainPromos.size)
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(12.dp * s))
                 }
 
                 chainPromos.forEachIndexed { promoIndex, promo ->
                     if (promoIndex > 0) {
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(16.dp * s))
                     }
                     ProductItem(
                         promo = promo,
@@ -208,7 +210,7 @@ fun BrandCard(
             }
 
             if (hasMore && !expanded) {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp * s))
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -231,6 +233,7 @@ fun BrandCard(
 
 @Composable
 private fun ChainHeader(chain: String, localName: String, count: Int) {
+    val s = rs()
     val cadenaCd = stringResource(R.string.cadena_cd)
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -274,6 +277,7 @@ private fun ProductItem(
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
 ) {
+    val s = rs()
     val urg = urgency(promo.endDate)
     val haptic = LocalHapticFeedback.current
 
@@ -337,7 +341,7 @@ private fun ProductItem(
                     color = if (urg != Urgency.NORMAL) UrgencyOrange else MaterialTheme.colorScheme.primary,
                 )
                 if (promo.price.startsWith("$")) {
-                    Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(8.dp * s))
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))

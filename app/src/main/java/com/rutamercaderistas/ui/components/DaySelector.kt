@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import com.rutamercaderistas.ui.theme.ComponentShapes
+import com.rutamercaderistas.ui.theme.rs
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,6 +39,7 @@ fun DaySelector(
     onDaySelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = rs()
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -59,7 +61,7 @@ fun DaySelector(
 
             Box(
                 modifier = Modifier
-                    .height(44.dp)
+                    .height(44.dp * s)
                     .shadow(elevation, ComponentShapes.pill)
                     .clip(ComponentShapes.pill)
                     .background(bgColor)
@@ -67,7 +69,7 @@ fun DaySelector(
                         onDaySelected(index)
                     }
                     .semantics { contentDescription = dia.nombreCompleto }
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = 12.dp * s),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
