@@ -67,6 +67,8 @@ import com.rutamercaderistas.viewmodel.SyncUiState
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
+private val BottomPadding = 96.dp
+
 @Composable
 fun MainScreen(
     routeUiState: RouteUiState,
@@ -321,7 +323,7 @@ private fun MainRoute(
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     LazyColumn(
-                        contentPadding = PaddingValues(bottom = 96.dp),
+                        contentPadding = PaddingValues(bottom = BottomPadding),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                         modifier = Modifier.fillMaxSize(),
                     ) {
@@ -387,7 +389,7 @@ private fun MainRoute(
         } else if (!isDataLoaded) {
             Box(modifier = Modifier.weight(1f)) {
                 LazyColumn(
-                    contentPadding = PaddingValues(bottom = 96.dp),
+                        contentPadding = PaddingValues(bottom = BottomPadding),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {

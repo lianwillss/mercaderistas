@@ -80,12 +80,9 @@ import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private val ClayBackground = Color(0xFFF0EBE3)
-private val ClaySurface = Color(0xFFE8E0D5)
-
 private fun Modifier.clayHighlight(shape: Shape = RoundedCornerShape(16.dp)): Modifier = drawBehind {
     drawRoundRect(
-        color = Color.White.copy(alpha = 0.45f),
+        color = Color.White.copy(alpha = 0.04f),
         topLeft = Offset(-size.width * 0.03f, -size.height * 0.03f),
         size = size,
         cornerRadius = CornerRadius(
@@ -268,8 +265,8 @@ fun PdfViewerScreen(
                                     }
                                 },
                                 colors = TopAppBarDefaults.topAppBarColors(
-                                    containerColor = ClaySurface.copy(alpha = 0.95f),
-                                    scrolledContainerColor = ClaySurface.copy(alpha = 0.95f),
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
+                                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
                                 ),
                                 modifier = Modifier
                                     .clayHighlight(RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp))
@@ -299,7 +296,7 @@ fun PdfViewerScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(ClayBackground),
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
                             contentAlignment = Alignment.Center,
                         ) {
                             Card(
@@ -309,7 +306,7 @@ fun PdfViewerScreen(
                                     .clayHighlight(RoundedCornerShape(4.dp)),
                                 shape = RoundedCornerShape(4.dp),
                                 colors = CardDefaults.cardColors(
-                                    containerColor = ClaySurface.copy(alpha = shimmerAlpha),
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = shimmerAlpha),
                                 ),
                             ) {
                                 Column(modifier = Modifier.padding(28.dp)) {

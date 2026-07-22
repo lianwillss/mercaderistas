@@ -50,8 +50,6 @@ import com.rutamercaderistas.ui.screens.renderThumbnail
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private val ClaySurface = Color(0xFFE8E0D5)
-
 @Composable
 fun PdfGridModal(
     brandName: String?,
@@ -68,7 +66,7 @@ fun PdfGridModal(
             .padding(24.dp)
             .padding(top = 48.dp),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = ClaySurface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -133,7 +131,7 @@ private fun PdfThumbnailItem(
             .fillMaxWidth()
             .clickable(onClick = onTap),
         shape = RoundedCornerShape(8.dp),
-        color = if (isCurrent) ClaySurface else MaterialTheme.colorScheme.surfaceVariant,
+        color = if (isCurrent) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
     ) {
         Box {
             if (bmp != null) {

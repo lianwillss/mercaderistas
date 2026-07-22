@@ -1,5 +1,8 @@
 package com.rutamercaderistas.ui.screens
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -12,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -45,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
@@ -62,6 +67,8 @@ import com.rutamercaderistas.ui.components.ShimmerPromotionsContent
 import com.rutamercaderistas.ui.components.urgency
 import com.rutamercaderistas.domain.model.normalizeChain
 import java.time.LocalDate
+
+private val BottomPadding = 96.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -342,14 +349,30 @@ fun PromotionsOverviewScreen(
                 }
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 96.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = BottomPadding),
                     verticalArrangement = Arrangement.spacedBy(24.dp),
                 ) {
                     itemsIndexed(
                         items = filteredEntries,
                         key = { _, entry -> entry.first },
                     ) { index, (brand, promos) ->
-                        Box(modifier = Modifier.animateItem()) {
+                        var visible by remember { mutableStateOf(false) }
+                        val animAlpha by animateFloatAsState(
+                            targetValue = if (visible) 1f else 0f,
+                            animationSpec = tween(250, delayMillis = index * 50),
+                        )
+                        val animOffsetY by animateDpAsState(
+                            targetValue = if (visible) 0.dp else 12.dp,
+                            animationSpec = tween(250, delayMillis = index * 50),
+                        )
+                        LaunchedEffect(Unit) { visible = true }
+
+                        Box(
+                            modifier = Modifier
+                                .animateItem()
+                                .graphicsLayer(alpha = animAlpha)
+                                .offset(y = animOffsetY)
+                        ) {
                             BrandCard(
                                 brand = brand,
                                 promos = promos,

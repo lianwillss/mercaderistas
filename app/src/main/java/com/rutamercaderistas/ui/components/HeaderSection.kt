@@ -285,17 +285,6 @@ fun HeaderSection(
                     onDismissRequest = { expanded = false }
                 ) {
                     DropdownMenuItem(
-                        text = { Text(stringResource(R.string.header_forzar_sincronizacion)) },
-                        onClick = {
-                            expanded = false
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onRefresh()
-                        },
-                        leadingIcon = {
-                            Icon(Icons.Outlined.Refresh, contentDescription = stringResource(R.string.header_actualizar_cd))
-                        }
-                    )
-                    DropdownMenuItem(
                         text = { Text(stringResource(R.string.header_manual_usuario)) },
                         onClick = {
                             expanded = false
