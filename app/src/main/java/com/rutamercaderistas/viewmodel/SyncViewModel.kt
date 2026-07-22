@@ -142,7 +142,6 @@ class SyncViewModel @Inject constructor(
                     _state.value = _state.value.copy(state = SyncState.Syncing(phase = "Indexando rutas…"))
                     val indexOk = ruteroManager.createIndex()
                     if (indexOk) {
-                        repository.clear()
                         _state.value = _state.value.copy(state = SyncState.Syncing(phase = "Actualizando promociones…"))
                         promotionRepository.refresh()
                         _state.value = _state.value.copy(state = SyncState.Idle)
@@ -180,6 +179,7 @@ class SyncViewModel @Inject constructor(
                     if (routeToLoad != null) {
                         val entries = ruteroManager.loadRoute(routeToLoad)
                         if (entries.isNotEmpty()) {
+                            repository.clear()
                             repository.setEntries(entries, routeToLoad)
                         }
                     }
