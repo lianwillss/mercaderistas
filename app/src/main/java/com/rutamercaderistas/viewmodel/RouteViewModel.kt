@@ -106,6 +106,8 @@ class RouteViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(RouteUiState())
     val uiState: StateFlow<RouteUiState> = _uiState.asStateFlow()
 
+    private var routeVersion = 0
+
     init {
         observeRoutes()
         observeRecentRoutes()
@@ -131,6 +133,7 @@ class RouteViewModel @Inject constructor(
     private fun observeEntries() {
         viewModelScope.launch {
             repository.entriesFlow.collect { entries ->
+                val versionAtStart = routeVersion
                 withContext(Dispatchers.Default) {
                     val activeDays = if (entries.isNotEmpty()) {
                         DiaSemana.todos().filter { repository.hasAnyVisitOnDay(it) }
@@ -145,22 +148,24 @@ class RouteViewModel @Inject constructor(
                     }.map { normalizeChain(it) }.toSet()
                     val chainToLocales = computeChainToLocales(allLocales)
 
-                    _uiState.update { state ->
-                        val previousCurrentDayLocales = (state.route as? RouteDataState.Loaded)?.currentDayLocales ?: emptyList()
-                        state.copy(
-                            route = RouteDataState.Loaded(
-                                selectedRoute = selectedRoute,
-                                entries = entries,
-                                activeDays = activeDays,
-                                currentDayLocales = previousCurrentDayLocales,
-                                allLocales = allLocales,
-                                stats = stats,
-                            ),
-                            chainToLocales = chainToLocales,
-                            routeBrands = routeBrands,
-                            routeChains = routeChains,
-                            needsInitialLoad = false,
-                        )
+                    if (versionAtStart == routeVersion) {
+                        _uiState.update { state ->
+                            val previousCurrentDayLocales = (state.route as? RouteDataState.Loaded)?.currentDayLocales ?: emptyList()
+                            state.copy(
+                                route = RouteDataState.Loaded(
+                                    selectedRoute = selectedRoute,
+                                    entries = entries,
+                                    activeDays = activeDays,
+                                    currentDayLocales = previousCurrentDayLocales,
+                                    allLocales = allLocales,
+                                    stats = stats,
+                                ),
+                                chainToLocales = chainToLocales,
+                                routeBrands = routeBrands,
+                                routeChains = routeChains,
+                                needsInitialLoad = false,
+                            )
+                        }
                     }
                 }
 
@@ -264,6 +269,12 @@ class RouteViewModel @Inject constructor(
                     val currentDay = activeDays.firstOrNull()
                     val currentDayLocales = if (currentDay != null)
                         repository.getLocalesForDay(currentDay) else emptyList()
+                    val routeBrands = computeRouteBrands(allLocales)
+                    val routeChains = allLocales.mapNotNull { locale ->
+                        effectiveChain(locale.cadena, locale.formato).takeIf { it.isNotBlank() }
+                    }.map { normalizeChain(it) }.toSet()
+                    val chainToLocales = computeChainToLocales(allLocales)
+                    routeVersion++
                     _uiState.update { it.copy(
                         route = RouteDataState.Loaded(
                             selectedRoute = rutero,
@@ -273,6 +284,10 @@ class RouteViewModel @Inject constructor(
                             allLocales = allLocales,
                             stats = stats,
                         ),
+                        chainToLocales = chainToLocales,
+                        routeBrands = routeBrands,
+                        routeChains = routeChains,
+                        needsInitialLoad = false,
                     )}
                 }
             } catch (e: Exception) {

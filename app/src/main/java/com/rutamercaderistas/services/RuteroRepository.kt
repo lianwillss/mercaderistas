@@ -28,9 +28,12 @@ class RuteroRepository @Inject constructor() {
      */
     fun setEntries(entries: List<EntradaRuta>, ruteroName: String) {
         activeRuteroName = ruteroName
-        _entriesFlow.value = entries
-        cachedStats = computeStats(entries)
-        Timber.d("ROUTE_LOADED: %s con %d registros", ruteroName, entries.size)
+        val normalized = entries.map { e ->
+            e.copy(codigo = e.codigo.trim(), local = e.local.trim())
+        }
+        _entriesFlow.value = normalized
+        cachedStats = computeStats(normalized)
+        Timber.d("ROUTE_LOADED: %s con %d registros", ruteroName, normalized.size)
     }
 
     fun getActiveRuteroName() = activeRuteroName
