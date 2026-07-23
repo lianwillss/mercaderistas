@@ -29,12 +29,6 @@ object UpdateChecker {
             val tagName = json.optString("tag_name", "")
             val versionName = tagName.removePrefix("v")
 
-            val versionCode = extractVersionCode(versionName)
-            if (versionCode < 0) {
-                Timber.w("Tag inválido: %s", tagName)
-                return@withContext noUpdate()
-            }
-
             val assets = json.optJSONArray("assets")
             var apkUrl: String? = null
             if (assets != null) {
@@ -52,16 +46,25 @@ object UpdateChecker {
                 return@withContext noUpdate()
             }
 
-            if (versionCode > currentVersionCode) {
-                Timber.i("Actualización disponible: %s (%d) > actual (%d)", versionName, versionCode, currentVersionCode)
+            val remoteVersion = parseVersion(versionName)
+            val localVersion = parseVersionFromCode(currentVersionCode)
+            if (remoteVersion == null) {
+                Timber.w("Tag inválido: %s", tagName)
+                return@withContext noUpdate()
+            }
+
+            if (remoteVersion.first > localVersion.first ||
+                (remoteVersion.first == localVersion.first && remoteVersion.second > localVersion.second)
+            ) {
+                Timber.i("Actualización disponible: %s > %s", versionName, formatVersion(localVersion))
                 UpdateInfo(
                     available = true,
-                    versionCode = versionCode,
+                    versionCode = currentVersionCode + 1,
                     versionName = versionName,
                     apkUrl = apkUrl
                 )
             } else {
-                Timber.i("Sin actualizaciones: remote=%d, local=%d", versionCode, currentVersionCode)
+                Timber.i("Sin actualizaciones: remote=%s, local=%s", versionName, formatVersion(localVersion))
                 noUpdate()
             }
         } catch (e: Exception) {
@@ -93,12 +96,22 @@ object UpdateChecker {
         } finally { conn?.disconnect() }
     }
 
-    private fun extractVersionCode(versionName: String): Int {
+    /** Parse "11.45" → Pair(11, 45) */
+    private fun parseVersion(versionName: String): Pair<Int, Int>? {
         val parts = versionName.split(".")
-        val major = parts.getOrNull(0)?.toIntOrNull() ?: return -1
+        val major = parts.getOrNull(0)?.toIntOrNull() ?: return null
         val minor = parts.getOrNull(1)?.toIntOrNull() ?: 0
-        return major * 1000 + minor
+        return major to minor
     }
+
+    /** Decode versionCode 11045 → Pair(11, 45) */
+    private fun parseVersionFromCode(versionCode: Int): Pair<Int, Int> {
+        val major = versionCode / 1000
+        val minor = versionCode % 1000
+        return major to minor
+    }
+
+    private fun formatVersion(v: Pair<Int, Int>): String = "${v.first}.${v.second}"
 
     private fun noUpdate() = UpdateInfo(
         available = false,

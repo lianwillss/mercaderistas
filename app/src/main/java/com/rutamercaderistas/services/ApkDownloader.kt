@@ -2,6 +2,7 @@ package com.rutamercaderistas.services
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -88,6 +89,19 @@ object ApkDownloader {
         } catch (e: Exception) {
             Timber.e(e, "Error en download")
             DownloadResult.Error("Error de conexión: ${e.localizedMessage ?: "desconocido"}")
+        }
+    }
+
+    fun readApkVersionCode(context: Context, apkFile: File): Int {
+        return try {
+            val info = context.packageManager.getPackageArchiveInfo(
+                apkFile.absolutePath,
+                PackageManager.GET_ACTIVITIES
+            )
+            info?.versionCode ?: 0
+        } catch (e: Exception) {
+            Timber.w(e, "Error leyendo versionCode del APK descargado")
+            0
         }
     }
 

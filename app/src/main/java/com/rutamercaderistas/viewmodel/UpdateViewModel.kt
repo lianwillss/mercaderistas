@@ -118,6 +118,13 @@ class UpdateViewModel @Inject constructor(
                     _state.value = UpdateUiState.Message(result.message)
                 }
                 is DownloadResult.Success -> {
+                    val apkVersion = ApkDownloader.readApkVersionCode(context, result.file)
+                    if (apkVersion <= BuildConfig.VERSION_CODE) {
+                        _state.value = UpdateUiState.Message(
+                            "La versión descargada no es más reciente que la instalada"
+                        )
+                        return@launch
+                    }
                     postReadyNotification(pendingVersionName)
                     val installError = withContext(Dispatchers.Main) {
                         ApkDownloader.installApk(context, result.file)
