@@ -357,7 +357,7 @@ class RouteExporter @Inject constructor(
         for (day in DiaSemana.todos()) {
             val locales = entries
                 .filter { isAssignedForDay(it, day) }
-                .groupBy { it.codigo + it.local }
+                .groupBy { it.codigo.uppercase() + it.local.uppercase() }
                 .map { (_, groupEntries) ->
                     val first = groupEntries.first()
                     LocalDelDia(

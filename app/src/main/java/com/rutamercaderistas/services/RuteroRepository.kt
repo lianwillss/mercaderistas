@@ -54,7 +54,7 @@ class RuteroRepository @Inject constructor() {
 
         return allEntries
             .filter { isAssignedForDay(it, dia) }
-            .groupBy { it.codigo + it.local }
+            .groupBy { it.codigo.uppercase() + it.local.uppercase() }
             .map { (_, entries) ->
                 val first = entries.first()
                 LocalDelDia(
@@ -100,7 +100,7 @@ class RuteroRepository @Inject constructor() {
         val allEntries = _entriesFlow.value
         if (allEntries.isEmpty()) return emptyList()
         return allEntries
-            .groupBy { it.codigo + it.local }
+            .groupBy { it.codigo.uppercase() + it.local.uppercase() }
             .map { (_, entries) ->
                 val first = entries.first()
                 LocalDelDia(
@@ -123,7 +123,7 @@ class RuteroRepository @Inject constructor() {
     }
 
     private fun computeStats(entries: List<EntradaRuta>): Stats {
-        val localesUnicos = entries.distinctBy { it.codigo + it.local }.size
+        val localesUnicos = entries.distinctBy { it.codigo.uppercase() + it.local.uppercase() }.size
         val marcasTotales = entries.distinctBy { it.cliente }.size
         return Stats(localesUnicos, marcasTotales, entries.size)
     }
