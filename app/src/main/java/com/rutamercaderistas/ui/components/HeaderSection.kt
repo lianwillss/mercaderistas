@@ -57,7 +57,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
 import com.rutamercaderistas.data.local.PromotionEntity
-import com.rutamercaderistas.ui.theme.Background
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.HeaderDeepBlue
 import com.rutamercaderistas.ui.theme.HeaderLightBlue
@@ -70,7 +69,7 @@ import com.rutamercaderistas.ui.theme.UrgencyOrangeSoft
 import com.rutamercaderistas.ui.theme.Wave1Blue
 import com.rutamercaderistas.ui.theme.Wave2Blue
 import com.rutamercaderistas.ui.theme.Wave3Blue
-import com.rutamercaderistas.ui.theme.rs
+import com.rutamercaderistas.ui.theme.LocalAppDimens
 import kotlin.math.PI
 import kotlin.math.sin
 
@@ -91,7 +90,8 @@ fun HeaderSection(
 ) {
     var expanded by remember { mutableStateOf(value = false) }
     val haptic = LocalHapticFeedback.current
-    val s = rs()
+    val dimens = LocalAppDimens.current
+    val themeBackground = MaterialTheme.colorScheme.background
 
     val infiniteTransition = rememberInfiniteTransition()
     val phase by infiniteTransition.animateFloat(
@@ -116,7 +116,7 @@ fun HeaderSection(
                     0.35f to HeaderMidDarkBlue,
                     0.65f to HeaderMidBlue,
                     0.85f to HeaderLightBlue,
-                    1.0f to Background,
+                    1.0f to themeBackground,
                 ),
             )
 
@@ -178,7 +178,7 @@ fun HeaderSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(start = 24.dp * s, end = 24.dp * s, top = 8.dp, bottom = 16.dp * s),
+                .padding(start = dimens.spacingSection, end = dimens.spacingSection, top = 8.dp, bottom = dimens.spacingLg),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -216,9 +216,12 @@ fun HeaderSection(
                             Spacer(modifier = Modifier.height(6.dp))
                             Box(
                                 modifier = Modifier
-                                    .clip(ComponentShapes.badge)
+                                    .clip(MaterialTheme.shapes.extraSmall)
                                     .background(UrgencyOrangeSoft.copy(alpha = 0.9f))
-                                    .clickable { onExpiringSoonClick() }
+                                    .clickable(
+                                        onClick = { onExpiringSoonClick() },
+                                        role = androidx.compose.ui.semantics.Role.Button,
+                                    )
                                     .padding(horizontal = 10.dp, vertical = 5.dp),
                                 contentAlignment = Alignment.Center,
                             ) {

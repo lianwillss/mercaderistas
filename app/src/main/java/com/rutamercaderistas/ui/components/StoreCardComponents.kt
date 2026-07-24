@@ -91,7 +91,7 @@ private fun PriorityBrandCard(
             .fillMaxWidth()
             .animateContentSize(animationSpec = tween(250)),
         onClick = onClick,
-        shape = ComponentShapes.cardSmall,
+        shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
             containerColor = if (isHighlighted)
                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.18f)

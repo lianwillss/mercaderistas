@@ -53,13 +53,13 @@ import com.rutamercaderistas.ui.theme.StoreColorRed
 import com.rutamercaderistas.ui.theme.StoreColorRedSoft
 import com.rutamercaderistas.ui.theme.StoreColorYellow
 import com.rutamercaderistas.ui.theme.StoreColorYellowSoft
-import com.rutamercaderistas.ui.theme.rs
+import com.rutamercaderistas.ui.theme.LocalAppDimens
 
 @Composable
 fun ManualScreen(
     onClose: () -> Unit
 ) {
-    val s = rs()
+    val dimens = LocalAppDimens.current
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -69,7 +69,7 @@ fun ManualScreen(
         ScreenHeader(
             onBack = onClose,
             title = stringResource(R.string.manual_usuario_title),
-            verticalPadding = 12.dp * s,
+            verticalPadding = dimens.spacingMd,
         )
 
         Column(
@@ -257,7 +257,7 @@ private fun SectionCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = ComponentShapes.cardSmall,
+        shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp)
     ) {

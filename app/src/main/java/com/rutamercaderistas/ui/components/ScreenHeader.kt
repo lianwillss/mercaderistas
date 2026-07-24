@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import com.rutamercaderistas.R
-import com.rutamercaderistas.ui.theme.rs
+import com.rutamercaderistas.ui.theme.LocalAppDimens
 
 @Composable
 fun ScreenHeader(
@@ -25,11 +25,11 @@ fun ScreenHeader(
     modifier: Modifier = Modifier,
     verticalPadding: Dp = 12.dp,
 ) {
-    val s = rs()
+    val dimens = LocalAppDimens.current
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp * s, vertical = verticalPadding),
+            .padding(horizontal = dimens.spacingMd, vertical = verticalPadding),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = onBack) {

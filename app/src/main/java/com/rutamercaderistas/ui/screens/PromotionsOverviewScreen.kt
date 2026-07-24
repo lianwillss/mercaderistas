@@ -62,7 +62,7 @@ import com.rutamercaderistas.ui.components.BrandCard
 import com.rutamercaderistas.ui.components.ScreenHeader
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.UrgencyOrange
-import com.rutamercaderistas.ui.theme.rs
+import com.rutamercaderistas.ui.theme.LocalAppDimens
 import timber.log.Timber
 import com.rutamercaderistas.ui.components.ShimmerPromotionsContent
 import com.rutamercaderistas.ui.components.urgency
@@ -87,7 +87,7 @@ fun PromotionsOverviewScreen(
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var soloMisMarcas by rememberSaveable { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
-    val s = rs()
+    val dimens = LocalAppDimens.current
 
     LaunchedEffect(promotionErrorMessage) {
         if (promotionErrorMessage != null) {
@@ -181,13 +181,13 @@ fun PromotionsOverviewScreen(
             onBack = onClose,
             title = stringResource(R.string.promociones_title),
             modifier = Modifier.background(MaterialTheme.colorScheme.surface),
-            verticalPadding = 16.dp * s,
+            verticalPadding = dimens.spacingLg,
         )
 
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp * s)
+                .padding(horizontal = dimens.spacingXl)
         ) {
             val tfColors = TextFieldDefaults.colors(
                 unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -238,7 +238,7 @@ fun PromotionsOverviewScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            Spacer(modifier = Modifier.height(16.dp * s))
+            Spacer(modifier = Modifier.height(dimens.spacingLg))
 
             Text(
                 text = stringResource(R.string.marcas_con_promociones, filteredEntries.size),
@@ -247,7 +247,7 @@ fun PromotionsOverviewScreen(
                 modifier = Modifier.padding(horizontal = 4.dp),
             )
 
-            Spacer(modifier = Modifier.height(16.dp * s))
+            Spacer(modifier = Modifier.height(dimens.spacingLg))
 
             Row(
                 modifier = Modifier
@@ -285,7 +285,7 @@ fun PromotionsOverviewScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp * s))
+            Spacer(modifier = Modifier.height(dimens.spacingLg))
         }
 
         promotionErrorMessage?.let { msg ->
@@ -293,7 +293,7 @@ fun PromotionsOverviewScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f))
-                    .padding(start = 20.dp * s, end = 4.dp, top = 10.dp * s, bottom = 10.dp * s),
+                    .padding(start = dimens.spacingXl, end = 4.dp, top = 10.dp, bottom = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -329,17 +329,17 @@ fun PromotionsOverviewScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(32.dp * s),
+                        .padding(dimens.spacingSection),
                     contentAlignment = Alignment.Center,
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
                             imageVector = Icons.Outlined.SearchOff,
-                            contentDescription = null,
+                            contentDescription = stringResource(R.string.sin_resultados),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                            modifier = Modifier.size(56.dp * s),
+                            modifier = Modifier.size(dimens.promoButtonSize),
                         )
-                        Spacer(modifier = Modifier.height(16.dp * s))
+                        Spacer(modifier = Modifier.height(dimens.spacingLg))
                         Text(
                             text = emptyMsg,
                             style = MaterialTheme.typography.bodyLarge,
@@ -349,8 +349,8 @@ fun PromotionsOverviewScreen(
                 }
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(start = 16.dp * s, end = 16.dp * s, top = 4.dp * s, bottom = 96.dp * s),
-                    verticalArrangement = Arrangement.spacedBy(24.dp * s),
+                    contentPadding = PaddingValues(start = dimens.spacingLg, end = dimens.spacingLg, top = dimens.spacingXs, bottom = dimens.contentPaddingBottom),
+                    verticalArrangement = Arrangement.spacedBy(dimens.spacingXxl),
                 ) {
                     itemsIndexed(
                         items = filteredEntries,

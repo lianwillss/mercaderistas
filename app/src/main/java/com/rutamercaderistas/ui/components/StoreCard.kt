@@ -50,6 +50,7 @@ import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.models.ClienteInfo
 import com.rutamercaderistas.models.LocalDelDia
 import com.rutamercaderistas.ui.theme.ComponentShapes
+import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.ui.theme.rs
 import com.rutamercaderistas.domain.model.effectiveChain
 import com.rutamercaderistas.domain.model.matchesChain
@@ -70,7 +71,7 @@ fun StoreCard(
     index: Int = 0,
     modifier: Modifier = Modifier
 ) {
-    val s = rs()
+    val dimens = LocalAppDimens.current
     var visible by remember { mutableStateOf(false) }
     val animAlpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
@@ -101,7 +102,7 @@ fun StoreCard(
             .fillMaxWidth()
             .graphicsLayer(alpha = animAlpha)
             .offset(y = animOffsetY),
-        shape = ComponentShapes.card,
+        shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
@@ -110,7 +111,7 @@ fun StoreCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp * s)
+                .padding(dimens.spacingLg)
                 .animateContentSize(animationSpec = tween(250))
         ) {
             // ── Header row ──
@@ -120,8 +121,8 @@ fun StoreCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(36.dp * s)
-                        .clip(ComponentShapes.cardSmall)
+                        .size(dimens.iconXl)
+                        .clip(MaterialTheme.shapes.medium)
                         .background(storeSoftColor(local.local)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -129,11 +130,11 @@ fun StoreCard(
                         imageVector = Icons.Outlined.Store,
                         contentDescription = stringResource(R.string.store_icon_cd),
                         tint = storeColor(local.local),
-                        modifier = Modifier.size(18.dp * s)
+                        modifier = Modifier.size(dimens.iconSm)
                     )
                 }
 
-                Spacer(modifier = Modifier.width(12.dp * s))
+                Spacer(modifier = Modifier.width(dimens.spacingMd))
 
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -170,7 +171,10 @@ fun StoreCard(
                         Row(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(12.dp))
-                                .clickable { onAddressClick(local.direccion) }
+                                .clickable(
+                                    onClick = { onAddressClick(local.direccion) },
+                                    role = androidx.compose.ui.semantics.Role.Button,
+                                )
                                 .padding(vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -205,13 +209,16 @@ fun StoreCard(
                     }
                 }
 
-                Spacer(modifier = Modifier.width(8.dp * s))
+                Spacer(modifier = Modifier.width(dimens.spacingSm))
 
                 Box(
                     modifier = Modifier
-                        .size(40.dp * s)
+                        .size(dimens.iconXxl)
                         .clip(CircleShape)
-                        .clickable { onShareLocal(buildStoreShareText(local, promotionsByBrand, brandCleanCache)) }
+                        .clickable(
+                            onClick = { onShareLocal(buildStoreShareText(local, promotionsByBrand, brandCleanCache)) },
+                            role = androidx.compose.ui.semantics.Role.Button,
+                        )
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center
                 ) {
@@ -219,15 +226,15 @@ fun StoreCard(
                         imageVector = Icons.Outlined.Share,
                         contentDescription = stringResource(R.string.compartir),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp * s),
+                        modifier = Modifier.size(dimens.iconSm),
                     )
                 }
 
-                Spacer(modifier = Modifier.width(8.dp * s))
+                Spacer(modifier = Modifier.width(dimens.spacingSm))
 
                 Box(
                     modifier = Modifier
-                        .size(36.dp * s)
+                        .size(dimens.iconXl)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primaryContainer),
                     contentAlignment = Alignment.Center
@@ -248,7 +255,7 @@ fun StoreCard(
                     }
                 }
 
-                Spacer(modifier = Modifier.width(6.dp * s))
+                Spacer(modifier = Modifier.width(6.dp * rs()))
 
                 Text(
                     text = "›",
@@ -257,14 +264,14 @@ fun StoreCard(
             }
 
             // ── Divider ──
-            Spacer(modifier = Modifier.height(14.dp * s))
+            Spacer(modifier = Modifier.height(14.dp * rs()))
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(1.dp)
                     .background(MaterialTheme.colorScheme.outlineVariant)
             )
-            Spacer(modifier = Modifier.height(14.dp * s))
+            Spacer(modifier = Modifier.height(14.dp * rs()))
 
             // ── Brands ──
             local.clientes.forEach { cliente ->
@@ -299,7 +306,7 @@ fun StoreCard(
                         cliente.nombre.equals(marcaResaltada, ignoreCase = true),
                     onClick = { onBrandClick(cliente.nombre) }
                 )
-                Spacer(modifier = Modifier.height(5.dp * s))
+                Spacer(modifier = Modifier.height(5.dp * rs()))
             }
         }
     }

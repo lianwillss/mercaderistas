@@ -57,6 +57,7 @@ import com.rutamercaderistas.ui.theme.UrgencyOrange
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.UrgencyOrangeSoft
 import com.rutamercaderistas.ui.theme.UrgencyTomorrowSoft
+import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.ui.theme.rs
 import timber.log.Timber
 import java.time.LocalDate
@@ -100,7 +101,7 @@ fun BrandCard(
     onPromoClick: (String) -> Unit,
     onSharePromo: (PromotionEntity) -> Unit = {},
 ) {
-    val s = rs()
+    val dimens = LocalAppDimens.current
     var expanded by rememberSaveable { mutableStateOf(false) }
     val visible = if (expanded) promos else promos.take(3)
     val hasMore = promos.size > 3
@@ -115,14 +116,14 @@ fun BrandCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = ComponentShapes.card,
+        shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp * s)
+                .padding(dimens.spacingLg)
                 .animateContentSize(animationSpec = tween(300)),
         ) {
             Row(
@@ -131,7 +132,7 @@ fun BrandCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(40.dp * s)
+                        .size(dimens.iconXxl)
                         .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.primaryContainer),
                     contentAlignment = Alignment.Center,
@@ -143,7 +144,7 @@ fun BrandCard(
                     )
                 }
 
-                Spacer(modifier = Modifier.width(12.dp * s))
+                Spacer(modifier = Modifier.width(dimens.spacingMd))
 
                 Text(
                     text = brand,
@@ -162,7 +163,7 @@ fun BrandCard(
                         .background(
                             Brush.horizontalGradient(listOf(PromoGradientStart, PromoGradientEnd))
                         )
-                        .padding(horizontal = 12.dp * s, vertical = 6.dp * s),
+                        .padding(horizontal = dimens.spacingMd, vertical = 6.dp * rs()),
                 ) {
                     val promocionesCd = stringResource(R.string.promociones_cd)
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -182,24 +183,24 @@ fun BrandCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp * s))
+            Spacer(modifier = Modifier.height(dimens.spacingXxl))
 
             sortedGroupKeys.forEachIndexed { groupIndex, chainKey ->
                 val chainPromos = groupedByChain[chainKey] ?: return@forEachIndexed
 
                 if (groupIndex > 0) {
-                    Spacer(modifier = Modifier.height(20.dp * s))
+                    Spacer(modifier = Modifier.height(dimens.spacingXl))
                 }
 
                 if (chainKey.isNotBlank()) {
                     val localName = chainToLocales[chainKey] ?: chainKey
                     ChainHeader(chain = chainKey, localName = localName, count = chainPromos.size)
-                    Spacer(modifier = Modifier.height(12.dp * s))
+                    Spacer(modifier = Modifier.height(dimens.spacingMd))
                 }
 
                 chainPromos.forEachIndexed { promoIndex, promo ->
                     if (promoIndex > 0) {
-                        Spacer(modifier = Modifier.height(16.dp * s))
+                        Spacer(modifier = Modifier.height(dimens.spacingLg))
                     }
                     ProductItem(
                         promo = promo,
@@ -210,12 +211,15 @@ fun BrandCard(
             }
 
             if (hasMore && !expanded) {
-                Spacer(modifier = Modifier.height(16.dp * s))
+                Spacer(modifier = Modifier.height(dimens.spacingLg))
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .clickable { expanded = true }
+                        .clickable(
+                            onClick = { expanded = true },
+                            role = androidx.compose.ui.semantics.Role.Button,
+                        )
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                         .padding(vertical = 12.dp),
                     contentAlignment = Alignment.Center,
@@ -233,7 +237,6 @@ fun BrandCard(
 
 @Composable
 private fun ChainHeader(chain: String, localName: String, count: Int) {
-    val s = rs()
     val cadenaCd = stringResource(R.string.cadena_cd)
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -257,7 +260,7 @@ private fun ChainHeader(chain: String, localName: String, count: Int) {
         Spacer(modifier = Modifier.width(6.dp))
         Box(
             modifier = Modifier
-                .clip(ComponentShapes.badge)
+                .clip(MaterialTheme.shapes.extraSmall)
                 .background(chainColor(chain).copy(alpha = 0.15f))
                 .padding(horizontal = 10.dp, vertical = 4.dp),
         ) {
@@ -277,7 +280,7 @@ private fun ProductItem(
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
 ) {
-    val s = rs()
+    val dimens = LocalAppDimens.current
     val urg = urgency(promo.endDate)
     val haptic = LocalHapticFeedback.current
 
@@ -341,7 +344,7 @@ private fun ProductItem(
                     color = if (urg != Urgency.NORMAL) UrgencyOrange else MaterialTheme.colorScheme.primary,
                 )
                 if (promo.price.startsWith("$")) {
-                Spacer(modifier = Modifier.width(8.dp * s))
+                Spacer(modifier = Modifier.width(dimens.spacingSm))
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))

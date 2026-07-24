@@ -32,6 +32,7 @@ import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.R
 import com.rutamercaderistas.services.RuteroRepository
 import com.rutamercaderistas.ui.theme.ComponentShapes
+import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.ui.theme.rs
 
 @Composable
@@ -42,12 +43,12 @@ fun StatsCards(
     onMarcasClick: () -> Unit = {},
     marcasConPromo: Int = 0,
 ) {
-    val s = rs()
+    val dimens = LocalAppDimens.current
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp * s),
-        horizontalArrangement = Arrangement.spacedBy(6.dp * s)
+            .padding(horizontal = dimens.spacingSm),
+        horizontalArrangement = Arrangement.spacedBy(6.dp * rs())
     ) {
         StatCard(
             icon = Icons.Rounded.Store,
@@ -98,34 +99,34 @@ private fun StatCard(
     onClick: () -> Unit = {},
     badge: (@Composable () -> Unit)? = null,
 ) {
-    val s = rs()
+    val dimens = LocalAppDimens.current
     Card(
         onClick = onClick,
         modifier = modifier,
-        shape = ComponentShapes.cardSmall,
+        shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = containerColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp * s),
+                .padding(dimens.spacingSm),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
                 tint = iconColor,
-                modifier = Modifier.size(12.dp * s)
+                modifier = Modifier.size(dimens.spacingMd)
             )
-            Spacer(modifier = Modifier.height(3.dp * s))
+            Spacer(modifier = Modifier.height(3.dp * rs()))
             Text(
                 text = "$value",
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
             if (badge != null) {
-                Spacer(modifier = Modifier.height(2.dp * s))
+                Spacer(modifier = Modifier.height(2.dp * rs()))
                 badge()
             }
             Text(

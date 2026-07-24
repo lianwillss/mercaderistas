@@ -54,6 +54,7 @@ import com.rutamercaderistas.R
 import com.rutamercaderistas.models.LocalDelDia
 import com.rutamercaderistas.ui.components.ScreenHeader
 import com.rutamercaderistas.ui.theme.ComponentShapes
+import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.ui.theme.rs
 import com.rutamercaderistas.ui.theme.storeColor
 import com.rutamercaderistas.ui.theme.storeSoftColor
@@ -66,7 +67,7 @@ fun AllLocalesScreen(
     initialSearch: String = "",
 ) {
     var searchQuery by remember { mutableStateOf(initialSearch) }
-    val s = rs()
+    val dimens = LocalAppDimens.current
 
     LaunchedEffect(initialSearch) {
         if (initialSearch.isNotBlank()) searchQuery = initialSearch
@@ -97,7 +98,7 @@ fun AllLocalesScreen(
         ScreenHeader(
             onBack = onClose,
             title = stringResource(R.string.todos_locales),
-            verticalPadding = 12.dp * s,
+            verticalPadding = dimens.spacingMd,
         )
 
         TextField(
@@ -118,19 +119,19 @@ fun AllLocalesScreen(
             shape = ComponentShapes.textField,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp * s, vertical = 4.dp * s)
+                .padding(horizontal = dimens.spacingMd, vertical = dimens.spacingXs)
         )
 
         Text(
             text = stringResource(R.string.locales_count, filteredLocales.size),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp * s, vertical = 4.dp * s)
+            modifier = Modifier.padding(horizontal = dimens.spacingLg, vertical = dimens.spacingXs)
         )
 
         LazyColumn(
-            contentPadding = PaddingValues(horizontal = 12.dp * s, vertical = 4.dp * s),
-            verticalArrangement = Arrangement.spacedBy(10.dp * s)
+            contentPadding = PaddingValues(horizontal = dimens.spacingMd, vertical = dimens.spacingXs),
+            verticalArrangement = Arrangement.spacedBy(10.dp * rs())
         ) {
             itemsIndexed(
                 items = filteredLocales,
@@ -153,19 +154,19 @@ fun AllLocalesScreen(
                         .fillMaxWidth()
                         .graphicsLayer(alpha = animAlpha)
                         .offset(y = animOffsetY),
-                    shape = ComponentShapes.cardSmall,
+                    shape = MaterialTheme.shapes.medium,
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(12.dp * s),
+                            .padding(dimens.spacingMd),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(28.dp * s)
+                                .size(dimens.iconLg)
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(storeSoftColor(local.local)),
                             contentAlignment = Alignment.Center
@@ -174,11 +175,11 @@ fun AllLocalesScreen(
                                 imageVector = Icons.Outlined.Store,
                                 contentDescription = stringResource(R.string.cadena_cd),
                                 tint = storeColor(local.local),
-                                modifier = Modifier.size(14.dp * s)
+                                modifier = Modifier.size(14.dp * rs())
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(10.dp * s))
+                        Spacer(modifier = Modifier.width(10.dp * rs()))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
@@ -218,7 +219,10 @@ fun AllLocalesScreen(
                                         color = MaterialTheme.colorScheme.primary,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.clickable { onAddressClick(local.direccion) }
+                                        modifier = Modifier.clickable(
+                                            onClick = { onAddressClick(local.direccion) },
+                                            role = androidx.compose.ui.semantics.Role.Button,
+                                        )
                                     )
                                 }
                             }

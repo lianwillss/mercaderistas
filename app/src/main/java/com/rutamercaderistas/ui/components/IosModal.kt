@@ -64,7 +64,7 @@ fun IosModal(
                         .padding(horizontal = 24.dp)
                         .fillMaxWidth()
                         .clickable(enabled = false) {},
-                    shape = ComponentShapes.card,
+                    shape = MaterialTheme.shapes.large,
                     elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surface,

@@ -5,6 +5,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
@@ -46,10 +48,13 @@ private val AppShapes = Shapes(
 
 @Composable
 fun MercaderistasTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = LightColorScheme,
-        typography = AppTypography,
-        shapes = AppShapes,
-        content = content
-    )
+    val dimens = rememberAppDimens()
+    CompositionLocalProvider(LocalAppDimens provides dimens) {
+        MaterialTheme(
+            colorScheme = LightColorScheme,
+            typography = AppTypography,
+            shapes = AppShapes,
+            content = content
+        )
+    }
 }
