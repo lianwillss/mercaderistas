@@ -47,7 +47,6 @@ fun storeColor(name: String): Color {
 }
 
 // ── Semantic tokens ──────────────────────────────────
-val OnlineGreen = Color(0xFF34C759)
 val OfflineRed = Color(0xFFFF3B30)
 val UrgencyOrange = Color(0xFFB45309)
 val UrgencyOrangeSoft = Color(0xFFFFF0E0)

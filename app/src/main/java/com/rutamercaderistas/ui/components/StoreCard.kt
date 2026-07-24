@@ -213,13 +213,13 @@ fun StoreCard(
 
                 Box(
                     modifier = Modifier
-                        .size(dimens.iconXxl)
+                        .size(dimens.iconXl)
                         .clip(CircleShape)
                         .clickable(
                             onClick = { onShareLocal(buildStoreShareText(local, promotionsByBrand, brandCleanCache)) },
                             role = androidx.compose.ui.semantics.Role.Button,
                         )
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(

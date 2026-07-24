@@ -16,25 +16,6 @@ private val InterFont = FontFamily(
 )
 
 val AppTypography = Typography(
-    displayLarge = TextStyle(
-        fontFamily = InterFont,
-        fontWeight = FontWeight.Bold,
-        fontSize = 57.sp,
-        lineHeight = 64.sp,
-        letterSpacing = (-0.25).sp,
-    ),
-    displayMedium = TextStyle(
-        fontFamily = InterFont,
-        fontWeight = FontWeight.Bold,
-        fontSize = 45.sp,
-        lineHeight = 52.sp,
-    ),
-    displaySmall = TextStyle(
-        fontFamily = InterFont,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 36.sp,
-        lineHeight = 44.sp,
-    ),
     headlineLarge = TextStyle(
         fontFamily = InterFont,
         fontWeight = FontWeight.Bold,
@@ -89,14 +70,14 @@ val AppTypography = Typography(
         fontFamily = InterFont,
         fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
-        lineHeight = 20.sp,
+        lineHeight = 22.sp,
         letterSpacing = 0.sp,
     ),
     bodySmall = TextStyle(
         fontFamily = InterFont,
         fontWeight = FontWeight.Medium,
         fontSize = 13.sp,
-        lineHeight = 18.sp,
+        lineHeight = 20.sp,
         letterSpacing = 0.4.sp,
     ),
     labelLarge = TextStyle(
@@ -112,6 +93,7 @@ val AppTypography = Typography(
         fontSize = 12.sp,
         lineHeight = 16.sp,
         letterSpacing = 0.25.sp,
+        fontFeatureSettings = "tnum",
     ),
     labelSmall = TextStyle(
         fontFamily = InterFont,

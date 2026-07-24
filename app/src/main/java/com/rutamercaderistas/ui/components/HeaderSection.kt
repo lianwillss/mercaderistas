@@ -62,8 +62,8 @@ import com.rutamercaderistas.ui.theme.HeaderDeepBlue
 import com.rutamercaderistas.ui.theme.HeaderLightBlue
 import com.rutamercaderistas.ui.theme.HeaderMidBlue
 import com.rutamercaderistas.ui.theme.HeaderMidDarkBlue
+import com.rutamercaderistas.ui.theme.AccentGreen
 import com.rutamercaderistas.ui.theme.OfflineRed
-import com.rutamercaderistas.ui.theme.OnlineGreen
 import com.rutamercaderistas.ui.theme.UrgencyOrange
 import com.rutamercaderistas.ui.theme.UrgencyOrangeSoft
 import com.rutamercaderistas.ui.theme.Wave1Blue
@@ -196,7 +196,7 @@ fun HeaderSection(
                             modifier = Modifier
                                 .size(8.dp)
                                 .clip(CircleShape)
-                                .background(if (isOnline) OnlineGreen else OfflineRed)
+                                .background(if (isOnline) AccentGreen else OfflineRed)
                         )
                     }
                     Spacer(modifier = Modifier.height(6.dp))
