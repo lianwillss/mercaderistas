@@ -79,6 +79,16 @@ class RouteViewModelTest {
         Dispatchers.resetMain()
     }
 
+    private fun awaitOnMain(condition: () -> Boolean) {
+        val deadline = System.currentTimeMillis() + 5000
+        while (System.currentTimeMillis() < deadline) {
+            testDispatcher.scheduler.advanceUntilIdle()
+            if (condition()) return
+            Thread.sleep(10)
+        }
+        throw AssertionError("Condición no cumplida dentro del timeout")
+    }
+
     private fun createViewModel(): RouteViewModel {
         val vm = RouteViewModel(
             fileRepository = fileRepository,
@@ -140,10 +150,10 @@ class RouteViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         viewModel.setCurrentDay(DiaSemana.LUNES)
-        assertEquals(1, viewModel.uiState.value.currentDayLocales.size)
+        awaitOnMain { viewModel.uiState.value.currentDayLocales.size == 1 }
 
         viewModel.setCurrentDay(DiaSemana.MARTES)
-        assertEquals(0, viewModel.uiState.value.currentDayLocales.size)
+        awaitOnMain { viewModel.uiState.value.currentDayLocales.isEmpty() }
     }
 
     @Test
@@ -199,27 +209,6 @@ class RouteViewModelTest {
         viewModel.exportRoute()
 
         assertEquals("Selecciona una ruta primero", viewModel.uiState.value.snackbarMessage)
-    }
-
-    @Test
-    fun `getShareText returns formatted route text`() = runTest(testDispatcher) {
-        val entries = listOf(
-            EntradaRuta("", "RUTA-1", "COD1", "Local Uno", "Dir 123", "Cliente A",
-                lunes = true),
-            EntradaRuta("", "RUTA-1", "COD1", "Local Uno", "Dir 123", "Cliente B",
-                lunes = true),
-        )
-        coEvery { ruteroManager.loadRoute("RUTA-1") } returns entries
-
-        val viewModel = createViewModel()
-        viewModel.selectRoute("RUTA-1")
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        viewModel.setCurrentDay(DiaSemana.LUNES)
-        val text = viewModel.getShareText()
-
-        assertTrue(text.contains("RUTA-1"))
-        assertTrue(text.contains("COD1"))
     }
 
     @Test

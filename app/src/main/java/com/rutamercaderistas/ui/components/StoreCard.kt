@@ -52,13 +52,10 @@ import com.rutamercaderistas.models.LocalDelDia
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.ui.theme.rs
-import com.rutamercaderistas.domain.model.effectiveChain
 import com.rutamercaderistas.domain.model.matchesChain
-import com.rutamercaderistas.domain.model.normalizeChain
 import com.rutamercaderistas.ui.theme.storeColor
 import com.rutamercaderistas.ui.theme.storeSoftColor
 import com.rutamercaderistas.utils.cleanBrand
-import timber.log.Timber
 
 @Composable
 fun StoreCard(
@@ -232,11 +229,17 @@ fun StoreCard(
 
                 Spacer(modifier = Modifier.width(dimens.spacingSm))
 
+                val contadorMarcasCd = stringResource(R.string.storecard_marcas)
+                val chevronNextCd = stringResource(R.string.chevron_next_cd)
+
                 Box(
                     modifier = Modifier
                         .size(dimens.iconXl)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .semantics {
+                            contentDescription = "${local.totalClientes} $contadorMarcasCd"
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
@@ -259,7 +262,8 @@ fun StoreCard(
 
                 Text(
                     text = "›",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.semantics { contentDescription = chevronNextCd }
                 )
             }
 
@@ -279,26 +283,6 @@ fun StoreCard(
                 val promos = promotionsByBrand[cleanBrandName]
                     .orEmpty()
                     .filter { matchesChain(it.chain, local.local, local.cadena, local.formato) }
-                if (promos.isNotEmpty()) {
-                    Timber.d("STORE: \"%s\" | cadena=\"%s\" formato=\"%s\" effChain=\"%s\" | marca=\"%s\" clean=\"%s\" → %d promos",
-                        local.local, local.cadena, local.formato,
-                        normalizeChain(effectiveChain(local.cadena, local.formato)),
-                        cliente.nombre, cleanBrandName, promos.size)
-                } else {
-                    val effChain = effectiveChain(local.cadena, local.formato)
-                    val normEffChain = normalizeChain(effChain)
-                    val brandPromos = promotionsByBrand[cleanBrandName].orEmpty()
-                    val chainCount = brandPromos.size
-                    val matchingChain = brandPromos.filter { normalizeChain(it.chain) == normEffChain }
-                    val nonMatching = brandPromos.filter { normalizeChain(it.chain) != normEffChain }
-                    if (chainCount > 0) {
-                        Timber.d("STORE: \"%s\" | marca=\"%s\" clean=\"%s\" | %d promos en map, 0 tras filtro cadena | effChain=\"%s\" norm=\"%s\" | coincide=%d difiere=%d | chains=%s",
-                            local.local, cliente.nombre, cleanBrandName,
-                            chainCount, effChain, normEffChain,
-                            matchingChain.size, nonMatching.size,
-                            nonMatching.joinToString(",") { "\"${it.chain}\"" })
-                    }
-                }
                 BrandItem(
                     cliente = cliente,
                     promotions = promos,

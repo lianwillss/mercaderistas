@@ -5,7 +5,6 @@ import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.services.ApkDownloader
 import com.rutamercaderistas.services.UpdateChecker
 import io.mockk.coEvery
-import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
@@ -33,7 +32,7 @@ class UpdateViewModelTest {
         Dispatchers.setMain(testDispatcher)
         application = mockk(relaxed = true)
         preferencesRepository = mockk {
-            every { getUpdateSuppressedUntil() } returns 0L
+            coEvery { getUpdateSuppressedUntil() } returns 0L
             coEvery { setUpdateSuppressedUntil(any()) } returns Unit
         }
         viewModel = UpdateViewModel(application, preferencesRepository)

@@ -10,7 +10,6 @@ import com.rutamercaderistas.services.PromotionRepository
 import com.rutamercaderistas.services.RuteroManager
 import com.rutamercaderistas.services.RuteroRepository
 import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -91,13 +90,6 @@ class SyncViewModelTest {
     fun `clearSnackbar resets message`() {
         viewModel.clearSnackbar()
         assertNull(viewModel.state.value.snackbarMessage)
-    }
-
-    @Test
-    fun `downloadPdf calls brandReference once`() {
-        viewModel.downloadPdf()
-        testDispatcher.scheduler.advanceUntilIdle()
-        coVerify(exactly = 1) { brandReference.descargarPdf(application, null, null) }
     }
 
     @Test

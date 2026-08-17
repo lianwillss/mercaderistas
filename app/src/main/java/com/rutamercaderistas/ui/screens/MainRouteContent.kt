@@ -252,7 +252,7 @@ fun MainRouteContent(
                             }
                             itemsIndexed(
                 items = locales,
-                key = { index, _ -> index },
+                key = { _, local -> "${local.codigo}|${local.local}" },
             ) { index, local ->
                 StoreCard(
                     local = local,
