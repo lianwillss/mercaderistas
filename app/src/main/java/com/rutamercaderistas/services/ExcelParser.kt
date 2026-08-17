@@ -28,8 +28,8 @@ class ExcelParser {
             try {
                 val reader = XSSFReader(pkg)
                 val sharedStrings: SharedStrings = reader.sharedStringsTable
-                val rId = findSheetRId(pkg, "RUTA RUTERO")
-                    ?: return Result.failure(Exception("Hoja 'RUTA RUTERO' no encontrada"))
+                val rId = findDataSheetRId(pkg, reader, sharedStrings)
+                    ?: return Result.failure(Exception("Hoja de datos no encontrada"))
 
                 val sheetStream = reader.getSheet(rId)
                 val ruteros = mutableSetOf<String>()
@@ -67,8 +67,8 @@ class ExcelParser {
             try {
                 val reader = XSSFReader(pkg)
                 val sharedStrings: SharedStrings = reader.sharedStringsTable
-                val rId = findSheetRId(pkg, "RUTA RUTERO")
-                    ?: return Result.failure(Exception("Hoja 'RUTA RUTERO' no encontrada"))
+                val rId = findDataSheetRId(pkg, reader, sharedStrings)
+                    ?: return Result.failure(Exception("Hoja de datos no encontrada"))
 
                 val sheetStream = reader.getSheet(rId)
                 val entries = mutableListOf<EntradaRuta>()
@@ -140,8 +140,8 @@ class ExcelParser {
             try {
                 val reader = XSSFReader(pkg)
                 val sharedStrings: SharedStrings = reader.sharedStringsTable
-                val rId = findSheetRId(pkg, "RUTA RUTERO")
-                    ?: return Result.failure(Exception("Hoja 'RUTA RUTERO' no encontrada"))
+                val rId = findDataSheetRId(pkg, reader, sharedStrings)
+                    ?: return Result.failure(Exception("Hoja de datos no encontrada"))
 
                 val sheetStream = reader.getSheet(rId)
                 val ruteros = mutableSetOf<String>()
@@ -261,11 +261,11 @@ class ExcelParser {
         }
     }
 
-    private fun findSheetRId(pkg: OPCPackage, sheetName: String): String? {
+    private fun allSheetNames(pkg: OPCPackage): List<Pair<String, String>> {
         return try {
             val part = pkg.getPart(PackagingURIHelper.createPartName("/xl/workbook.xml"))
             val stream = part.inputStream
-            var rId: String? = null
+            val sheets = mutableListOf<Pair<String, String>>()
             val factory = SAXParserFactory.newInstance()
             val xmlReader = factory.newSAXParser().xmlReader
             xmlReader.contentHandler = object : DefaultHandler() {
@@ -273,16 +273,62 @@ class ExcelParser {
                     if (qName == "sheet") {
                         val name = atts.getValue("name")
                         val id = atts.getValue("r:id")
-                        if (name != null && id != null && name.equals(sheetName, ignoreCase = true)) {
-                            rId = id
-                        }
+                        if (name != null && id != null) sheets.add(name to id)
                     }
                 }
             }
             xmlReader.parse(InputSource(stream))
             stream.close()
-            rId
-        } catch (_: Exception) { null }
+            sheets
+        } catch (_: Exception) { emptyList() }
+    }
+
+    /**
+     * Ubica la hoja de datos. Intenta nombres conocidos ("RUTA RUTERO", "DETALLE")
+     * y como último recurso escanea las hojas buscando encabezados conocidos.
+     */
+    private fun findDataSheetRId(
+        pkg: OPCPackage,
+        reader: XSSFReader,
+        sharedStrings: SharedStrings,
+    ): String? {
+        val sheets = allSheetNames(pkg)
+        val knownNames = listOf("RUTA RUTERO", "DETALLE")
+        sheets.firstOrNull { (name, _) ->
+            knownNames.any { it.equals(name.trim(), ignoreCase = true) }
+        }?.second?.let { return it }
+
+        for ((name, rId) in sheets) {
+            try {
+                reader.getSheet(rId)?.use { stream ->
+                    if (sheetHasKnownHeaders(stream, sharedStrings)) {
+                        Timber.i("HOJA_DATOS_FALLBACK: seleccionada '%s' (%s)", name, rId)
+                        return rId
+                    }
+                }
+            } catch (_: Exception) {
+                // Hoja ilegible; se sigue con la siguiente
+            }
+        }
+        return null
+    }
+
+    private fun sheetHasKnownHeaders(stream: InputStream, sharedStrings: SharedStrings): Boolean {
+        var foundRutero = false
+        var foundCliente = false
+        var done = false
+        val handler = sheetHandler(sharedStrings, onRow = { rowNum, values ->
+            if (!done && rowNum == 1) {
+                done = true
+                for (v in values) {
+                    val norm = ColumnMapper.normalize(v)
+                    if (norm == "RUTERO") foundRutero = true
+                    if (norm == "CLIENTE") foundCliente = true
+                }
+            }
+        })
+        parseSheetStream(stream, handler)
+        return foundRutero && foundCliente
     }
 
     private fun parseSheetStream(stream: InputStream, handler: DefaultHandler) {
