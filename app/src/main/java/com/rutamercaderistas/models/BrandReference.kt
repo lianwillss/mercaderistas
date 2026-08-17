@@ -35,7 +35,7 @@ class BrandReference @Inject constructor(
         "ABEJA DORADA" to 8, "ALUSWEET" to 9, "TAGATOSA" to 10, "ASMODEE" to 11,
         "BAGNO" to 16, "BERRYSUR" to 18, "BESHOS" to 19, "BIGU" to 20,
         "BREDEN MASTER" to 24, "BY MARIA" to 26, "CALIFORNIA" to 27, "CALLAQUI" to 28,
-        "CASO Y CIA" to 32, "CINNABON" to 45, "ETNIKER" to 46,
+        "CASO Y CIA" to 32, "CINNABON" to 45, "COMERCIAL SZ" to 46, "ETNIKER" to 46,
         "CORRALES DEL SUR" to 47, "CUK" to 51,
         "DEJAPOO" to 56, "DERAIZ" to 57, "DU SOLEIL" to 60,
         "ECOCULTIVA" to 62, "EL GAJO" to 63, "EVERSKIN" to 64,
@@ -45,7 +45,7 @@ class BrandReference @Inject constructor(
         "LA CABRESA" to 75, "LA FERMENTISTA" to 76,
         "LOVE CO" to 77,
         "MAILEMU MIEL" to 79, "MENESS" to 80,
-        "MIEL TRAPENSE" to 81, "MIEL TRAPENSES" to 81, "MORETTA WINES" to 82,
+        "MIEL TRAPENSE" to 81, "MIEL TRAPENSES" to 81, "MORETTA WINES" to 82, "MORETTA" to 82,
         "NAT NATURAL" to 83,
         "OLIMPIA" to 85, "FRANUI" to 85,
         "PATPOT CHIPS" to 86, "PEPILU" to 87,
@@ -75,6 +75,10 @@ class BrandReference @Inject constructor(
             result[name] = start..end.coerceAtLeast(start)
         }
         result
+    }
+
+    private val knownBrandStarts: List<Int> by lazy {
+        brandPages.values.distinct().sorted()
     }
 
     private val detectedPages = ConcurrentHashMap<String, Int>()
@@ -126,7 +130,12 @@ class BrandReference @Inject constructor(
     fun getPageRange(brandName: String): IntRange? {
         val norm = brandName.normalizeMarca()
         brandRanges.entries.firstOrNull { it.key.normalizeMarca() == norm }?.value?.let { return it }
-        detectedPages[norm]?.let { page -> return page..(page + PAGES_PER_BRAND - 1) }
+        detectedPages[norm]?.let { page ->
+            val end = knownBrandStarts.firstOrNull { it > page }
+                ?.minus(1)
+                ?: (page + PAGES_PER_BRAND - 1)
+            return page..end.coerceAtLeast(page)
+        }
         return null
     }
 
