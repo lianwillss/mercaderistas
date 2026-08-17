@@ -77,6 +77,7 @@ class MercaderistasApp : Application(), Configuration.Provider {
     private suspend fun performUpgradeCleanup(previousVersion: Int) {
         cacheDir.deleteRecursively()
         File(filesDir, "thumbnails").deleteRecursively()
+        File(filesDir, com.rutamercaderistas.models.PdfDownloader.PDF_FILE_NAME).delete()
         brandPagesRepository.clearAll()
         preferencesRepository.setUpdateSuppressedUntil(0)
         preferencesRepository.setLastVersionCode(BuildConfig.VERSION_CODE)

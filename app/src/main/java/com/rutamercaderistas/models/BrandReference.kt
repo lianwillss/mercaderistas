@@ -2,6 +2,8 @@ package com.rutamercaderistas.models
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.pdf.PdfRenderer
+import android.os.ParcelFileDescriptor
 import com.rutamercaderistas.R
 import com.rutamercaderistas.data.preferences.BrandPagesRepository
 import timber.log.Timber
@@ -30,28 +32,30 @@ class BrandReference @Inject constructor(
     }
 
     private val brandPages = mapOf(
-        "ABEJA DORADA" to 8, "ALUSWEET" to 9, "ASMODEE" to 11,
-        "BAGNO" to 17, "BERRYSUR" to 20, "BESHOS" to 19,
-        "BIGU" to 21, "BREDEN MASTER" to 25, "BY MARIA" to 27,
-        "CALIFORNIA" to 28, "CALLAQUI" to 29,
-        "CASO Y CIA" to 33, "CORRALES DEL SUR" to 39, "CUK" to 45,
-        "DEJAPOO" to 49, "DERAIZ" to 50, "DU SOLEIL" to 53,
-        "ECOCULTIVA" to 55, "EL GAJO" to 56, "EVERSKIN" to 57,
-        "GLOBAL RETAIL" to 58, "GRANA" to 60,
-        "KOMBUCHACHA" to 62,
-        "LA CABRESA" to 64, "LA FERMENTISTA" to 65,
-        "LOVE CO" to 66, "LUTHIER" to 68,
-        "MAILEMU MIEL" to 69, "MENESS" to 70,
-        "MIEL TRAPENSE" to 73, "MIEL TRAPENSES" to 73,
-        "NAT NATURAL" to 71, "NUTRIPOP" to 74,
-        "PATPOT CHIPS" to 75, "PEPILU" to 76,
-        "PROMERCO" to 77, "PROPAL" to 80,
-        "QUINTAL" to 81,
-        "SOHO" to 83, "SUK" to 86,
-        "TASTY FREE" to 89, "TNOGAL" to 91,
-        "VEG MONKEY" to 93,
-        "WANKUN" to 95, "WILD LAMA" to 96,
-        "YEET POWER DRINK" to 99
+        "ABEJA DORADA" to 8, "ALUSWEET" to 9, "TAGATOSA" to 10, "ASMODEE" to 11,
+        "BAGNO" to 16, "BERRYSUR" to 18, "BESHOS" to 19, "BIGU" to 20,
+        "BREDEN MASTER" to 24, "BY MARIA" to 26, "CALIFORNIA" to 27, "CALLAQUI" to 28,
+        "CASO Y CIA" to 32, "CINNABON" to 45, "ETNIKER" to 46,
+        "CORRALES DEL SUR" to 47, "CUK" to 51,
+        "DEJAPOO" to 56, "DERAIZ" to 57, "DU SOLEIL" to 60,
+        "ECOCULTIVA" to 62, "EL GAJO" to 63, "EVERSKIN" to 64,
+        "FROZT" to 65, "GLARE" to 66,
+        "GLOBAL RETAIL" to 67, "GRANA" to 69,
+        "JAPI JANE" to 71, "KOBBO" to 72,
+        "LA CABRESA" to 75, "LA FERMENTISTA" to 76,
+        "LOVE CO" to 77,
+        "MAILEMU MIEL" to 79, "MENESS" to 80,
+        "MIEL TRAPENSE" to 81, "MIEL TRAPENSES" to 81, "MORETTA WINES" to 82,
+        "NAT NATURAL" to 83,
+        "OLIMPIA" to 85, "FRANUI" to 85,
+        "PATPOT CHIPS" to 86, "PEPILU" to 87,
+        "PROPAL" to 88,
+        "QUINTAL" to 89,
+        "SOHO" to 91, "SUK" to 94,
+        "TALLOW" to 97, "THE POWER OF FOOD" to 98, "TNOGAL" to 99,
+        "UP WINE" to 101,
+        "VEG MONKEY" to 102,
+        "WANKUN" to 103, "WILD LAMA" to 104, "JOCKEYS" to 105
     )
 
     private val normalizedPages: Map<String, Int> by lazy {
@@ -144,25 +148,38 @@ class BrandReference @Inject constructor(
     private fun abrirPdf(context: Context, pdfFile: File, brandName: String, page: Int) {
         try {
             val range = getPageRange(brandName)
-            val norm = brandName.normalizeMarca()
+            val realPageCount = pdfPageCount(pdfFile)
+            val endPage = if (realPageCount > 0) minOf(range?.last ?: page, realPageCount) else range?.last ?: page
+            val startPage = if (range != null) page.coerceIn(range.first, endPage) else page.coerceAtLeast(1)
             val lastDocPage = context.getSharedPreferences("pdf_viewer_prefs", Context.MODE_PRIVATE)
                 .getInt("last_page_$brandName", -1)
-            val startPage = if (lastDocPage >= 0 && range != null && lastDocPage in range) {
+            val resolvedStart = if (lastDocPage >= 0 && lastDocPage in startPage..endPage) {
                 lastDocPage
             } else {
-                range?.first ?: page
+                startPage
             }
             val intent = Intent(context, PdfViewerActivity::class.java).apply {
                 putExtra("pdf_path", pdfFile.absolutePath)
-                putExtra("page_start", startPage)
-                putExtra("page_end", range?.last ?: page)
-                putExtra("page_num", range?.first ?: page)
+                putExtra("page_start", resolvedStart)
+                putExtra("page_end", endPage)
+                putExtra("page_num", startPage)
                 putExtra("brand_name", brandName)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
         } catch (e: Exception) {
             Timber.e(e, "Error abriendo PDF")
+        }
+    }
+
+    private fun pdfPageCount(pdfFile: File): Int {
+        return try {
+            ParcelFileDescriptor.open(pdfFile, ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
+                PdfRenderer(pfd).use { renderer -> renderer.pageCount }
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "Error leyendo páginas del PDF")
+            0
         }
     }
 
