@@ -186,7 +186,7 @@ fun AllLocalesScreen(
                                 text = local.local.ifBlank { stringResource(R.string.sin_numero) },
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )
                             if (local.codigo.isNotBlank()) {

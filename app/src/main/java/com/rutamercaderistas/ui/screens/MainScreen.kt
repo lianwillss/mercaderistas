@@ -2,6 +2,9 @@ package com.rutamercaderistas.ui.screens
 
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
@@ -10,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -24,6 +28,10 @@ import com.rutamercaderistas.models.DiaSemana
 
 import com.rutamercaderistas.viewmodel.RouteUiState
 import com.rutamercaderistas.viewmodel.SyncUiState
+
+private val slideUpEnter: EnterTransition = slideInVertically { it }
+private val slideDownEnter: EnterTransition = slideInVertically { -it }
+private val slideDownExit: ExitTransition = slideOutVertically { it }
 
 @Composable
 fun MainScreen(
@@ -84,10 +92,10 @@ fun MainScreen(
             )
         }
         composable<AllLocalesRoute>(
-            enterTransition = { slideInVertically { it } },
-            exitTransition = { slideOutVertically { it } },
-            popEnterTransition = { slideInVertically { -it } },
-            popExitTransition = { slideOutVertically { it } },
+            enterTransition = { slideUpEnter },
+            exitTransition = { slideDownExit },
+            popEnterTransition = { slideDownEnter },
+            popExitTransition = { slideDownExit },
         ) { backStackEntry ->
             val args: AllLocalesRoute = backStackEntry.toRoute()
             AllLocalesScreen(
@@ -98,10 +106,10 @@ fun MainScreen(
             )
         }
         composable<PromotionsRoute>(
-            enterTransition = { slideInVertically { it } },
-            exitTransition = { slideOutVertically { it } },
-            popEnterTransition = { slideInVertically { -it } },
-            popExitTransition = { slideOutVertically { it } },
+            enterTransition = { slideUpEnter },
+            exitTransition = { slideDownExit },
+            popEnterTransition = { slideDownEnter },
+            popExitTransition = { slideDownExit },
         ) {
             PromotionsOverviewScreen(
                 promotionsByBrand = routeUiState.promotionsByBrand,
@@ -122,10 +130,10 @@ fun MainScreen(
             )
         }
         composable<ManualRoute>(
-            enterTransition = { slideInVertically { it } },
-            exitTransition = { slideOutVertically { it } },
-            popEnterTransition = { slideInVertically { -it } },
-            popExitTransition = { slideOutVertically { it } },
+            enterTransition = { slideUpEnter },
+            exitTransition = { slideDownExit },
+            popEnterTransition = { slideDownEnter },
+            popExitTransition = { slideDownExit },
         ) {
             ManualScreen(onClose = { navController.popBackStack() })
         }

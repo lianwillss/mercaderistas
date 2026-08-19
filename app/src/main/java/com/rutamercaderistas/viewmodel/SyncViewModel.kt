@@ -10,6 +10,7 @@ import android.net.NetworkRequest
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.rutamercaderistas.Constants
+import com.rutamercaderistas.R
 import com.rutamercaderistas.data.network.downloadBytes
 import com.rutamercaderistas.services.PromotionRepository
 import timber.log.Timber
@@ -126,39 +127,39 @@ class SyncViewModel @Inject constructor(
     private suspend fun performDriveSync(): SyncResult<Boolean> {
         return withContext(Dispatchers.IO) {
             try {
-                _state.value = _state.value.copy(state = SyncState.Syncing(phase = "Descargando Excel…"))
+                _state.value = _state.value.copy(state = SyncState.Syncing(phase = getApplication<Application>().getString(R.string.sync_descargando)))
                 val cacheBustedUrl = "${Constants.DRIVE_EXPORT_URL}&ts=${System.currentTimeMillis()}"
                 val bytes = downloadWithRetries(cacheBustedUrl)
                     ?: return@withContext SyncResult.Error(
-                        if (!_state.value.isOnline) "Sin conexión a Internet"
-                        else "Error de descarga desde Drive. Revisa tu conexión o inténtalo más tarde."
+                        if (!_state.value.isOnline) getApplication<Application>().getString(R.string.sync_sin_internet)
+                        else getApplication<Application>().getString(R.string.sync_error_drive)
                     ).also {
                         _state.value = _state.value.copy(state = SyncState.Idle)
                     }
 
-                _state.value = _state.value.copy(state = SyncState.Syncing(phase = "Procesando archivo…"))
+                _state.value = _state.value.copy(state = SyncState.Syncing(phase = getApplication<Application>().getString(R.string.sync_procesando)))
                 val changed = ruteroManager.saveMasterExcel(bytes)
                 if (changed) {
-                    _state.value = _state.value.copy(state = SyncState.Syncing(phase = "Indexando rutas…"))
+                    _state.value = _state.value.copy(state = SyncState.Syncing(phase = getApplication<Application>().getString(R.string.sync_indexando)))
                     val indexOk = ruteroManager.createIndex()
                     if (indexOk) {
-                        _state.value = _state.value.copy(state = SyncState.Syncing(phase = "Actualizando promociones…"))
+                        _state.value = _state.value.copy(state = SyncState.Syncing(phase = getApplication<Application>().getString(R.string.sync_actualizando_promos)))
                         promotionRepository.refresh()
                         _state.value = _state.value.copy(state = SyncState.Idle)
                         SyncResult.Success(true)
                     } else {
                         _state.value = _state.value.copy(state = SyncState.Idle)
-                        SyncResult.Error("No se pudo leer el Excel")
+                        SyncResult.Error(getApplication<Application>().getString(R.string.sync_error_excel))
                     }
                 } else {
-                    _state.value = _state.value.copy(state = SyncState.Syncing(phase = "Actualizando promociones…"))
+                    _state.value = _state.value.copy(state = SyncState.Syncing(phase = getApplication<Application>().getString(R.string.sync_actualizando_promos)))
                     promotionRepository.refresh()
                     _state.value = _state.value.copy(state = SyncState.Idle)
                     SyncResult.NoChange
                 }
             } catch (e: Exception) {
                 _state.value = _state.value.copy(state = SyncState.Idle)
-                SyncResult.Error(e.message ?: "Error de sincronización")
+                SyncResult.Error(e.message ?: getApplication<Application>().getString(R.string.sync_error_general))
             }
         }
     }
@@ -185,7 +186,7 @@ class SyncViewModel @Inject constructor(
                     }
                     _state.value = _state.value.copy(
                         state = SyncState.Idle,
-                        snackbarMessage = "Datos actualizados",
+                        snackbarMessage = getApplication<Application>().getString(R.string.sync_datos_actualizados),
                     )
                 }
                 is SyncResult.Error -> {
@@ -200,7 +201,7 @@ class SyncViewModel @Inject constructor(
                 is SyncResult.Offline -> {
                     _state.value = _state.value.copy(
                         state = SyncState.Idle,
-                        snackbarMessage = "Sin conexión",
+                        snackbarMessage = getApplication<Application>().getString(R.string.sync_sin_conexion),
                     )
                 }
             }

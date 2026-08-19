@@ -1,6 +1,5 @@
 package com.rutamercaderistas.ui.components
 
-import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -115,7 +114,7 @@ private fun StatCard(
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = label,
+                contentDescription = null,
                 tint = iconColor,
                 modifier = Modifier.size(dimens.spacingMd)
             )
@@ -150,14 +149,6 @@ private fun StatsCardsPreview() {
                 marcasConPromo = 3,
             )
         }
-    }
-}
-
-@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
-@Composable
-private fun StatsCardsPreviewDark() {
-    if (BuildConfig.DEBUG) {
-        StatsCardsPreview()
     }
 }
 

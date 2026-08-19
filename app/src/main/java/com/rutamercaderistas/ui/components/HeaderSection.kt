@@ -1,6 +1,5 @@
 package com.rutamercaderistas.ui.components
 
-import android.content.res.Configuration
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -250,7 +249,7 @@ fun HeaderSection(
 
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(dimens.touchMin)
                         .clip(CircleShape)
                         .background(Color.White.copy(alpha = 0.2f))
                         .clickable {
@@ -271,7 +270,7 @@ fun HeaderSection(
 
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(dimens.touchMin)
                         .clip(CircleShape)
                         .background(Color.White.copy(alpha = 0.2f))
                         .clickable { expanded = true },
@@ -337,14 +336,6 @@ private fun HeaderSectionPreview() {
                 onOpenManual = {},
             )
         }
-    }
-}
-
-@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
-@Composable
-private fun HeaderSectionPreviewDark() {
-    if (BuildConfig.DEBUG) {
-        HeaderSectionPreview()
     }
 }
 

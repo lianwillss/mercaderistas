@@ -12,6 +12,7 @@ class ColumnMapper {
             return pattern.matcher(nrc).replaceAll("")
                 .uppercase()
                 .trim()
+                .replace("\uFEFF", "")
                 .replace("\\s+".toRegex(), " ")
         }
     }

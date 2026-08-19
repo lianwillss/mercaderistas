@@ -85,7 +85,7 @@ private fun ExpiringPromoRow(promo: PromotionEntity) {
                     text = promo.brand,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(modifier = Modifier.height(2.dp))

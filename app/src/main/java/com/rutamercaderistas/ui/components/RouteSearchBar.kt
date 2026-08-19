@@ -1,6 +1,5 @@
 package com.rutamercaderistas.ui.components
 
-import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -184,7 +183,7 @@ fun RouteSearchBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp)
-                    .height(56.dp)
+                    .heightIn(min = 56.dp)
                     .onFocusChanged { state ->
                         isFocused = state.isFocused
                     }
@@ -356,13 +355,5 @@ private fun RouteSearchBarPreview() {
                 onSearchActiveChanged = {},
             )
         }
-    }
-}
-
-@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
-@Composable
-private fun RouteSearchBarPreviewDark() {
-    if (BuildConfig.DEBUG) {
-        RouteSearchBarPreview()
     }
 }

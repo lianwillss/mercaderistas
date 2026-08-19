@@ -53,12 +53,29 @@ class PromotionRepository @Inject constructor(
 
             withContext(Dispatchers.Default) {
                 try {
-                    val csv = bytes.decodeToString()
+                    val csv = bytes.decodeToString().removePrefix("\uFEFF")
                     Timber.d("Promociones: descargados %d bytes", bytes.size)
 
                     val lines = csv.lines()
-                        .drop(1) // skip header
                         .filter { it.isNotBlank() }
+                        .toMutableList()
+                    if (lines.isEmpty()) return@withContext true
+
+                    val headers = parseCsvLine(lines.removeAt(0)) ?: emptyList()
+                    val mapper = ColumnMapper()
+                    mapper.map(headers)
+                    val idxBrand = mapper.getIndex("MARCA", "BRAND", "PRODUCTO")
+                    val idxChain = mapper.getIndex("CADENA", "CHAIN", "TIENDA", "SUBCADENA")
+                    val idxStart = mapper.getIndex("INICIO", "DESDE", "INICIAL")
+                    val idxEnd = mapper.getIndex("FINAL", "HASTA", "FINALIZACION")
+                    val idxProduct = mapper.getIndex("SKU", "NOMBRE", "PRODUCTO")
+                    val idxPrice = mapper.findFirstContaining("PRECIO", "% PROMOCION", "OFERTA")
+                    if (idxBrand == -1 || idxChain == -1 || idxStart == -1 || idxEnd == -1) {
+                        Timber.w("Promociones: header no reconocido (%d cols): %s", headers.size, headers.joinToString(","))
+                        return@withContext true
+                    }
+                    val maxIdx = maxOf(idxBrand, idxChain, idxStart, idxEnd, idxProduct, idxPrice)
+
                     Timber.d("Promociones: %d líneas en CSV (sin header)", lines.size)
 
                     val today = java.time.LocalDate.now()
@@ -68,17 +85,17 @@ class PromotionRepository @Inject constructor(
                     var filteredByDate = 0
                     val entities = lines.mapNotNull { line ->
                         val cols = parseCsvLine(line) ?: return@mapNotNull null
-                        if (cols.size < 6) {
+                        if (cols.size <= maxIdx) {
                             Timber.d("Promociones: línea saltada (solo %d columnas): %s", cols.size, line.take(80))
                             return@mapNotNull null
                         }
 
-                        val brand = cols[0].trim()
-                        val chain = cols[1].trim()
-                        val start = cols[2].trim()
-                        val end = cols[3].trim()
-                        val product = cols[4].trim()
-                        val price = cols[5].trim()
+                        val brand = cols[idxBrand].trim()
+                        val chain = cols[idxChain].trim()
+                        val start = cols[idxStart].trim()
+                        val end = cols[idxEnd].trim()
+                        val product = if (idxProduct in cols.indices) cols[idxProduct].trim() else ""
+                        val price = if (idxPrice in cols.indices) cols[idxPrice].trim() else ""
 
                         totalRead++
 

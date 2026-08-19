@@ -122,7 +122,7 @@ fun PromotionList(
                     text = promo.productName,
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (showChain && promo.chain.isNotBlank()) {

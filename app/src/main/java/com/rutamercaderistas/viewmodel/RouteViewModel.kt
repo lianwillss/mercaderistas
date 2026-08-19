@@ -1,5 +1,6 @@
 package com.rutamercaderistas.viewmodel
 
+import android.content.Context
 import androidx.compose.runtime.Stable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -13,6 +14,7 @@ import com.rutamercaderistas.domain.usecase.GroupedPromotions
 import com.rutamercaderistas.models.DiaSemana
 import com.rutamercaderistas.models.EntradaRuta
 import com.rutamercaderistas.models.LocalDelDia
+import com.rutamercaderistas.R
 import com.rutamercaderistas.services.PromotionRepository
 import com.rutamercaderistas.services.RecentRoutesStore
 import com.rutamercaderistas.services.RuteroManager
@@ -21,6 +23,7 @@ import com.rutamercaderistas.domain.model.effectiveChain
 import com.rutamercaderistas.domain.model.normalizeChain
 import com.rutamercaderistas.utils.cleanBrand
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -91,6 +94,7 @@ data class RouteUiState(
 
 @HiltViewModel
 class RouteViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val fileRepository: FileRepository,
     private val preferencesRepository: PreferencesRepository,
     private val ruteroManager: RuteroManager,
@@ -237,8 +241,8 @@ class RouteViewModel @Inject constructor(
                 updatePromotionState(groupPromotions(all))
                 _uiState.update { it.copy(
                     promotions = when (val p = _uiState.value.promotions) {
-                        is PromotionsState.Loaded -> p.copy(error = if (ok) null else "No se pudieron descargar las promociones")
-                        else -> PromotionsState.Loaded(error = if (ok) null else "No se pudieron descargar las promociones")
+                        is PromotionsState.Loaded -> p.copy(error = if (ok) null else context.getString(R.string.ruta_error_promos))
+                        else -> PromotionsState.Loaded(error = if (ok) null else context.getString(R.string.ruta_error_promos))
                     },
                 )}
             } catch (e: Exception) {
@@ -310,7 +314,7 @@ class RouteViewModel @Inject constructor(
     }
 
     fun updateSyncLabel() {
-        val label = if (!fileRepository.excelExists()) "hoy"
+        val label = if (!fileRepository.excelExists()) context.getString(R.string.ruta_hoy)
         else {
             val modified = Instant.ofEpochMilli(fileRepository.excelLastModified())
             val now = Instant.now()
@@ -318,10 +322,10 @@ class RouteViewModel @Inject constructor(
             val hours = ChronoUnit.HOURS.between(modified, now)
             val days = ChronoUnit.DAYS.between(modified, now)
             when {
-                minutes < 1 -> "ahora"
-                minutes < 60 -> "hace $minutes min"
-                hours < 24 -> "hace $hours h"
-                else -> "hace $days d"
+                minutes < 1 -> context.getString(R.string.ruta_ahora)
+                minutes < 60 -> context.getString(R.string.ruta_hace_min, minutes)
+                hours < 24 -> context.getString(R.string.ruta_hace_h, hours)
+                else -> context.getString(R.string.ruta_hace_d, days)
             }
         }
         _uiState.update { it.copy(lastSyncRelative = label) }
@@ -330,7 +334,7 @@ class RouteViewModel @Inject constructor(
     fun exportRoute() {
         val s = _uiState.value
         val name = s.selectedRoute ?: run {
-            _uiState.update { it.copy(snackbarMessage = "Selecciona una ruta primero") }
+            _uiState.update { it.copy(snackbarMessage = context.getString(R.string.ruta_selecciona_primero)) }
             return
         }
         viewModelScope.launch {
@@ -339,10 +343,10 @@ class RouteViewModel @Inject constructor(
                 try {
                     routeExporter.shareImage(file, name)
                 } catch (e: Exception) {
-                    _uiState.update { it.copy(snackbarMessage = "Error al compartir: ${e.message}") }
+                    _uiState.update { it.copy(snackbarMessage = context.getString(R.string.ruta_error_compartir, e.message)) }
                 }
             } catch (e: Exception) {
-                _uiState.update { it.copy(snackbarMessage = "Error al exportar: ${e.message}") }
+                _uiState.update { it.copy(snackbarMessage = context.getString(R.string.ruta_error_exportar, e.message)) }
             }
         }
     }
@@ -368,8 +372,8 @@ class RouteViewModel @Inject constructor(
                 _uiState.update { it.copy(
                     chainToLocales = chainToLocales,
                     promotions = when (val p = _uiState.value.promotions) {
-                        is PromotionsState.Loaded -> p.copy(error = if (ok) null else "No se pudieron descargar las promociones")
-                        else -> PromotionsState.Loaded(error = if (ok) null else "No se pudieron descargar las promociones")
+                        is PromotionsState.Loaded -> p.copy(error = if (ok) null else context.getString(R.string.ruta_error_promos))
+                        else -> PromotionsState.Loaded(error = if (ok) null else context.getString(R.string.ruta_error_promos))
                     },
                 )}
             } catch (e: Exception) {

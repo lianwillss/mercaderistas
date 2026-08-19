@@ -31,7 +31,7 @@ data class AppDimens(
     val iconLg: Dp = 28.dp,
     val iconXl: Dp = 36.dp,
     val iconXxl: Dp = 40.dp,
-    val touchMin: Dp = 44.dp,
+    val touchMin: Dp = 48.dp,
     val contentPaddingBottom: Dp = 96.dp,
     val promoButtonSize: Dp = 56.dp,
 )
@@ -57,7 +57,7 @@ fun rememberAppDimens(): AppDimens {
             iconLg = (28 * this).dp,
             iconXl = (36 * this).dp,
             iconXxl = (40 * this).dp,
-            touchMin = (44 * this).dp,
+            touchMin = 48.dp,
             contentPaddingBottom = (96 * this).dp,
             promoButtonSize = (56 * this).dp,
         )

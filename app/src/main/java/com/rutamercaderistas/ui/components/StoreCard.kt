@@ -45,7 +45,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import android.content.res.Configuration
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.models.ClienteInfo
 import com.rutamercaderistas.models.LocalDelDia
@@ -139,7 +138,7 @@ fun StoreCard(
                             text = local.local.ifBlank { stringResource(R.string.sin_numero) },
                             style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
                         if (hasPromos) {
@@ -332,14 +331,6 @@ private fun buildStoreShareText(
 @Preview(showBackground = true)
 @Composable
 private fun StoreCardPreview() {
-    if (BuildConfig.DEBUG) {
-        StoreCardPreviewContent()
-    }
-}
-
-@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
-@Composable
-private fun StoreCardPreviewDark() {
     if (BuildConfig.DEBUG) {
         StoreCardPreviewContent()
     }

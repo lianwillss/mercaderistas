@@ -1,5 +1,7 @@
 package com.rutamercaderistas.viewmodel
 
+import android.content.Context
+import com.rutamercaderistas.R
 import com.rutamercaderistas.data.export.RouteExporter
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.data.preferences.FileRepository
@@ -34,6 +36,7 @@ import org.junit.Test
 class RouteViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
+    private lateinit var context: Context
     private lateinit var fileRepository: FileRepository
     private lateinit var preferencesRepository: PreferencesRepository
     private lateinit var ruteroManager: RuteroManager
@@ -51,6 +54,10 @@ class RouteViewModelTest {
         Dispatchers.setMain(testDispatcher)
         createdViewModels.clear()
 
+        context = mockk<Context>(relaxed = true) {
+            every { getString(any()) } returns "context_string"
+            every { getString(R.string.ruta_selecciona_primero) } returns "Selecciona una ruta primero"
+        }
         fileRepository = mockk(relaxed = true) {
             every { excelExists() } returns true
         }
@@ -91,6 +98,7 @@ class RouteViewModelTest {
 
     private fun createViewModel(): RouteViewModel {
         val vm = RouteViewModel(
+            context = context,
             fileRepository = fileRepository,
             preferencesRepository = preferencesRepository,
             ruteroManager = ruteroManager,
@@ -115,8 +123,7 @@ class RouteViewModelTest {
 
         val viewModel = createViewModel()
         viewModel.selectRoute("RUTA-1")
-
-        testDispatcher.scheduler.advanceUntilIdle()
+        awaitOnMain { (viewModel.uiState.value.route as? RouteDataState.Loaded)?.selectedRoute == "RUTA-1" }
 
         coVerify { recentRoutesStore.addRoute("RUTA-1") }
         assertEquals("RUTA-1", repository.getActiveRuteroName())
@@ -131,8 +138,7 @@ class RouteViewModelTest {
 
         val viewModel = createViewModel()
         viewModel.selectRoute("EMU-2")
-
-        testDispatcher.scheduler.advanceUntilIdle()
+        awaitOnMain { (viewModel.uiState.value.route as? RouteDataState.Loaded)?.selectedRoute == "EMU-2" }
 
         coVerify { preferencesRepository.setSelectedRoute("EMU-2") }
     }
@@ -165,7 +171,7 @@ class RouteViewModelTest {
 
         val viewModel = createViewModel()
         viewModel.loadInitialData()
-        testDispatcher.scheduler.advanceUntilIdle()
+        awaitOnMain { (viewModel.uiState.value.route as? RouteDataState.Loaded)?.selectedRoute == "RUTA-1" }
 
         assertEquals("RUTA-1", repository.getActiveRuteroName())
     }
@@ -180,7 +186,7 @@ class RouteViewModelTest {
 
         val viewModel = createViewModel()
         viewModel.loadInitialData()
-        testDispatcher.scheduler.advanceUntilIdle()
+        awaitOnMain { (viewModel.uiState.value.route as? RouteDataState.Loaded)?.selectedRoute == "RUTA-2" }
 
         assertEquals("RUTA-2", repository.getActiveRuteroName())
     }
@@ -195,7 +201,7 @@ class RouteViewModelTest {
 
         val viewModel = createViewModel()
         viewModel.selectRoute("RUTA-1")
-        testDispatcher.scheduler.advanceUntilIdle()
+        awaitOnMain { (viewModel.uiState.value.route as? RouteDataState.Loaded)?.selectedRoute == "RUTA-1" }
 
         viewModel.exportRoute()
         testDispatcher.scheduler.advanceUntilIdle()
