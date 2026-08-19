@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.rutamercaderistas.BuildConfig
@@ -73,7 +74,7 @@ fun DaySelector(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
                         Text(
                             text = dia.abreviacion,
@@ -81,6 +82,8 @@ fun DaySelector(
                                 else MaterialTheme.typography.labelLarge,
                             color = if (isSelected) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Clip,
                         )
                         Text(
                             text = dayNumbers.getOrElse(index) { 0 }.toString(),
@@ -88,6 +91,8 @@ fun DaySelector(
                                 else MaterialTheme.typography.labelMedium,
                             color = if (isSelected) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Clip,
                         )
                     }
                     if (esHoy) {
