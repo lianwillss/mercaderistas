@@ -31,6 +31,7 @@ import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.SystemUpdate
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -69,10 +70,21 @@ import com.rutamercaderistas.ui.theme.Wave1Blue
 import com.rutamercaderistas.ui.theme.Wave2Blue
 import com.rutamercaderistas.ui.theme.Wave3Blue
 import com.rutamercaderistas.ui.theme.LocalAppDimens
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.sin
 
 private val TWO_PI = (2 * PI).toFloat()
+
+@Composable
+private fun rememberFechaHoy(): String? {
+    val formatter = remember {
+        DateTimeFormatter.ofPattern("EEEE d", Locale("es", "CL"))
+    }
+    return remember { LocalDate.now().format(formatter).replaceFirstChar { it.uppercase() } }
+}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -122,54 +134,54 @@ fun HeaderSection(
             val path1 = Path().apply {
                 moveTo(0f, h * 0.72f)
                 for (x in 0..w.toInt() step 4) {
-                    val y = h * 0.72f + sin(x * 0.008f + phase) * 14f + sin(x * 0.015f + phase * 1.3f) * 8f
+                    val y = h * 0.72f + sin(x * 0.008f + phase) * 8f + sin(x * 0.015f + phase * 1.3f) * 4f
                     lineTo(x.toFloat(), y)
                 }
                 lineTo(w, h)
                 lineTo(0f, h)
                 close()
             }
-            drawPath(path1, Wave1Blue.copy(alpha = 0.35f))
+            drawPath(path1, Wave1Blue.copy(alpha = 0.25f))
 
             val path2 = Path().apply {
                 moveTo(0f, h * 0.82f)
                 for (x in 0..w.toInt() step 4) {
-                    val y = h * 0.82f + sin(x * 0.012f - phase * 0.7f) * 10f + sin(x * 0.02f + phase) * 5f
+                    val y = h * 0.82f + sin(x * 0.012f - phase * 0.7f) * 6f + sin(x * 0.02f + phase) * 3f
                     lineTo(x.toFloat(), y)
                 }
                 lineTo(w, h)
                 lineTo(0f, h)
                 close()
             }
-            drawPath(path2, Wave2Blue.copy(alpha = 0.25f))
+            drawPath(path2, Wave2Blue.copy(alpha = 0.18f))
 
             val path3 = Path().apply {
                 moveTo(0f, h * 0.62f)
                 for (x in 0..w.toInt() step 4) {
-                    val y = h * 0.62f + sin(x * 0.005f + phase * 0.5f) * 6f
+                    val y = h * 0.62f + sin(x * 0.005f + phase * 0.5f) * 4f
                     lineTo(x.toFloat(), y)
                 }
                 lineTo(w, h * 0.9f)
                 lineTo(0f, h * 0.9f)
                 close()
             }
-            drawPath(path3, Wave3Blue.copy(alpha = 0.15f))
+            drawPath(path3, Wave3Blue.copy(alpha = 0.12f))
 
-            val dotPositions = (0..10).map { i ->
-                val x = w * (i + 1) / 12f
-                val y = h * 0.35f + sin(x * 0.025f + phase * 0.4f + i * 0.5f) * 16f
+            val dotPositions = (0..8).map { i ->
+                val x = w * (i + 1) / 10f
+                val y = h * 0.35f + sin(x * 0.025f + phase * 0.4f + i * 0.5f) * 10f
                 Offset(x, y)
             }
             for (i in 0 until dotPositions.lastIndex) {
                 drawLine(
-                    Color.White.copy(alpha = 0.07f),
+                    Color.White.copy(alpha = 0.05f),
                     dotPositions[i],
                     dotPositions[i + 1],
-                    strokeWidth = 1.5f,
+                    strokeWidth = 1.2f,
                 )
             }
             dotPositions.forEach { pos ->
-                drawCircle(Color.White.copy(alpha = 0.18f), radius = 2.5f, center = pos)
+                drawCircle(Color.White.copy(alpha = 0.12f), radius = 2f, center = pos)
             }
         }
 
@@ -211,6 +223,15 @@ fun HeaderSection(
                                 modifier = Modifier.weight(1f, fill = false),
                             )
                         }
+                        val fechaHoy = rememberFechaHoy()
+                        if (fechaHoy != null) {
+                            Text(
+                                text = fechaHoy,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = Color.White.copy(alpha = 0.9f),
+                                maxLines = 1,
+                            )
+                        }
                         if (promosExpiringSoon.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(6.dp))
                             Box(
@@ -226,10 +247,11 @@ fun HeaderSection(
                             ) {
                                 val porVencerCd = stringResource(R.string.por_vencer_cd)
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = "\u26A0\uFE0F",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        modifier = Modifier.semantics { contentDescription = porVencerCd },
+                                    Icon(
+                                        imageVector = Icons.Outlined.WarningAmber,
+                                        contentDescription = porVencerCd,
+                                        tint = UrgencyOrange,
+                                        modifier = Modifier.size(16.dp),
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(

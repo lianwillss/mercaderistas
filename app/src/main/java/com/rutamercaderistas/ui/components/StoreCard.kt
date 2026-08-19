@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import com.rutamercaderistas.BuildConfig
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 import com.rutamercaderistas.R
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Store
@@ -100,7 +103,7 @@ fun StoreCard(
             .offset(y = animOffsetY),
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
@@ -144,10 +147,11 @@ fun StoreCard(
                         if (hasPromos) {
                             val promosCd = stringResource(R.string.promociones_cd)
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "\uD83D\uDD25",
-                                style = MaterialTheme.typography.labelSmall,
-                                modifier = Modifier.semantics { contentDescription = promosCd },
+                            Icon(
+                                imageVector = Icons.Outlined.LocalFireDepartment,
+                                contentDescription = promosCd,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(dimens.iconSm),
                             )
                         }
                     }
@@ -207,12 +211,26 @@ fun StoreCard(
 
                 Spacer(modifier = Modifier.width(dimens.spacingSm))
 
+                val shareContext = LocalContext.current
+                val shareMarcasLabel = stringResource(R.string.share_marcas_count, local.totalClientes)
+                val sharePromosPlural: (Int) -> String = { count ->
+                    shareContext.resources.getQuantityString(R.plurals.promos_count_plural, count, count)
+                }
                 Box(
                     modifier = Modifier
                         .size(dimens.iconXl)
                         .clip(CircleShape)
                         .clickable(
-                            onClick = { onShareLocal(buildStoreShareText(local, promotionsByBrand, brandCleanCache)) },
+                            onClick = {
+                                val shareText = buildStoreShareText(
+                                    local = local,
+                                    promotionsByBrand = promotionsByBrand,
+                                    brandCleanCache = brandCleanCache,
+                                    marcasLabel = shareMarcasLabel,
+                                    promosPlural = sharePromosPlural,
+                                )
+                                onShareLocal(shareText)
+                            },
                             role = androidx.compose.ui.semantics.Role.Button,
                         )
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)),
@@ -259,10 +277,11 @@ fun StoreCard(
 
                 Spacer(modifier = Modifier.width(6.dp * rs()))
 
-                Text(
-                    text = "›",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.semantics { contentDescription = chevronNextCd }
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = chevronNextCd,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.size(dimens.iconSm),
                 )
             }
 
@@ -301,6 +320,8 @@ private fun buildStoreShareText(
     local: LocalDelDia,
     promotionsByBrand: Map<String, List<PromotionEntity>>,
     brandCleanCache: Map<String, String>,
+    marcasLabel: String,
+    promosPlural: (Int) -> String,
 ): String {
     return buildString {
         appendLine("\uD83C\uDFEA ${local.local.ifBlank { "S/N" }}")
@@ -308,13 +329,13 @@ private fun buildStoreShareText(
         if (local.comuna.isNotBlank()) appendLine("\uD83C\uDFD9\uFE0F ${local.comuna}")
         appendLine()
         if (local.clientes.isNotEmpty()) {
-            appendLine("Marcas (${local.totalClientes}):")
+            appendLine(marcasLabel)
             local.clientes.forEach { c ->
                 val clean = brandCleanCache[c.nombre] ?: c.nombre.cleanBrand()
                 val promos = promotionsByBrand[clean].orEmpty()
                     .filter { matchesChain(it.chain, local.local, local.cadena, local.formato) }
                 append("  \u2022 ${c.nombre}")
-                if (promos.isNotEmpty()) append(" \uD83D\uDD25 ${promos.size} promo${if (promos.size != 1) "s" else ""}")
+                if (promos.isNotEmpty()) append(" \uD83D\uDD25 ${promosPlural(promos.size)}")
                 appendLine()
                 promos.forEach { p ->
                     append("    - ${p.productName}")

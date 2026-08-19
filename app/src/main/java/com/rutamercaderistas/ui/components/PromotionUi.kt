@@ -10,8 +10,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.LocalFireDepartment
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,6 +29,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.ui.DateFormatters
@@ -52,10 +57,14 @@ fun PromotionBadge(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            Text(text = "\uD83D\uDD25", style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.semantics { contentDescription = promoIconCd })
+            Icon(
+                imageVector = Icons.Outlined.LocalFireDepartment,
+                contentDescription = promoIconCd,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(12.dp),
+            )
             Text(
-                text = stringResource(R.string.promos_count, count, if (count != 1) "s" else ""),
+                text = pluralStringResource(R.plurals.promos_count_plural, count, count),
                 style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
             )

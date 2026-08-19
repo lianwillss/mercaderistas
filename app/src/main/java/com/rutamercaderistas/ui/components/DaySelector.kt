@@ -1,10 +1,6 @@
 package com.rutamercaderistas.ui.components
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,23 +8,39 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import com.rutamercaderistas.ui.theme.ComponentShapes
-import com.rutamercaderistas.ui.theme.LocalAppDimens
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.models.DiaSemana
+import com.rutamercaderistas.ui.theme.LocalAppDimens
+import java.time.DayOfWeek
+import java.time.LocalDate
+
+private fun diaDeHoy(): DiaSemana? {
+    return when (LocalDate.now().dayOfWeek) {
+        DayOfWeek.MONDAY -> DiaSemana.LUNES
+        DayOfWeek.TUESDAY -> DiaSemana.MARTES
+        DayOfWeek.WEDNESDAY -> DiaSemana.MIERCOLES
+        DayOfWeek.THURSDAY -> DiaSemana.JUEVES
+        DayOfWeek.FRIDAY -> DiaSemana.VIERNES
+        DayOfWeek.SATURDAY -> DiaSemana.SABADO
+        DayOfWeek.SUNDAY -> DiaSemana.DOMINGO
+        else -> null
+    }
+}
 
 @Composable
 fun DaySelector(
@@ -39,53 +51,54 @@ fun DaySelector(
     modifier: Modifier = Modifier,
 ) {
     val dimens = LocalAppDimens.current
-    Row(
+    val hoy = diaDeHoy()
+
+    SingleChoiceSegmentedButtonRow(
         modifier = modifier
             .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
+            .padding(horizontal = dimens.spacingMd)
+            .heightIn(min = dimens.touchMin),
     ) {
         days.forEachIndexed { index, dia ->
             val isSelected = index == selectedIndex
-
-            val bgColor by animateColorAsState(
-                targetValue = if (isSelected) MaterialTheme.colorScheme.surface
-                    else MaterialTheme.colorScheme.surfaceVariant,
-                label = "day_bg"
-            )
-            val elevation by animateDpAsState(
-                targetValue = if (isSelected) 4.dp else 0.dp,
-                label = "day_elev"
-            )
-
-            Box(
+            val esHoy = dia == hoy
+            SegmentedButton(
+                selected = isSelected,
+                onClick = { onDaySelected(index) },
+                shape = SegmentedButtonDefaults.itemShape(index, days.size),
                 modifier = Modifier
                     .heightIn(min = dimens.touchMin)
-                    .shadow(elevation, ComponentShapes.pill)
-                    .clip(ComponentShapes.pill)
-                    .background(bgColor)
-                    .clickable {
-                        onDaySelected(index)
-                    }
-                    .semantics { contentDescription = dia.nombreCompleto }
-                    .padding(horizontal = dimens.spacingMd),
-                contentAlignment = Alignment.Center
+                    .semantics { contentDescription = dia.nombreCompleto },
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = dia.abreviacion,
-                        style = if (isSelected) MaterialTheme.typography.titleSmall
-                            else MaterialTheme.typography.labelLarge,
-                        color = if (isSelected) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = dayNumbers.getOrElse(index) { 0 }.toString(),
-                        style = if (isSelected) MaterialTheme.typography.labelLarge
-                            else MaterialTheme.typography.labelMedium,
-                        color = if (isSelected) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            text = dia.abreviacion,
+                            style = if (isSelected) MaterialTheme.typography.titleSmall
+                                else MaterialTheme.typography.labelLarge,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = dayNumbers.getOrElse(index) { 0 }.toString(),
+                            style = if (isSelected) MaterialTheme.typography.labelLarge
+                                else MaterialTheme.typography.labelMedium,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (esHoy) {
+                        Box(
+                            modifier = Modifier
+                                .padding(top = 2.dp)
+                                .size(4.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary),
+                        )
+                    }
                 }
             }
         }

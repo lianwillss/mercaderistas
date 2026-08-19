@@ -70,14 +70,23 @@
     <string name="marcas_con_promociones">%d marcas con promociones</string>
     <string name="solo_mis_marcas">Solo mis marcas</string>
     <string name="solo_hoy">Solo hoy</string>
+    <string name="promo_cadena_count">%1$s · %2$d</string>
     <string name="sin_resultados_para">Sin resultados para \"%s\"</string>
     <string name="sin_promociones_para">Sin promociones para \"%s\"</string>
     <string name="sin_promociones_activas">Sin promociones activas</string>
     <string name="ver_mas">Ver %d más</string>
     <string name="vence_hoy">Vence hoy</string>
     <string name="termina_manana">Termina mañana</string>
+    <plurals name="promo_expiring_count">
+        <item quantity="one">%d promo próxima a vencer</item>
+        <item quantity="other">%d promos próximas a vencer</item>
+    </plurals>
     <string name="descuento">Descuento</string>
-    <string name="promos_count">%1$d promo%2$s</string>
+    <string name="share_marcas_count">Marcas (%1$d):</string>
+    <plurals name="promos_count_plural">
+        <item quantity="one">%d promo</item>
+        <item quantity="other">%d promos</item>
+    </plurals>
 
     <!-- All Locales -->
     <string name="todos_locales">Todos los locales</string>
@@ -119,6 +128,38 @@
     <string name="manual_check_datos">La app verifica automáticamente si hay nuevos datos cada vez que abres la aplicación.</string>
     <string name="manual_sin_visitas_selector">Los días sin visitas no aparecen en el selector.</string>
     <string name="manual_navegacion_pdf">La navegación a la página exacta funciona gracias a un mapa interno de marcas con sus números de página correspondientes.</string>
+    <string name="manual_intro">Mercaderistas es una aplicación que te permite gestionar tus rutas de visita a locales comerciales. Descarga automáticamente un Excel desde Google Drive con la información de cada ruta, organiza los locales por día y te permite abrir el PDF del catalogador en la página exacta de cada marca.</string>
+    <string name="manual_sync_step1">Toca el botón ⋮ (tres puntos) en la esquina superior derecha.</string>
+    <string name="manual_sync_step2">Selecciona \"Forzar sincronización\".</string>
+    <string name="manual_sync_step3">Una barra de progreso indica que los datos se están descargando.</string>
+    <string name="manual_sync_step4">Al terminar, la lista de rutas se actualiza automáticamente.</string>
+    <string name="manual_ruta_step1">Toca el campo \"Buscar ruta…\" en la parte superior.</string>
+    <string name="manual_ruta_step2">Escribe el nombre de la ruta (ej. \"RUTA 1\").</string>
+    <string name="manual_ruta_step3">Selecciona la ruta de la lista desplegable.</string>
+    <string name="manual_ruta_step4">También puedes elegir una ruta reciente del historial.</string>
+    <string name="manual_dias_texto">Usa el selector de días (LUN, MAR, MIÉ, etc.) para cambiar de día. También puedes deslizar horizontalmente sobre la pantalla.</string>
+    <string name="manual_tarjeta_texto">Cada local se muestra como una tarjeta blanca con bordes redondeados y sombra sutil. Contiene:</string>
+    <string name="manual_tarjeta_b1">Icono con el color de la cadena (ver tabla arriba)</string>
+    <string name="manual_tarjeta_b2">Nombre del local en formato natural</string>
+    <string name="manual_tarjeta_b3">Código interno del local</string>
+    <string name="manual_tarjeta_b4">Dirección en azul (toca para abrir en Google Maps)</string>
+    <string name="manual_tarjeta_b5">Contador circular con el número de marcas a visitar</string>
+    <string name="manual_prioritarias">Marcas prioritarias:</string>
+    <string name="manual_prio_b1">Tarjeta blanca independiente con barra naranja a la izquierda</string>
+    <string name="manual_prio_b2">Ícono de estrella dentro de un círculo naranja</string>
+    <string name="manual_prio_b3">Chip verde que indica la frecuencia de visita (ej. \"3×\" semanal)</string>
+    <string name="manual_normales">Marcas normales:</string>
+    <string name="manual_norm_b1">Fila compacta sin tarjeta independiente</string>
+    <string name="manual_norm_b2">Círculo con iniciales de la marca en un color generado automáticamente</string>
+    <string name="manual_norm_b3">Badge de frecuencia cuando corresponde</string>
+    <string name="manual_pdf_step1">Toca cualquier marca dentro de un local.</string>
+    <string name="manual_pdf_step2">La aplicación abre el PDF del catalogador en la página exacta de esa marca.</string>
+    <string name="manual_pdf_step3">Si la marca no se encuentra en el PDF, aparece un mensaje: \"Marca no encontrada\".</string>
+    <string name="manual_locales_step1">Toca la tarjeta \"Locales\" en la sección de estadísticas (arriba, junto a Marcas y Visitas).</string>
+    <string name="manual_locales_step2">Se abre una pantalla completa con todos los locales de la ruta.</string>
+    <string name="manual_locales_step3">Cada local muestra su nombre, dirección y código de colores por cadena.</string>
+    <string name="manual_locales_step4">Toca la dirección para abrirla en Google Maps.</string>
+    <string name="manual_locales_step5">Presiona ← para volver.</string>
 
     <!-- Promo Expiring -->
     <string name="por_vencer_title">Por vencer</string>
@@ -161,8 +202,8 @@
     <string name="ruta_hace_d">hace %d d</string>
 
     <!-- Promotions date -->
-    <string name="promo_desde">Desde </string>
-    <string name="promo_hasta">Hasta </string>
+    <string name="promo_desde">Desde %1$s</string>
+    <string name="promo_hasta">Hasta %1$s</string>
     <string name="promo_separador"> → </string>
 
     <!-- Promo expiring -->

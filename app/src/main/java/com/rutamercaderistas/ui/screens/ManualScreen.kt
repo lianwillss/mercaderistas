@@ -86,11 +86,7 @@ fun ManualScreen(
                 color = MaterialTheme.colorScheme.primary
             ) {
                     Text(
-                        text = "Mercaderistas es una aplicación que te permite gestionar tus rutas de " +
-                                "visita a locales comerciales. Descarga automáticamente un Excel desde " +
-                                "Google Drive con la información de cada ruta, organiza los locales por " +
-                                "día y te permite abrir el PDF del catalogador en la página exacta de " +
-                                "cada marca.",
+                        text = stringResource(R.string.manual_intro),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
@@ -108,10 +104,10 @@ fun ManualScreen(
                 icon = Icons.Outlined.Refresh,
                 color = MaterialTheme.colorScheme.secondary
             ) {
-                NumberedStep("Toca el botón ⋮ (tres puntos) en la esquina superior derecha.")
-                NumberedStep("Selecciona \"Forzar sincronización\".")
-                NumberedStep("Una barra de progreso indica que los datos se están descargando.")
-                NumberedStep("Al terminar, la lista de rutas se actualiza automáticamente.")
+                NumberedStep(stringResource(R.string.manual_sync_step1))
+                NumberedStep(stringResource(R.string.manual_sync_step2))
+                NumberedStep(stringResource(R.string.manual_sync_step3))
+                NumberedStep(stringResource(R.string.manual_sync_step4))
                 Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = stringResource(R.string.manual_check_datos),
@@ -126,10 +122,10 @@ fun ManualScreen(
                 icon = Icons.Outlined.Store,
                 color = MaterialTheme.colorScheme.tertiary
             ) {
-                NumberedStep("Toca el campo \"Buscar ruta…\" en la parte superior.")
-                NumberedStep("Escribe el nombre de la ruta (ej. \"RUTA 1\").")
-                NumberedStep("Selecciona la ruta de la lista desplegable.")
-                NumberedStep("También puedes elegir una ruta reciente del historial.")
+                NumberedStep(stringResource(R.string.manual_ruta_step1))
+                NumberedStep(stringResource(R.string.manual_ruta_step2))
+                NumberedStep(stringResource(R.string.manual_ruta_step3))
+                NumberedStep(stringResource(R.string.manual_ruta_step4))
             }
 
             // ── Navegar entre días ──
@@ -139,8 +135,7 @@ fun ManualScreen(
                 color = MaterialTheme.colorScheme.tertiary
             ) {
                 Text(
-                    text = "Usa el selector de días (LUN, MAR, MIÉ, etc.) para cambiar de día. " +
-                            "También puedes deslizar horizontalmente sobre la pantalla.",
+                    text = stringResource(R.string.manual_dias_texto),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
@@ -173,17 +168,16 @@ fun ManualScreen(
                 color = MaterialTheme.colorScheme.primary
             ) {
                 Text(
-                    text = "Cada local se muestra como una tarjeta blanca con bordes redondeados " +
-                            "y sombra sutil. Contiene:",
+                    text = stringResource(R.string.manual_tarjeta_texto),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Spacer(modifier = Modifier.height(6.dp))
-                BulletPoint("Icono con el color de la cadena (ver tabla arriba)")
-                BulletPoint("Nombre del local en formato natural")
-                BulletPoint("Código interno del local")
-                BulletPoint("Dirección en azul (toca para abrir en Google Maps)")
-                BulletPoint("Contador circular con el número de marcas a visitar")
+                BulletPoint(stringResource(R.string.manual_tarjeta_b1))
+                BulletPoint(stringResource(R.string.manual_tarjeta_b2))
+                BulletPoint(stringResource(R.string.manual_tarjeta_b3))
+                BulletPoint(stringResource(R.string.manual_tarjeta_b4))
+                BulletPoint(stringResource(R.string.manual_tarjeta_b5))
             }
 
             // ── Marcas ──
@@ -193,22 +187,22 @@ fun ManualScreen(
                 color = MaterialTheme.colorScheme.tertiary
             ) {
                 Text(
-                    text = "Marcas prioritarias:",
+                    text = stringResource(R.string.manual_prioritarias),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                BulletPoint("Tarjeta blanca independiente con barra naranja a la izquierda")
-                BulletPoint("Ícono de estrella dentro de un círculo naranja")
-                BulletPoint("Chip verde que indica la frecuencia de visita (ej. \"3×\" semanal)")
+                BulletPoint(stringResource(R.string.manual_prio_b1))
+                BulletPoint(stringResource(R.string.manual_prio_b2))
+                BulletPoint(stringResource(R.string.manual_prio_b3))
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "Marcas normales:",
+                    text = stringResource(R.string.manual_normales),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                BulletPoint("Fila compacta sin tarjeta independiente")
-                BulletPoint("Círculo con iniciales de la marca en un color generado automáticamente")
-                BulletPoint("Badge de frecuencia cuando corresponde")
+                BulletPoint(stringResource(R.string.manual_norm_b1))
+                BulletPoint(stringResource(R.string.manual_norm_b2))
+                BulletPoint(stringResource(R.string.manual_norm_b3))
             }
 
             // ── Abrir PDF ──
@@ -217,9 +211,9 @@ fun ManualScreen(
                 icon = Icons.Outlined.Description,
                 color = MaterialTheme.colorScheme.tertiary
             ) {
-                NumberedStep("Toca cualquier marca dentro de un local.")
-                NumberedStep("La aplicación abre el PDF del catalogador en la página exacta de esa marca.")
-                NumberedStep("Si la marca no se encuentra en el PDF, aparece un mensaje: \"Marca no encontrada\".")
+                NumberedStep(stringResource(R.string.manual_pdf_step1))
+                NumberedStep(stringResource(R.string.manual_pdf_step2))
+                NumberedStep(stringResource(R.string.manual_pdf_step3))
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = stringResource(R.string.manual_navegacion_pdf),
@@ -234,11 +228,11 @@ fun ManualScreen(
                 icon = Icons.Outlined.LocationOn,
                 color = MaterialTheme.colorScheme.primary
             ) {
-                NumberedStep("Toca la tarjeta \"Locales\" en la sección de estadísticas (arriba, junto a Marcas y Visitas).")
-                NumberedStep("Se abre una pantalla completa con todos los locales de la ruta.")
-                NumberedStep("Cada local muestra su nombre, dirección y código de colores por cadena.")
-                NumberedStep("Toca la dirección para abrirla en Google Maps.")
-                NumberedStep("Presiona ← para volver.")
+                NumberedStep(stringResource(R.string.manual_locales_step1))
+                NumberedStep(stringResource(R.string.manual_locales_step2))
+                NumberedStep(stringResource(R.string.manual_locales_step3))
+                NumberedStep(stringResource(R.string.manual_locales_step4))
+                NumberedStep(stringResource(R.string.manual_locales_step5))
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -258,7 +252,7 @@ private fun SectionCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {

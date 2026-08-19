@@ -66,7 +66,7 @@ fun PdfGridModal(
             .padding(24.dp)
             .padding(top = 48.dp),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(

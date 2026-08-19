@@ -203,7 +203,7 @@ fun RouteSearchBar(
                         .padding(top = 4.dp)
                         .shadow(8.dp, RoundedCornerShape(16.dp)),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
                 ) {
                     LazyColumn(
                         modifier = Modifier

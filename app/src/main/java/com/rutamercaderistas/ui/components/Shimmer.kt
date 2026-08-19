@@ -94,7 +94,7 @@ fun ShimmerStoreCard(modifier: Modifier = Modifier) {
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(24.dp))
-                .background(MaterialTheme.colorScheme.surface)
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
                 .padding(16.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -127,7 +127,7 @@ fun ShimmerStatsCards(modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surface)
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
                     .padding(8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -153,7 +153,7 @@ fun ShimmerDaySelector(modifier: Modifier = Modifier) {
             Column(
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surface)
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
                     .padding(horizontal = 10.dp, vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -176,7 +176,7 @@ fun ShimmerPromotionsContent(modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(20.dp))
-                    .background(MaterialTheme.colorScheme.surface)
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
                     .padding(20.dp)
             ) {
                 Column {

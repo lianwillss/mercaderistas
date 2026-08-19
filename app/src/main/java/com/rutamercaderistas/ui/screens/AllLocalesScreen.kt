@@ -40,6 +40,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,7 +67,7 @@ fun AllLocalesScreen(
     onAddressClick: (String) -> Unit,
     initialSearch: String = "",
 ) {
-    var searchQuery by remember { mutableStateOf(initialSearch) }
+    var searchQuery by rememberSaveable { mutableStateOf(initialSearch) }
     val dimens = LocalAppDimens.current
 
     LaunchedEffect(initialSearch) {
@@ -129,13 +130,36 @@ fun AllLocalesScreen(
             modifier = Modifier.padding(horizontal = dimens.spacingLg, vertical = dimens.spacingXs)
         )
 
-        LazyColumn(
+        if (filteredLocales.isEmpty() && searchQuery.isNotBlank()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Outlined.Store,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                        modifier = Modifier.size(48.dp),
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = stringResource(R.string.sin_resultados_para, searchQuery),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
             contentPadding = PaddingValues(horizontal = dimens.spacingMd, vertical = dimens.spacingXs),
             verticalArrangement = Arrangement.spacedBy(10.dp * rs())
         ) {
             itemsIndexed(
                 items = filteredLocales,
-                key = { index, _ -> index }
+                key = { _, local -> local.codigo }
             ) { index, local ->
                 var visible by remember { mutableStateOf(false) }
                 val animAlpha by animateFloatAsState(
@@ -155,7 +179,7 @@ fun AllLocalesScreen(
                         .graphicsLayer(alpha = animAlpha)
                         .offset(y = animOffsetY),
                     shape = MaterialTheme.shapes.medium,
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
                     Row(
@@ -231,6 +255,7 @@ fun AllLocalesScreen(
                     }
                 }
             }
+        }
         }
     }
 }

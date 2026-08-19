@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
@@ -82,13 +83,14 @@ fun urgency(endDate: String): Urgency {
 
 fun formatDate(iso: String): String = DateFormatters.formatFull(iso)
 
+@Composable
 fun dateText(promo: PromotionEntity): String {
     val start = if (promo.startDate.isNotBlank()) formatDate(promo.startDate) else null
     val end = if (promo.endDate.isNotBlank()) formatDate(promo.endDate) else null
     return when {
         start != null && end != null -> "$start → $end"
-        start != null -> "Desde $start"
-        end != null -> "Hasta $end"
+        start != null -> stringResource(R.string.promo_desde, start)
+        end != null -> stringResource(R.string.promo_hasta, end)
         else -> ""
     }
 }
@@ -117,7 +119,7 @@ fun BrandCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(
@@ -175,7 +177,7 @@ fun BrandCard(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = stringResource(R.string.promos_count, promos.size, if (promos.size != 1) "s" else ""),
+                            text = pluralStringResource(R.plurals.promos_count_plural, promos.size, promos.size),
                             style = MaterialTheme.typography.labelMedium,
                             color = Color.White,
                         )
@@ -288,13 +290,7 @@ private fun ProductItem(
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.small)
-            .background(
-                when (urg) {
-                    Urgency.TODAY -> UrgencyOrangeSoft
-                    Urgency.TOMORROW -> UrgencyTomorrowSoft
-                    Urgency.NORMAL -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                }
-            )
+            .background(MaterialTheme.colorScheme.surfaceContainer)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = {
@@ -310,18 +306,29 @@ private fun ProductItem(
                 modifier = Modifier.padding(bottom = 4.dp),
             ) {
                 val emojiDesc = if (urg == Urgency.TODAY) stringResource(R.string.vence_hoy) else stringResource(R.string.termina_manana)
-                Icon(
-                    imageVector = if (urg == Urgency.TODAY) Icons.Filled.Warning else Icons.Outlined.LocalFireDepartment,
-                    contentDescription = emojiDesc,
-                    tint = UrgencyOrange,
-                    modifier = Modifier.size(16.dp),
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = emojiDesc,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = UrgencyOrange,
-                )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (urg == Urgency.TODAY) UrgencyOrangeSoft else UrgencyTomorrowSoft)
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Icon(
+                            imageVector = if (urg == Urgency.TODAY) Icons.Filled.Warning else Icons.Outlined.LocalFireDepartment,
+                            contentDescription = null,
+                            tint = UrgencyOrange,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Text(
+                            text = emojiDesc,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = UrgencyOrange,
+                        )
+                    }
+                }
             }
         }
 

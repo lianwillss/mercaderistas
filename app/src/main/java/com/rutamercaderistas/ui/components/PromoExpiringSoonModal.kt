@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.ui.theme.UrgencyOrange
@@ -38,7 +39,7 @@ fun PromoExpiringSoonModal(
         visible = true,
         onDismiss = onDismiss,
         title = stringResource(R.string.por_vencer_title),
-        subtitle = "${promos.size} promo${if (promos.size != 1) "s" else ""} próxima${if (promos.size != 1) "s" else ""} a vencer",
+        subtitle = pluralStringResource(R.plurals.promo_expiring_count, promos.size, promos.size),
     ) {
         LazyColumn(
             modifier = Modifier

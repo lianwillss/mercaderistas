@@ -103,6 +103,12 @@ fun PromotionsOverviewScreen(
             .distinct().sorted()
     }
 
+    val chainCounts = remember(promotionsByBrand) {
+        promotionsByBrand.values.flatten()
+            .groupingBy { normalizeChain(it.chain) }
+            .eachCount()
+    }
+
     var selectedChain by rememberSaveable { mutableStateOf("Todas") }
     var soloHoy by rememberSaveable { mutableStateOf(false) }
 
@@ -277,7 +283,7 @@ fun PromotionsOverviewScreen(
                         },
                         label = {
                             Text(
-                                text = chain,
+                                text = stringResource(R.string.promo_cadena_count, chain, chainCounts[chain] ?: 0),
                                 style = MaterialTheme.typography.labelLarge,
                             )
                         },

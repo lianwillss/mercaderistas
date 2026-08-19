@@ -95,7 +95,7 @@ private fun PriorityBrandCard(
         colors = CardDefaults.cardColors(
             containerColor = if (isHighlighted)
                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.18f)
-            else MaterialTheme.colorScheme.surface
+            else MaterialTheme.colorScheme.surfaceContainerLow
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
@@ -200,7 +200,7 @@ private fun NormalBrandRow(
         ) {
             Box(
                 modifier = Modifier
-                    .size(17.dp)
+                    .size(24.dp)
                     .clip(CircleShape)
                     .background(avatarSoftColor(cliente.nombre)),
                 contentAlignment = Alignment.Center
