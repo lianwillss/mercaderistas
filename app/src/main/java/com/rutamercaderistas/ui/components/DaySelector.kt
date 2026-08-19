@@ -1,33 +1,37 @@
 package com.rutamercaderistas.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.models.DiaSemana
-import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.LocalAppDimens
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -56,71 +60,92 @@ fun DaySelector(
     val dimens = LocalAppDimens.current
     val hoy = diaDeHoy()
 
-    Row(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(horizontal = dimens.spacingMd),
     ) {
-        days.forEachIndexed { index, dia ->
-            val isSelected = index == selectedIndex
-            val esHoy = dia == hoy
+        val segmentWidth = maxWidth / days.size.coerceAtLeast(1)
+        val textMeasurer = rememberTextMeasurer()
+        val density = LocalDensity.current
 
-            Box(
-                modifier = Modifier
-                    .heightIn(min = dimens.touchMin)
-                    .clip(ComponentShapes.pill)
-                    .background(
-                        if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                        else MaterialTheme.colorScheme.surfaceContainerLow
-                    )
-                    .border(
-                        width = 1.dp,
-                        color = if (isSelected) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.outlineVariant,
-                        shape = ComponentShapes.pill,
-                    )
-                    .clickable { onDaySelected(index) }
-                    .semantics { contentDescription = dia.nombreCompleto }
-                    .padding(horizontal = dimens.spacingMd),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    ) {
-                        Text(
-                            text = dia.abreviacion,
-                            style = if (isSelected) MaterialTheme.typography.titleSmall
-                                else MaterialTheme.typography.labelLarge,
-                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Clip,
-                        )
-                        Text(
-                            text = dayNumbers.getOrElse(index) { 0 }.toString(),
-                            style = if (isSelected) MaterialTheme.typography.labelLarge
-                                else MaterialTheme.typography.labelMedium,
-                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Clip,
-                        )
-                    }
-                    if (esHoy) {
-                        Box(
-                            modifier = Modifier
-                                .padding(top = 2.dp)
-                                .size(4.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (isSelected) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.onSurfaceVariant
-                                ),
-                        )
+        SingleChoiceSegmentedButtonRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = dimens.touchMin),
+        ) {
+            days.forEachIndexed { index, dia ->
+                val isSelected = index == selectedIndex
+                val esHoy = dia == hoy
+
+                val dayStyle = if (isSelected) MaterialTheme.typography.titleSmall
+                    else MaterialTheme.typography.labelLarge
+                val numStyle = if (isSelected) MaterialTheme.typography.labelLarge
+                    else MaterialTheme.typography.labelMedium
+                val num = dayNumbers.getOrElse(index) { 0 }.toString()
+                val label = "${dia.abreviacion} $num"
+
+                val scale = remember(label, segmentWidth, dayStyle.fontSize) {
+                    val measuredPx = textMeasurer.measure(
+                        text = AnnotatedString(label),
+                        style = dayStyle,
+                    ).size.width
+                    val naturalDp = with(density) { measuredPx.toDp() }
+                    if (naturalDp <= segmentWidth) 1f
+                    else (segmentWidth / naturalDp).coerceIn(0.6f, 1f)
+                }
+
+                val fitDayStyle = if (scale < 1f) dayStyle.copy(
+                    fontSize = dayStyle.fontSize * scale,
+                    lineHeight = dayStyle.lineHeight * scale,
+                ) else dayStyle
+                val fitNumStyle = if (scale < 1f) numStyle.copy(
+                    fontSize = numStyle.fontSize * scale,
+                    lineHeight = numStyle.lineHeight * scale,
+                ) else numStyle
+
+                SegmentedButton(
+                    selected = isSelected,
+                    onClick = { onDaySelected(index) },
+                    shape = SegmentedButtonDefaults.itemShape(index, days.size),
+                    modifier = Modifier
+                        .heightIn(min = dimens.touchMin)
+                        .semantics { contentDescription = dia.nombreCompleto },
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            Text(
+                                text = dia.abreviacion,
+                                style = fitDayStyle,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Clip,
+                            )
+                            Text(
+                                text = num,
+                                style = fitNumStyle,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Clip,
+                            )
+                        }
+                        if (esHoy) {
+                            Box(
+                                modifier = Modifier
+                                    .padding(top = 2.dp)
+                                    .size(4.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (isSelected) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                            )
+                        }
                     }
                 }
             }
