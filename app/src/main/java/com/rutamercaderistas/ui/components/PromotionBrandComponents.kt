@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -217,6 +218,7 @@ fun BrandCard(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .heightIn(min = dimens.touchMin)
                         .clip(RoundedCornerShape(12.dp))
                         .clickable(
                             onClick = { expanded = true },
@@ -239,14 +241,13 @@ fun BrandCard(
 
 @Composable
 private fun ChainHeader(chain: String, localName: String, count: Int) {
-    val cadenaCd = stringResource(R.string.cadena_cd)
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = Icons.Outlined.Store,
-            contentDescription = cadenaCd,
+            contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(18.dp),
         )
@@ -269,7 +270,7 @@ private fun ChainHeader(chain: String, localName: String, count: Int) {
             Text(
                 text = chain,
                 style = MaterialTheme.typography.labelMedium,
-                color = chainColor(chain),
+                color = chainTextColor(chain),
             )
         }
     }

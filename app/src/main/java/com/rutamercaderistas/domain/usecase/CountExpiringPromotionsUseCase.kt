@@ -7,25 +7,26 @@ import timber.log.Timber
 
 class CountExpiringPromotionsUseCase @Inject constructor() {
 
-    fun countToday(promos: List<PromotionEntity>): Int {
-        val today = LocalDate.now()
-        return promos.count { promo ->
-            try { promo.endDate.isNotBlank() && LocalDate.parse(promo.endDate) == today }
-            catch (_: Exception) {
-                Timber.w("Error parseando endDate '%s' en countToday", promo.endDate)
-                false
-            }
-        }
-    }
+    fun countToday(promos: List<PromotionEntity>): Int =
+        getExpiringOn(promos, LocalDate.now()).size
 
-    fun countTomorrow(promos: List<PromotionEntity>): Int {
-        val tomorrow = LocalDate.now().plusDays(1)
-        return promos.count { promo ->
-            try { promo.endDate.isNotBlank() && LocalDate.parse(promo.endDate) == tomorrow }
-            catch (_: Exception) {
-                Timber.w("Error parseando endDate '%s' en countTomorrow", promo.endDate)
-                false
-            }
+    fun countTomorrow(promos: List<PromotionEntity>): Int =
+        getExpiringOn(promos, LocalDate.now().plusDays(1)).size
+
+    fun getExpiringToday(promos: List<PromotionEntity>): List<PromotionEntity> =
+        getExpiringOn(promos, LocalDate.now())
+
+    fun getExpiringTomorrow(promos: List<PromotionEntity>): List<PromotionEntity> =
+        getExpiringOn(promos, LocalDate.now().plusDays(1))
+
+    private fun getExpiringOn(
+        promos: List<PromotionEntity>,
+        date: LocalDate,
+    ): List<PromotionEntity> = promos.filter { promo ->
+        try { promo.endDate.isNotBlank() && LocalDate.parse(promo.endDate) == date }
+        catch (_: Exception) {
+            Timber.w("Error parseando endDate '%s'", promo.endDate)
+            false
         }
     }
 

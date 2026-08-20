@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.rutamercaderistas.ui.theme.ComponentShapes
+import com.rutamercaderistas.ui.theme.LocalAppDimens
 
 @Composable
 fun IosModal(
@@ -50,6 +51,7 @@ fun IosModal(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     if (visible) {
+        val dimens = LocalAppDimens.current
         Dialog(
             onDismissRequest = onDismiss,
             properties = DialogProperties(usePlatformDefaultWidth = false),
@@ -105,7 +107,7 @@ fun IosModal(
                                 val cerrarCd = stringResource(R.string.cerrar_cd)
                                 Box(
                                     modifier = Modifier
-                                        .size(40.dp)
+                                        .size(dimens.touchMin)
                                         .clip(CircleShape)
                                         .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                                         .clickable(onClick = onDismiss),

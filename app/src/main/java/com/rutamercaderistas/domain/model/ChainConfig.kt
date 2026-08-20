@@ -31,6 +31,25 @@ val chainColorsHex: Map<String, Long> = ALL_CHAINS
     .filter { it.colorHex != 0xFF6B7280L }
     .associate { it.name to it.colorHex }
 
+// Tonos oscuros accesibles (AA >= 4.5:1 sobre fondos claros) para texto de cadenas
+val chainTextColorsHex: Map<String, Long> = ALL_CHAINS
+    .filter { it.colorHex != 0xFF6B7280L }
+    .associate { it.name to chainTextColorHex(it.colorHex) }
+
+private fun chainTextColorHex(colorHex: Long): Long {
+    return when (colorHex) {
+        0xFF065F46L, 0xFF059669L -> 0xFF065F46L
+        0xFFDC2626L -> 0xFFB91C1CL
+        0xFF16A34AL -> 0xFF166534L
+        0xFFEAB308L -> 0xFF854D0EL
+        0xFFEC4899L -> 0xFFBE185DL
+        0xFF3B82F6L -> 0xFF1D4ED8L
+        0xFF8B5CF6L -> 0xFF6D28D9L
+        0xFF1A56DBL -> 0xFF1E40AFL
+        else -> 0xFF44403CL
+    }
+}
+
 internal val holdingToChains: Map<String, Set<String>> = ALL_CHAINS
     .mapNotNull { chain -> chain.holding?.let { holding -> holding to chain } }
     .groupBy { (holding, _) -> holding }

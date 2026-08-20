@@ -19,8 +19,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
@@ -153,35 +154,37 @@ fun AllLocalesScreen(
                 }
             }
         } else {
-            LazyColumn(
-            contentPadding = PaddingValues(horizontal = dimens.spacingMd, vertical = dimens.spacingXs),
-            verticalArrangement = Arrangement.spacedBy(10.dp * rs())
-        ) {
-            itemsIndexed(
-                items = filteredLocales,
-                key = { _, local -> local.codigo }
-            ) { index, local ->
-                var visible by remember { mutableStateOf(false) }
-                val animAlpha by animateFloatAsState(
-                    targetValue = if (visible) 1f else 0f,
-                    animationSpec = tween(250, delayMillis = index * 50),
-                )
-                val animOffsetY by animateDpAsState(
-                    targetValue = if (visible) 0.dp else 12.dp,
-                    animationSpec = tween(250, delayMillis = index * 50),
-                )
-                LaunchedEffect(Unit) { visible = true }
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 340.dp),
+                contentPadding = PaddingValues(horizontal = dimens.spacingMd, vertical = dimens.spacingXs),
+                verticalArrangement = Arrangement.spacedBy(10.dp * rs()),
+                horizontalArrangement = Arrangement.spacedBy(10.dp * rs()),
+            ) {
+                itemsIndexed(
+                    items = filteredLocales,
+                    key = { _, local -> local.codigo }
+                ) { index, local ->
+                    var visible by remember { mutableStateOf(false) }
+                    val animAlpha by animateFloatAsState(
+                        targetValue = if (visible) 1f else 0f,
+                        animationSpec = tween(250, delayMillis = index * 50),
+                    )
+                    val animOffsetY by animateDpAsState(
+                        targetValue = if (visible) 0.dp else 12.dp,
+                        animationSpec = tween(250, delayMillis = index * 50),
+                    )
+                    LaunchedEffect(Unit) { visible = true }
 
-                Card(
-                    modifier = Modifier
-                        .animateItem()
-                        .fillMaxWidth()
-                        .graphicsLayer(alpha = animAlpha)
-                        .offset(y = animOffsetY),
-                    shape = MaterialTheme.shapes.medium,
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                ) {
+                    Card(
+                        modifier = Modifier
+                            .animateItem()
+                            .fillMaxWidth()
+                            .graphicsLayer(alpha = animAlpha)
+                            .offset(y = animOffsetY),
+                        shape = MaterialTheme.shapes.medium,
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -197,7 +200,7 @@ fun AllLocalesScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Store,
-                                contentDescription = stringResource(R.string.cadena_cd),
+                                contentDescription = null,
                                 tint = storeColor(local.local),
                                 modifier = Modifier.size(14.dp * rs())
                             )
@@ -208,7 +211,7 @@ fun AllLocalesScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = local.local.ifBlank { stringResource(R.string.sin_numero) },
-                                style = MaterialTheme.typography.titleSmall,
+                                style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis

@@ -7,6 +7,7 @@ import androidx.compose.ui.res.stringResource
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.R
 import com.rutamercaderistas.ui.theme.ComponentShapes
+import com.rutamercaderistas.ui.theme.LocalAppDimens
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -78,6 +79,7 @@ fun RouteSearchBar(
     var showDropdown by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val haptic = LocalHapticFeedback.current
+    val dimens = LocalAppDimens.current
 
     val showRecent = isFocused && text.isBlank() && recentRoutes.isNotEmpty()
 
@@ -139,7 +141,7 @@ fun RouteSearchBar(
                     if (text.isNotEmpty()) {
                         Box(
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(dimens.touchMin)
                                 .clip(RoundedCornerShape(20.dp))
                                 .clickable {
                                     text = ""

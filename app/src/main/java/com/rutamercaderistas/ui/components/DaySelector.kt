@@ -21,7 +21,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -134,8 +137,12 @@ fun DaySelector(
                                 else MaterialTheme.colorScheme.outlineVariant,
                             shape = ComponentShapes.pill,
                         )
-                        .clickable { onDaySelected(index) }
-                        .semantics { contentDescription = dia.nombreCompleto }
+                        .clickable(onClick = { onDaySelected(index) })
+                        .semantics {
+                            contentDescription = dia.nombreCompleto
+                            selected = isSelected
+                            role = Role.RadioButton
+                        }
                         .padding(horizontal = innerPadding, vertical = 6.dp),
                     contentAlignment = Alignment.Center,
                 ) {

@@ -120,19 +120,19 @@ fun ShimmerStatsCards(modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        repeat(3) {
+        repeat(4) {
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(12.dp))
                     .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                    .padding(8.dp),
+                    .padding(horizontal = 5.dp, vertical = 3.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 ShimmerCircle(12)
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(3.dp))
                 ShimmerBlock(modifier = Modifier.width(32.dp).height(18.dp))
                 Spacer(modifier = Modifier.height(2.dp))
                 ShimmerSmallBlock(modifier = Modifier.width(40.dp))

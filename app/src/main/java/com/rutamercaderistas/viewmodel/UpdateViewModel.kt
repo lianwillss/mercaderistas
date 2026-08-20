@@ -12,6 +12,7 @@ import androidx.core.app.NotificationCompat
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.Constants
 import com.rutamercaderistas.MainActivity
+import com.rutamercaderistas.R
 import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.services.ApkDownloader
 import com.rutamercaderistas.services.DownloadResult
@@ -80,13 +81,17 @@ class UpdateViewModel @Inject constructor(
                     )
                     postUpdateNotification(info.versionName)
                 } else if (showFeedback) {
-                    _state.value = UpdateUiState.Message("Sin actualizaciones disponibles")
+                    _state.value = UpdateUiState.Message(
+                        getApplication<Application>().getString(R.string.update_no_disponible)
+                    )
                 } else {
                     _state.value = UpdateUiState.Idle
                 }
             } catch (_: Exception) {
                 _state.value = if (showFeedback) {
-                    UpdateUiState.Message("Error al buscar actualización")
+                    UpdateUiState.Message(
+                        getApplication<Application>().getString(R.string.update_error_buscar)
+                    )
                 } else {
                     UpdateUiState.Idle
                 }
@@ -121,7 +126,7 @@ class UpdateViewModel @Inject constructor(
                     val apkVersion = ApkDownloader.readApkVersionCode(context, result.file)
                     if (apkVersion <= BuildConfig.VERSION_CODE) {
                         _state.value = UpdateUiState.Message(
-                            "La versión descargada no es más reciente que la instalada"
+                            getApplication<Application>().getString(R.string.update_version_no_reciente)
                         )
                         return@launch
                     }
@@ -161,16 +166,18 @@ class UpdateViewModel @Inject constructor(
     }
 
     private fun postUpdateNotification(versionName: String) {
+        val context = getApplication<Application>()
         postChannelNotification(
-            title = "Actualización disponible",
-            text = "Nueva versión $versionName disponible",
+            title = context.getString(R.string.update_notif_disponible),
+            text = context.getString(R.string.update_notif_nueva, versionName),
         )
     }
 
     private fun postReadyNotification(versionName: String) {
+        val context = getApplication<Application>()
         postChannelNotification(
-            title = "Actualización lista para instalar",
-            text = "Versión $versionName — toca para instalar",
+            title = context.getString(R.string.update_notif_lista),
+            text = context.getString(R.string.update_notif_toca, versionName),
         )
     }
 

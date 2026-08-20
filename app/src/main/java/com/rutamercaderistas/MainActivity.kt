@@ -9,8 +9,12 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -48,6 +52,8 @@ import com.rutamercaderistas.worker.SyncWorker
 import com.rutamercaderistas.worker.UpdateCheckWorker
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import java.time.Duration
+import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
 
 @AndroidEntryPoint
@@ -120,7 +126,10 @@ class MainActivity : ComponentActivity() {
 
             MercaderistasTheme {
                 Scaffold(
-                    snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+                    snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+                    contentWindowInsets = WindowInsets.safeDrawing.only(
+                        WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
+                    )
                 ) { innerPadding ->
                     MainScreen(
                         routeUiState = routeUiState,
@@ -228,6 +237,7 @@ class MainActivity : ComponentActivity() {
             .build()
 
         val request = PeriodicWorkRequestBuilder<DailyPromotionNotificationWorker>(1, TimeUnit.DAYS)
+            .setInitialDelay(delayUntilNextMorning(), TimeUnit.MILLISECONDS)
             .setConstraints(constraints)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.SECONDS)
             .build()
@@ -237,6 +247,15 @@ class MainActivity : ComponentActivity() {
             ExistingPeriodicWorkPolicy.KEEP,
             request,
         )
+    }
+
+    private fun delayUntilNextMorning(targetHour: Int = 7): Long {
+        val now = ZonedDateTime.now()
+        var nextRun = now.toLocalDate().atTime(targetHour, 0).atZone(now.zone)
+        if (!nextRun.isAfter(now)) {
+            nextRun = nextRun.plusDays(1)
+        }
+        return Duration.between(now, nextRun).toMillis()
     }
 
     private fun schedulePeriodicUpdateCheck() {

@@ -1,5 +1,6 @@
 package com.rutamercaderistas.ui.screens
 
+import android.app.Activity
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.AnimatedContentTransitionScope
@@ -9,13 +10,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
+import androidx.core.view.WindowCompat
 import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.rutamercaderistas.R
@@ -53,6 +61,13 @@ fun MainScreen(
     onSharePromo: (PromotionEntity) -> Unit,
 ) {
     val navController = rememberNavController()
+    val backStackEntry by navController.currentBackStackEntryAsState()
+
+    val isMainRoute = backStackEntry?.destination?.hasRoute<MainRoute>() ?: true
+    SystemBarAppearance(
+        lightIcons = !isMainRoute,
+        lightNavIcons = true,
+    )
 
     NavHost(
         navController = navController,
@@ -137,5 +152,20 @@ fun MainScreen(
         ) {
             ManualScreen(onClose = { navController.popBackStack() })
         }
+    }
+}
+
+@Composable
+private fun SystemBarAppearance(
+    lightIcons: Boolean,
+    lightNavIcons: Boolean,
+) {
+    val view = LocalView.current
+    val window = (view.context as? Activity)?.window ?: return
+    val controller = remember(window) { WindowCompat.getInsetsController(window, view) }
+    DisposableEffect(lightIcons, lightNavIcons) {
+        controller.isAppearanceLightStatusBars = lightIcons
+        controller.isAppearanceLightNavigationBars = lightNavIcons
+        onDispose {}
     }
 }

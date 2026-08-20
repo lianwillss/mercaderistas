@@ -153,7 +153,7 @@ class RouteViewModelTest {
 
         val viewModel = createViewModel()
         viewModel.selectRoute("RUTA-1")
-        testDispatcher.scheduler.advanceUntilIdle()
+        awaitOnMain { viewModel.uiState.value.selectedRoute == "RUTA-1" }
 
         viewModel.setCurrentDay(DiaSemana.LUNES)
         awaitOnMain { viewModel.uiState.value.currentDayLocales.size == 1 }
@@ -212,7 +212,9 @@ class RouteViewModelTest {
     @Test
     fun `exportRoute shows error when no route selected`() = runTest(testDispatcher) {
         val viewModel = createViewModel()
+        awaitOnMain { viewModel.uiState.value.route is RouteDataState.Loaded }
         viewModel.exportRoute()
+        awaitOnMain { viewModel.uiState.value.snackbarMessage != null }
 
         assertEquals("Selecciona una ruta primero", viewModel.uiState.value.snackbarMessage)
     }
@@ -220,7 +222,9 @@ class RouteViewModelTest {
     @Test
     fun `clearSnackbar resets snackbar message`() = runTest(testDispatcher) {
         val viewModel = createViewModel()
+        awaitOnMain { viewModel.uiState.value.route is RouteDataState.Loaded }
         viewModel.exportRoute()
+        awaitOnMain { viewModel.uiState.value.snackbarMessage != null }
         assertNotNull(viewModel.uiState.value.snackbarMessage)
 
         viewModel.clearSnackbar()

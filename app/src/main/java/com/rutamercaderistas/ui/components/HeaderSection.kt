@@ -6,7 +6,10 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -201,6 +204,7 @@ fun HeaderSection(
                             text = stringResource(R.string.header_rutero),
                             style = MaterialTheme.typography.headlineLarge,
                             color = Color.White,
+                            modifier = Modifier.semantics { heading() },
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Box(
@@ -220,7 +224,9 @@ fun HeaderSection(
                                 color = Color.White.copy(alpha = 0.75f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false),
+                                modifier = Modifier
+                                    .weight(1f, fill = false)
+                                    .semantics { liveRegion = LiveRegionMode.Polite },
                             )
                         }
                         val fechaHoy = rememberFechaHoy()
@@ -245,11 +251,10 @@ fun HeaderSection(
                                     .padding(horizontal = 10.dp, vertical = 5.dp),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                val porVencerCd = stringResource(R.string.por_vencer_cd)
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
                                         imageVector = Icons.Outlined.WarningAmber,
-                                        contentDescription = porVencerCd,
+                                        contentDescription = null,
                                         tint = UrgencyOrange,
                                         modifier = Modifier.size(16.dp),
                                     )

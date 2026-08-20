@@ -144,7 +144,36 @@ class CountExpiringPromotionsUseCaseTest {
     }
 
     @Test
-    fun `getExpiringSoon handles empty list`() = runTest {
-        assertTrue(useCase.getExpiringSoon(emptyList()).isEmpty())
+    fun `getExpiringToday returns promos ending today`() = runTest {
+        val today = LocalDate.now().toString()
+        val promos = listOf(
+            PromotionEntity(brand = "A", chain = "", productName = "P1", price = "", endDate = today),
+            PromotionEntity(brand = "B", chain = "", productName = "P2", price = "", endDate = "2026-12-31"),
+        )
+        assertEquals(listOf("A"), useCase.getExpiringToday(promos).map { it.brand })
+    }
+
+    @Test
+    fun `getExpiringTomorrow returns promos ending tomorrow`() = runTest {
+        val tomorrow = LocalDate.now().plusDays(1).toString()
+        val promos = listOf(
+            PromotionEntity(brand = "A", chain = "", productName = "P1", price = "", endDate = tomorrow),
+            PromotionEntity(brand = "B", chain = "", productName = "P2", price = "", endDate = "2026-12-31"),
+        )
+        assertEquals(listOf("A"), useCase.getExpiringTomorrow(promos).map { it.brand })
+    }
+
+    @Test
+    fun `getExpiringTomorrow is empty when only today expires`() = runTest {
+        val today = LocalDate.now().toString()
+        val promos = listOf(
+            PromotionEntity(brand = "A", chain = "", productName = "P1", price = "", endDate = today),
+        )
+        assertTrue(useCase.getExpiringTomorrow(promos).isEmpty())
+    }
+
+    @Test
+    fun `getExpiringToday handles empty list`() = runTest {
+        assertTrue(useCase.getExpiringToday(emptyList()).isEmpty())
     }
 }

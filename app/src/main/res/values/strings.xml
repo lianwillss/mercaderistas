@@ -58,6 +58,22 @@
     <string name="stats_marcas_label">Marcas</string>
     <string name="stats_visitas_label">Visitas</string>
     <string name="stats_con_promo">%d con promo</string>
+    <string name="stats_cod_prov_label">Cod. Prov</string>
+
+    <!-- Códigos de proveedor -->
+    <string name="cod_prov_title">Códigos de proveedor</string>
+    <string name="cod_prov_subtitle">Códigos por marca</string>
+    <string name="cod_prov_nat_natural">NAT NATURAL</string>
+    <string name="cod_prov_suk">SUK</string>
+    <string name="cod_prov_fermentista">FERMENTISTA</string>
+    <string name="cod_prov_love_co">LOVE CO</string>
+    <string name="cod_prov_cuk">CUK</string>
+    <string name="cod_prov_bymaria">BYMARIA</string>
+    <string name="cod_prov_global_retail">GLOBAL RETAIL</string>
+    <string name="cod_prov_caso">CASO&amp;CIA</string>
+    <string name="cod_prov_ecocultiva">ECOCULTIVA</string>
+    <string name="cod_prov_dusoleil">DUSOLEIL</string>
+    <string name="cod_prov_olimpia">OLIMPIA</string>
 
     <!-- Search -->
     <string name="buscar_ruta">Buscar ruta…</string>
@@ -113,6 +129,13 @@
     <string name="descargando_version">Descargando versión %s…</string>
     <string name="version_disponible">Versión %s disponible. ¿Quieres actualizar ahora?</string>
     <string name="download_progress_percent">%d%%</string>
+    <string name="update_no_disponible">Sin actualizaciones disponibles</string>
+    <string name="update_error_buscar">Error al buscar actualización</string>
+    <string name="update_version_no_reciente">La versión descargada no es más reciente que la instalada</string>
+    <string name="update_notif_disponible">Actualización disponible</string>
+    <string name="update_notif_nueva">Nueva versión %s disponible</string>
+    <string name="update_notif_lista">Actualización lista para instalar</string>
+    <string name="update_notif_toca">Versión %s — toca para instalar</string>
 
     <!-- Manual screen -->
     <string name="manual_que_es">¿Qué es Mercaderistas?</string>
@@ -168,6 +191,20 @@
     <string name="vence_manana_label">Vence mañana</string>
     <string name="vence_en_dias">Vence en %d días</string>
 
+    <!-- Notification worker -->
+    <plurals name="notif_promo_hoy">
+        <item quantity="one">🔥 1 promo vence hoy</item>
+        <item quantity="other">🔥 %d promos vencen hoy</item>
+    </plurals>
+    <plurals name="notif_promo_manana">
+        <item quantity="one">%d promo vence mañana</item>
+        <item quantity="other">%d promos vencen mañana</item>
+    </plurals>
+    <string name="notif_y_mas">y %d más</string>
+    <string name="notif_detalle_promo">%1$s — %2$s</string>
+    <string name="notif_detalle_promo_precio">%1$s — %2$s (%3$s)</string>
+    <string name="notif_manana">%d vencen mañana</string>
+
     <!-- PDF Viewer -->
     <string name="pdf_no_disponible">PDF no disponible</string>
     <string name="pdf_archivo_no_encontrado">Archivo no encontrado</string>
@@ -220,16 +257,10 @@
     <string name="descartar_cd">Descartar</string>
     <string name="marca_cd">Marca</string>
     <string name="direccion_cd">Dirección</string>
-    <string name="cadena_cd">Cadena</string>
     <string name="prioritaria_cd">Prioritaria</string>
     <string name="frecuencia_cd">Frecuencia</string>
-    <string name="store_icon_cd">Icono tienda</string>
-    <string name="promo_icon_cd">Icono promoción</string>
-    <string name="por_vencer_cd">Próximas a vencer</string>
     <string name="promociones_cd">Tiene promociones</string>
-    <string name="chevron_next_cd">Ver detalle</string>
     <string name="cerrar_cd">Cerrar</string>
-    <string name="expandido_cd">Expandido</string>
     <string name="sin_conexion_cd">Sin conexión</string>
     <string name="todas_cd">Todas</string>
 </resources>

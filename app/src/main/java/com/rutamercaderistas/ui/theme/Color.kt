@@ -54,6 +54,12 @@ val UrgencyTomorrowSoft = Color(0xFFFFF8F0)
 val ErrorRed = Color(0xFFD32F2F)
 val DiscountRed = Color(0xFFB91C1C)
 val DiscountSoft = Color(0xFFFEE2E2)
+
+// Precios de promos: tonos oscuros que cumplen contraste AA (>= 4.5:1) sobre fondos claros
+val PriceBlue = Color(0xFF005FB8)
+val PriceGreen = Color(0xFF1E7D32)
+val PricePurple = Color(0xFF6A1B9A)
+val PriceOrange = Color(0xFFB45309)
 val UrgencyBadgeSoft = Color(0xFFFEF3C7)
 val PromoGradientStart = Color(0xFFF97316)
 val PromoGradientEnd = Color(0xFFEF4444)

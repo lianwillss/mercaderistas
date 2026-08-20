@@ -46,6 +46,7 @@ import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.models.ClienteInfo
 import com.rutamercaderistas.ui.theme.ComponentShapes
+import com.rutamercaderistas.ui.theme.PriceGreen
 import kotlin.math.abs
 
 @Composable
@@ -241,11 +242,11 @@ private fun NormalBrandRow(
                         .background(MaterialTheme.colorScheme.secondaryContainer)
                         .padding(horizontal = 4.dp, vertical = 1.dp)
                 ) {
-                    Text(
-                        text = cliente.frecuenciaTexto,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
+Text(
+                    text = cliente.frecuenciaTexto,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = PriceGreen
+                )
                 }
             }
         }
@@ -300,13 +301,13 @@ fun FrequencyChip(text: String) {
         ) {
             Text(
                 text = text,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.secondary,
+                style = MaterialTheme.typography.labelMedium,
+                color = PriceGreen,
             )
             Icon(
                 imageVector = Icons.Outlined.DateRange,
                 contentDescription = stringResource(R.string.frecuencia_cd),
-                tint = MaterialTheme.colorScheme.secondary,
+                tint = PriceGreen,
                 modifier = Modifier.size(8.dp)
             )
         }

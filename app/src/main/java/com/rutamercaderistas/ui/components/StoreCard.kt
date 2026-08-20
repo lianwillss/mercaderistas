@@ -42,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
@@ -53,6 +54,7 @@ import com.rutamercaderistas.models.ClienteInfo
 import com.rutamercaderistas.models.LocalDelDia
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.LocalAppDimens
+import com.rutamercaderistas.ui.theme.PriceBlue
 import com.rutamercaderistas.ui.theme.rs
 import com.rutamercaderistas.domain.model.matchesChain
 import com.rutamercaderistas.ui.theme.storeColor
@@ -127,7 +129,7 @@ fun StoreCard(
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Store,
-                        contentDescription = stringResource(R.string.store_icon_cd),
+                        contentDescription = null,
                         tint = storeColor(local.local),
                         modifier = Modifier.size(dimens.iconSm)
                     )
@@ -143,6 +145,7 @@ fun StoreCard(
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.semantics { heading() },
                         )
                         if (hasPromos) {
                             val promosCd = stringResource(R.string.promociones_cd)
@@ -218,7 +221,7 @@ fun StoreCard(
                 }
                 Box(
                     modifier = Modifier
-                        .size(dimens.iconXl)
+                        .size(dimens.touchMin)
                         .clip(CircleShape)
                         .clickable(
                             onClick = {
@@ -247,7 +250,6 @@ fun StoreCard(
                 Spacer(modifier = Modifier.width(dimens.spacingSm))
 
                 val contadorMarcasCd = stringResource(R.string.storecard_marcas)
-                val chevronNextCd = stringResource(R.string.chevron_next_cd)
 
                 Box(
                     modifier = Modifier
@@ -265,12 +267,12 @@ fun StoreCard(
                         Text(
                             text = "${local.totalClientes}",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = PriceBlue,
                         )
                         Text(
                             text = stringResource(R.string.storecard_marcas),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = PriceBlue,
                         )
                     }
                 }
@@ -279,7 +281,7 @@ fun StoreCard(
 
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = chevronNextCd,
+                    contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                     modifier = Modifier.size(dimens.iconSm),
                 )

@@ -75,7 +75,7 @@ fun PdfGridModal(
             ) {
                 Text(
                     text = brandName ?: stringResource(R.string.pdf_seleccionar_pagina),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.weight(1f),
                 )
                 IconButton(onClick = onDismiss) {

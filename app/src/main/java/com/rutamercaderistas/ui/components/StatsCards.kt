@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.ShoppingBag
 import androidx.compose.material.icons.rounded.Store
 import androidx.compose.material.icons.rounded.Visibility
@@ -43,14 +44,14 @@ fun StatsCards(
     modifier: Modifier = Modifier,
     onLocalesClick: () -> Unit = {},
     onMarcasClick: () -> Unit = {},
+    onCodProvClick: () -> Unit = {},
     marcasConPromo: Int = 0,
 ) {
-    val dimens = LocalAppDimens.current
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = dimens.spacingSm),
-        horizontalArrangement = Arrangement.spacedBy(6.dp * rs())
+            .padding(horizontal = LocalAppDimens.current.spacingSm),
+        horizontalArrangement = Arrangement.spacedBy(4.dp * rs())
     ) {
         StatCard(
             icon = Icons.Rounded.Store,
@@ -73,8 +74,9 @@ fun StatsCards(
                 {
                     Text(
                         text = stringResource(R.string.stats_con_promo, marcasConPromo),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error,
+                        maxLines = 1,
                     )
                 }
             } else null
@@ -85,6 +87,15 @@ fun StatsCards(
             label = stringResource(R.string.stats_visitas_label),
             containerColor = MaterialTheme.colorScheme.tertiaryContainer,
             iconColor = MaterialTheme.colorScheme.tertiary,
+            modifier = Modifier.weight(1f)
+        )
+        StatCard(
+            icon = Icons.Rounded.Badge,
+            value = CodProvItems.size,
+            label = stringResource(R.string.stats_cod_prov_label),
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            iconColor = MaterialTheme.colorScheme.primary,
+            onClick = onCodProvClick,
             modifier = Modifier.weight(1f)
         )
     }
@@ -101,7 +112,11 @@ private fun StatCard(
     onClick: () -> Unit = {},
     badge: (@Composable () -> Unit)? = null,
 ) {
-    val dimens = LocalAppDimens.current
+    val factor = rs()
+    val chipSize = 18.dp * factor
+    val iconSize = 12.dp * factor
+    val padV = 3.dp * factor
+    val padH = 5.dp * factor
     Card(
         onClick = onClick,
         modifier = modifier,
@@ -112,12 +127,12 @@ private fun StatCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(dimens.spacingSm),
+                .padding(horizontal = padH, vertical = padV),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(
                 modifier = Modifier
-                    .size(dimens.iconXl)
+                    .size(chipSize)
                     .clip(CircleShape)
                     .background(containerColor.copy(alpha = 0.4f)),
                 contentAlignment = Alignment.Center
@@ -126,24 +141,26 @@ private fun StatCard(
                     imageVector = icon,
                     contentDescription = null,
                     tint = iconColor,
-                    modifier = Modifier.size(dimens.iconSm)
+                    modifier = Modifier.size(iconSize)
                 )
             }
-            Spacer(modifier = Modifier.height(3.dp * rs()))
+            Spacer(modifier = Modifier.height(1.dp * factor))
             Text(
                 text = "$value",
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            if (badge != null) {
-                Spacer(modifier = Modifier.height(2.dp * rs()))
-                badge()
-            }
+            Spacer(modifier = Modifier.height(1.dp * factor))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
             )
+            if (badge != null) {
+                Spacer(modifier = Modifier.height(1.dp * factor))
+                badge()
+            }
         }
     }
 }

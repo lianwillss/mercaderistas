@@ -46,6 +46,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.rutamercaderistas.R
 import com.rutamercaderistas.models.DiaSemana
+import com.rutamercaderistas.ui.components.CodProvModal
 import com.rutamercaderistas.ui.components.DaySelector
 import com.rutamercaderistas.ui.components.HeaderSection
 import com.rutamercaderistas.ui.components.PromoExpiringSoonModal
@@ -94,6 +95,7 @@ fun MainRouteContent(
 
     var searchActive by remember { mutableStateOf(false) }
     var showExpiringSoon by remember { mutableStateOf(false) }
+    var showCodProv by remember { mutableStateOf(false) }
 
     val activeDayNumbers by remember(activeDays) {
         derivedStateOf { activeDays.map { day -> diaDelMes(day) } }
@@ -180,6 +182,7 @@ fun MainRouteContent(
                     stats = stats,
                     onLocalesClick = onNavigateToAllLocales,
                     onMarcasClick = onNavigateToPromotions,
+                    onCodProvClick = { showCodProv = true },
                     marcasConPromo = routeState.marcasConPromo,
                 )
                 Spacer(modifier = Modifier.height(dimens.spacingXxl))
@@ -302,6 +305,11 @@ fun MainRouteContent(
             onDismiss = { showExpiringSoon = false },
         )
     }
+
+    CodProvModal(
+        visible = showCodProv,
+        onDismiss = { showCodProv = false },
+    )
 }
 
 @Composable

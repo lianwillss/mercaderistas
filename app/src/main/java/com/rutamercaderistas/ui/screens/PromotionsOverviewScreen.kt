@@ -19,8 +19,9 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -354,9 +355,11 @@ fun PromotionsOverviewScreen(
                     }
                 }
             } else {
-                LazyColumn(
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 480.dp),
                     contentPadding = PaddingValues(start = dimens.spacingLg, end = dimens.spacingLg, top = dimens.spacingXs, bottom = dimens.contentPaddingBottom),
                     verticalArrangement = Arrangement.spacedBy(dimens.spacingXxl),
+                    horizontalArrangement = Arrangement.spacedBy(dimens.spacingLg),
                 ) {
                     itemsIndexed(
                         items = filteredEntries,
