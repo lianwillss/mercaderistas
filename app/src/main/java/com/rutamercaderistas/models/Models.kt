@@ -34,7 +34,8 @@ data class EntradaRuta(
     val jueves: Boolean = false,
     val viernes: Boolean = false,
     val sabado: Boolean = false,
-    val domingo: Boolean = false
+    val domingo: Boolean = false,
+    val codEan: String = "",
 ) {
     // Cuántos días a la semana se visita esta marca en este local
     val frecuencia: Int get() =

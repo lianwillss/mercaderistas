@@ -14,8 +14,8 @@ android {
         applicationId "com.rutamercaderistas"
         minSdk 26
         targetSdk 35
-        versionCode 11063
-        versionName "11.63"
+        versionCode 11064
+        versionName "11.64"
         resConfigs "es"
         buildConfigField "String", "SENTRY_DSN", '""'
     }
@@ -159,6 +159,8 @@ dependencies {
     // ── ML Kit OCR para detectar marcas en el PDF ────────────────────
     implementation libs.mlkit.text.recognition
 
+    implementation libs.zxing.core
+    implementation libs.zxing.android.embedded
     // ── DataStore Preferences para rutas recientes ────────────────────
     implementation libs.datastore.preferences
 

@@ -29,6 +29,7 @@ import androidx.navigation.toRoute
 import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.ui.navigation.AllLocalesRoute
+import com.rutamercaderistas.ui.navigation.EanSearchRoute
 import com.rutamercaderistas.ui.navigation.MainRoute
 import com.rutamercaderistas.ui.navigation.ManualRoute
 import com.rutamercaderistas.ui.navigation.PromotionsRoute
@@ -104,6 +105,11 @@ fun MainScreen(
                 onBrandClick = onBrandClick,
                 onAddressClick = onAddressClick,
                 onShareLocal = onShareLocal,
+                onCodEanClick = {
+                    navController.navigate(EanSearchRoute) {
+                        launchSingleTop = true
+                    }
+                },
             )
         }
         composable<AllLocalesRoute>(
@@ -151,6 +157,14 @@ fun MainScreen(
             popExitTransition = { slideDownExit },
         ) {
             ManualScreen(onClose = { navController.popBackStack() })
+        }
+        composable<EanSearchRoute>(
+            enterTransition = { slideUpEnter },
+            exitTransition = { slideDownExit },
+            popEnterTransition = { slideDownEnter },
+            popExitTransition = { slideDownExit },
+        ) {
+            EanSearchScreen(onBack = { navController.popBackStack() })
         }
     }
 }

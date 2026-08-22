@@ -54,11 +54,11 @@
     <string name="header_menu_cd">Menú</string>
 
     <!-- Stats -->
-    <string name="stats_locales_label">Locales</string>
+<string name="stats_locales_label">Locales</string>
     <string name="stats_marcas_label">Marcas</string>
     <string name="stats_visitas_label">Visitas</string>
-    <string name="stats_con_promo">%d con promo</string>
     <string name="stats_cod_prov_label">Cod. Prov</string>
+    <string name="stats_cod_ean_label">Cod. EAN</string>
 
     <!-- Códigos de proveedor -->
     <string name="cod_prov_title">Códigos de proveedor</string>
@@ -263,4 +263,23 @@
     <string name="cerrar_cd">Cerrar</string>
     <string name="sin_conexion_cd">Sin conexión</string>
     <string name="todas_cd">Todas</string>
+
+    <!-- EAN Search -->
+    <string name="ean_search_title">Buscar EAN / Código de Barras</string>
+    <string name="ean_search_placeholder">EAN, SKU, Cód. Proveedor o escanear…</string>
+    <string name="ean_results_count">%d resultados</string>
+    <string name="escanear_codigo_barras">Escanear código de barras</string>
+    <string name="reintentar_carga">Reintentar carga</string>
+    <string name="ean_codigo_label">Código EAN: %s</string>
+    <string name="ean_barcode_title">Código de barras</string>
+    <string name="ean_barcode_cd">Código de barras del producto %s</string>
+    <string name="ean_barcode_zoom_hint">Toca para ampliar y verificar el código</string>
+    <string name="ean_zoom_cd">Ampliar código de barras</string>
+    <string name="ean_refresh_cd">Actualizar catálogo EAN</string>
+    <string name="ean_empty_results">Sin resultados para \"%s\"</string>
+    <string name="ean_copy_cd">Copiar EAN</string>
+    <string name="ean_copied">EAN copiado al portapapeles</string>
+    <string name="ean_loading_cd">Cargando catálogo</string>
+    <string name="ean_scanning_cd">Iniciando escáner</string>
+    <string name="ean_search_label">Buscar producto por nombre, EAN o SKU</string>
 </resources>

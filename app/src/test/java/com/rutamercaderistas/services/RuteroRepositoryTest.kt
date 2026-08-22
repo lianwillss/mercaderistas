@@ -1,7 +1,10 @@
 package com.rutamercaderistas.services
 
+import com.rutamercaderistas.data.local.EanProductDao
 import com.rutamercaderistas.models.DiaSemana
 import com.rutamercaderistas.models.EntradaRuta
+import io.mockk.coEvery
+import io.mockk.mockk
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -17,7 +20,10 @@ class RuteroRepositoryTest {
 
     @Before
     fun setUp() {
-        repository = RuteroRepository()
+        val eanDao = mockk<EanProductDao>(relaxed = true) {
+            coEvery { countValidEan() } returns 0
+        }
+        repository = RuteroRepository(eanDao)
     }
 
     @Test

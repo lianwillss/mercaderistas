@@ -122,7 +122,7 @@ fun ShimmerStatsCards(modifier: Modifier = Modifier) {
             .padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        repeat(4) {
+        repeat(5) {
             Column(
                 modifier = Modifier
                     .weight(1f)

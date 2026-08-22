@@ -2,6 +2,7 @@ package com.rutamercaderistas.di
 
 import android.content.Context
 import com.rutamercaderistas.data.local.AppDatabase
+import com.rutamercaderistas.data.local.EanProductDao
 import com.rutamercaderistas.data.local.PromotionDao
 import com.rutamercaderistas.data.local.RouteEntryDao
 import com.rutamercaderistas.services.RecentRoutesStore
@@ -33,6 +34,12 @@ object AppModule {
     @Singleton
     fun providePromotionDao(db: AppDatabase): PromotionDao {
         return db.promotionDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideEanProductDao(db: AppDatabase): EanProductDao {
+        return db.eanProductDao()
     }
 
     @Provides

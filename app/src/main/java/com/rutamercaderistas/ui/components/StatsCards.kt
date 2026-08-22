@@ -17,6 +17,7 @@ import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.ShoppingBag
 import androidx.compose.material.icons.rounded.Store
 import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.FormatAlignJustify
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -45,6 +46,7 @@ fun StatsCards(
     onLocalesClick: () -> Unit = {},
     onMarcasClick: () -> Unit = {},
     onCodProvClick: () -> Unit = {},
+    onCodEanClick: () -> Unit = {},
     marcasConPromo: Int = 0,
 ) {
     Row(
@@ -73,7 +75,7 @@ fun StatsCards(
             badge = if (marcasConPromo > 0) {
                 {
                     Text(
-                        text = stringResource(R.string.stats_con_promo, marcasConPromo),
+                        text = stringResource(R.string.marcas_con_promociones, marcasConPromo),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error,
                         maxLines = 1,
@@ -96,6 +98,15 @@ fun StatsCards(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
             iconColor = MaterialTheme.colorScheme.primary,
             onClick = onCodProvClick,
+            modifier = Modifier.weight(1f)
+        )
+        StatCard(
+            icon = Icons.Rounded.FormatAlignJustify,
+            value = stats.totalCodEan,
+            label = stringResource(R.string.stats_cod_ean_label),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            onClick = onCodEanClick,
             modifier = Modifier.weight(1f)
         )
     }

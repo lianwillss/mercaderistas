@@ -1,5 +1,6 @@
 package com.rutamercaderistas.services
 
+import com.rutamercaderistas.data.local.EanProductDao
 import com.rutamercaderistas.models.ClienteInfo
 import timber.log.Timber
 import com.rutamercaderistas.models.DiaSemana
@@ -16,7 +17,9 @@ import javax.inject.Singleton
  * RuteroRepository: Maneja únicamente los datos de la ruta ACTIVA.
  */
 @Singleton
-class RuteroRepository @Inject constructor() {
+class RuteroRepository @Inject constructor(
+    private val eanProductDao: EanProductDao,
+) {
     private val _entriesFlow = MutableStateFlow<List<EntradaRuta>>(emptyList())
     val entriesFlow: StateFlow<List<EntradaRuta>> = _entriesFlow.asStateFlow()
 
@@ -26,7 +29,7 @@ class RuteroRepository @Inject constructor() {
     /**
      * Establece los datos de la ruta seleccionada.
      */
-    fun setEntries(entries: List<EntradaRuta>, ruteroName: String) {
+    suspend fun setEntries(entries: List<EntradaRuta>, ruteroName: String) {
         activeRuteroName = ruteroName
         val normalized = entries.map { e ->
             e.copy(codigo = e.codigo.trim(), local = e.local.trim())
@@ -92,7 +95,7 @@ class RuteroRepository @Inject constructor() {
         return _entriesFlow.value.any { isAssignedForDay(it, dia) }
     }
 
-    fun getStats(): Stats {
+    suspend fun getStats(): Stats {
         return cachedStats ?: computeStats(_entriesFlow.value).also { cachedStats = it }
     }
 
@@ -122,15 +125,17 @@ class RuteroRepository @Inject constructor() {
             }
     }
 
-    private fun computeStats(entries: List<EntradaRuta>): Stats {
+    private suspend fun computeStats(entries: List<EntradaRuta>): Stats {
         val localesUnicos = entries.distinctBy { it.codigo.uppercase() + it.local.uppercase() }.size
         val marcasTotales = entries.distinctBy { it.cliente }.size
-        return Stats(localesUnicos, marcasTotales, entries.size)
+        val totalCodEan = eanProductDao.countValidEan()
+        return Stats(localesUnicos, marcasTotales, entries.size, totalCodEan)
     }
 
     data class Stats(
         val totalLocales: Int,
         val totalMarcas: Int,
-        val visitasTotales: Int
+        val visitasTotales: Int,
+        val totalCodEan: Int = 0
     )
 }

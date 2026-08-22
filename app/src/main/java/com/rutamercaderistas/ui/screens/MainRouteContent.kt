@@ -83,6 +83,7 @@ fun MainRouteContent(
     onBrandClick: (String) -> Unit,
     onAddressClick: (String) -> Unit,
     onShareLocal: (String) -> Unit,
+    onCodEanClick: () -> Unit = {},
 ) {
     val entries = routeState.entries
     val selectedRoute = routeState.selectedRoute
@@ -183,6 +184,7 @@ fun MainRouteContent(
                     onLocalesClick = onNavigateToAllLocales,
                     onMarcasClick = onNavigateToPromotions,
                     onCodProvClick = { showCodProv = true },
+                    onCodEanClick = onCodEanClick,
                     marcasConPromo = routeState.marcasConPromo,
                 )
                 Spacer(modifier = Modifier.height(dimens.spacingXxl))

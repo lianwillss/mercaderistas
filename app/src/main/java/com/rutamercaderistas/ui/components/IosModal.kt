@@ -29,8 +29,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import com.rutamercaderistas.R
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -48,6 +51,7 @@ fun IosModal(
     onConfirm: (() -> Unit)? = null,
     dismissText: String? = null,
     onDismissAction: (() -> Unit)? = null,
+    scrimColor: Color = Color.Black.copy(alpha = 0.7f),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     if (visible) {
@@ -59,7 +63,7 @@ fun IosModal(
             Box(
                 modifier = modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.scrim)
+                    .background(scrimColor)
                     .clickable(onClick = onDismiss),
                 contentAlignment = Alignment.Center,
             ) {
@@ -93,6 +97,7 @@ fun IosModal(
                                         text = title,
                                         style = MaterialTheme.typography.headlineSmall,
                                         color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.semantics { heading() },
                                     )
                                     if (subtitle != null) {
                                         Spacer(modifier = Modifier.height(4.dp))

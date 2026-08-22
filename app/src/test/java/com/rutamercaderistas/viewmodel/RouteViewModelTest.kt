@@ -3,6 +3,7 @@ package com.rutamercaderistas.viewmodel
 import android.content.Context
 import com.rutamercaderistas.R
 import com.rutamercaderistas.data.export.RouteExporter
+import com.rutamercaderistas.data.local.EanProductDao
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.data.preferences.FileRepository
 import com.rutamercaderistas.data.preferences.PreferencesRepository
@@ -69,7 +70,9 @@ class RouteViewModelTest {
             every { recentRoutesFlow } returns MutableStateFlow(emptyList())
         }
         routeExporter = mockk(relaxed = true)
-        repository = RuteroRepository()
+        repository = RuteroRepository(mockk<EanProductDao>(relaxed = true) {
+            coEvery { countValidEan() } returns 0
+        })
         promotionRepository = mockk(relaxed = true) {
             coEvery { getAllPromotions() } returns emptyList()
             coEvery { refresh() } returns true
