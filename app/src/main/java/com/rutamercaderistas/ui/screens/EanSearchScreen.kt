@@ -85,6 +85,10 @@ import com.rutamercaderistas.viewmodel.EanSearchViewModel
 
 private val barcodeCache = LruCache<String, Bitmap>(64)
 
+private sealed interface EanResultRow
+private data class EanBrandRow(val brand: String) : EanResultRow
+private data class EanProductRow(val product: EanProductEntity) : EanResultRow
+
 @Composable
 fun EanSearchScreen(
     viewModel: EanSearchViewModel = hiltViewModel(),
@@ -306,6 +310,16 @@ fun EanSearchScreen(
                     if (value.query.isNotBlank() && value.results.isEmpty()) {
                         EanEmptyState(query = value.query)
                     } else {
+                        val rows = remember(value.results) {
+                            buildList<EanResultRow> {
+                                value.results
+                                    .groupBy { it.marca.ifBlank { "\u0000" } }
+                                    .forEach { (brandKey, products) ->
+                                        add(EanBrandRow(brandKey))
+                                        products.forEach { add(EanProductRow(it)) }
+                                    }
+                            }
+                        }
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(
@@ -314,11 +328,23 @@ fun EanSearchScreen(
                             ),
                             verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
                         ) {
-                            items(value.results, key = { it.id }) { product ->
-                                EanProductCard(
-                                    product = product,
-                                    onBarcodeClick = { zoomProduct = product },
-                                )
+                            items(rows, key = {
+                                when (it) {
+                                    is EanBrandRow -> "brand_${it.brand}"
+                                    is EanProductRow -> it.product.id
+                                }
+                            }) { row ->
+                                when (row) {
+                                    is EanBrandRow -> EanBrandHeader(
+                                        title = if (row.brand == "\u0000")
+                                            stringResource(R.string.ean_sin_marca)
+                                        else row.brand,
+                                    )
+                                    is EanProductRow -> EanProductCard(
+                                        product = row.product,
+                                        onBarcodeClick = { zoomProduct = row.product },
+                                    )
+                                }
                             }
                         }
                     }
@@ -493,6 +519,24 @@ private fun EanProductCard(
             }
         }
     }
+}
+
+@Composable
+private fun EanBrandHeader(title: String) {
+    val dimens = LocalAppDimens.current
+    val headerBg = MaterialTheme.colorScheme.background.let { c ->
+        Color(c.red * 0.85f, c.green * 0.85f, c.blue * 0.85f, c.alpha)
+    }
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(headerBg)
+            .padding(horizontal = dimens.spacingMd, vertical = 4.dp)
+            .semantics { heading() },
+    )
 }
 
 @Composable

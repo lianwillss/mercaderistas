@@ -271,6 +271,7 @@
     <string name="ean_search_title">Buscar EAN / Código de Barras</string>
     <string name="ean_search_placeholder">EAN, SKU, Cód. Proveedor o escanear…</string>
     <string name="ean_results_count">%d resultados</string>
+    <string name="ean_sin_marca">Sin marca</string>
     <string name="escanear_codigo_barras">Escanear código de barras</string>
     <string name="reintentar_carga">Reintentar carga</string>
     <string name="ean_codigo_label">Código EAN: %s</string>
