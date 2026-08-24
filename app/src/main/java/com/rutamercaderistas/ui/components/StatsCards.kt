@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CircleShape
@@ -17,7 +18,6 @@ import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.ShoppingBag
 import androidx.compose.material.icons.rounded.Store
 import androidx.compose.material.icons.rounded.Visibility
-import androidx.compose.material.icons.rounded.FormatAlignJustify
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -31,12 +31,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.R
 import com.rutamercaderistas.services.RuteroRepository
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.LocalAppDimens
+import com.rutamercaderistas.ui.theme.AccentOrangeSoft
+import com.rutamercaderistas.ui.theme.PriceBlue
+import com.rutamercaderistas.ui.theme.PriceGreen
+import com.rutamercaderistas.ui.theme.PriceOrange
 import com.rutamercaderistas.ui.theme.rs
 
 @Composable
@@ -68,20 +74,12 @@ fun StatsCards(
             icon = Icons.Rounded.ShoppingBag,
             value = stats.totalMarcas,
             label = stringResource(R.string.stats_marcas_label),
+            labelColor = MaterialTheme.colorScheme.onSurface,
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
             iconColor = MaterialTheme.colorScheme.secondary,
             onClick = onMarcasClick,
             modifier = Modifier.weight(1f),
-            badge = if (marcasConPromo > 0) {
-                {
-                    Text(
-                        text = stringResource(R.string.marcas_con_promociones, marcasConPromo),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error,
-                        maxLines = 1,
-                    )
-                }
-            } else null
+            promoCount = marcasConPromo,
         )
         StatCard(
             icon = Icons.Rounded.Visibility,
@@ -100,12 +98,7 @@ fun StatsCards(
             onClick = onCodProvClick,
             modifier = Modifier.weight(1f)
         )
-        StatCard(
-            icon = Icons.Rounded.FormatAlignJustify,
-            value = stats.totalCodEan,
-            label = stringResource(R.string.stats_cod_ean_label),
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-            iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        EanAccessCard(
             onClick = onCodEanClick,
             modifier = Modifier.weight(1f)
         )
@@ -121,16 +114,19 @@ private fun StatCard(
     iconColor: Color,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {},
-    badge: (@Composable () -> Unit)? = null,
+    labelColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    subtitle: String? = null,
+    subtitleColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    promoCount: Int = 0,
 ) {
     val factor = rs()
     val chipSize = 18.dp * factor
     val iconSize = 12.dp * factor
-    val padV = 3.dp * factor
+    val padV = 2.dp * factor
     val padH = 5.dp * factor
     Card(
         onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.height(98.dp * factor),
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = containerColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
@@ -158,20 +154,113 @@ private fun StatCard(
             Spacer(modifier = Modifier.height(1.dp * factor))
             Text(
                 text = "$value",
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Spacer(modifier = Modifier.height(1.dp * factor))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = labelColor,
                 maxLines = 1,
             )
-            if (badge != null) {
+            if (subtitle != null) {
                 Spacer(modifier = Modifier.height(1.dp * factor))
-                badge()
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = subtitleColor,
+                    maxLines = 1,
+                )
             }
+            if (promoCount > 0) {
+                Spacer(modifier = Modifier.height(2.dp * factor))
+                Box(
+                    modifier = Modifier
+                        .background(AccentOrangeSoft, RoundedCornerShape(50))
+                        .padding(horizontal = 6.dp * factor, vertical = 1.dp * factor),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_promo),
+                                contentDescription = null,
+                                tint = PriceOrange,
+                                modifier = Modifier.size(10.dp * factor)
+                            )
+                            Spacer(modifier = Modifier.width(2.dp * factor))
+                            Text(
+                                text = "$promoCount",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = PriceOrange,
+                                maxLines = 1,
+                            )
+                        }
+                        Text(
+                            text = stringResource(R.string.promociones_word),
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                            color = PriceOrange,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EanAccessCard(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val factor = rs()
+    val chipSize = 18.dp * factor
+    val iconSize = 12.dp * factor
+    val padV = 2.dp * factor
+    val padH = 5.dp * factor
+    Card(
+        onClick = onClick,
+        modifier = modifier.height(98.dp * factor),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = padH, vertical = padV),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(chipSize)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_barcode),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(iconSize)
+                )
+            }
+            Spacer(modifier = Modifier.height(1.dp * factor))
+            Text(
+                text = stringResource(R.string.stats_cod_ean_label),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+            )
+            Spacer(modifier = Modifier.height(1.dp * factor))
+            Text(
+                text = stringResource(R.string.ean_tap_to_search),
+                style = MaterialTheme.typography.labelSmall,
+                color = PriceBlue,
+                maxLines = 1,
+            )
         }
     }
 }

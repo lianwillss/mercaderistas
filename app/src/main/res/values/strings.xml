@@ -56,6 +56,9 @@
     <!-- Stats -->
 <string name="stats_locales_label">Locales</string>
     <string name="stats_marcas_label">Marcas</string>
+    <string name="stats_marcas_subtitle">Sin promociones</string>
+    <string name="promociones_count">%d PROMOCIONES</string>
+    <string name="promociones_word">PROMOCIONES</string>
     <string name="stats_visitas_label">Visitas</string>
     <string name="stats_cod_prov_label">Cod. Prov</string>
     <string name="stats_cod_ean_label">Cod. EAN</string>
@@ -279,6 +282,7 @@
     <string name="ean_empty_results">Sin resultados para \"%s\"</string>
     <string name="ean_copy_cd">Copiar EAN</string>
     <string name="ean_copied">EAN copiado al portapapeles</string>
+    <string name="ean_tap_to_search">Buscar</string>
     <string name="ean_loading_cd">Cargando catálogo</string>
     <string name="ean_scanning_cd">Iniciando escáner</string>
     <string name="ean_search_label">Buscar producto por nombre, EAN o SKU</string>
