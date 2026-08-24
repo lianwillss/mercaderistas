@@ -490,21 +490,6 @@ private fun EanProductCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-
-                if (product.unBase.isNotBlank() || product.unPedido.isNotBlank() || product.conversion.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = buildString {
-                            if (product.unBase.isNotBlank()) append("Base: ${product.unBase}")
-                            if (product.unPedido.isNotBlank()) append(" · Pedido: ${product.unPedido}")
-                            if (product.conversion.isNotBlank()) append(" · Conv: ${product.conversion}")
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
             }
         }
     }

@@ -13,12 +13,13 @@ import java.io.InputStream
 import java.text.Normalizer
 import javax.inject.Inject
 
-const val EAN_DATA_VERSION = 1
+const val EAN_DATA_VERSION = 2
 
 // Prefijo/sufijo de los archivos Excel de catálogo EAN en assets.
-// Para agregar más productos basta con soltar otro archivo "ean_*.xlsx"
-// en app/src/main/assets/: la app los combina automáticamente al importar.
-private const val EAN_ASSET_PREFIX = "ean_"
+// Para agregar más productos basta con soltar otro archivo "ean*.xlsx"
+// (p. ej. "ean loveco.xlsx", "ean_otromarca.xlsx") en app/src/main/assets/:
+// la app los combina automáticamente al importar.
+private const val EAN_ASSET_PREFIX = "ean"
 private const val EAN_ASSET_SUFFIX = ".xlsx"
 
 fun normalizeSearch(text: String): String {
@@ -32,28 +33,22 @@ class EanExcelParser @Inject constructor(
     private val eanProductDao: EanProductDao,
 ) {
 
-    // Column indices based on the Excel structure
-    private companion object {
-        const val COL_COD_CENCOSUD = 0
-        const val COL_COD_PROVEEDOR = 1
-        const val COL_EAN_PRINCIPAL = 2
-        const val COL_DESCRIPCION = 3
-        const val COL_UNNAMED_4 = 4
-        const val COL_MARCA = 5
-        const val COL_UN_BASE = 6
-        const val COL_UN_PEDIDO = 7
-        const val COL_CONVERSION = 8
-        const val COL_ESTADO = 9
-        const val COL_CAT_N1_CENCOSUD = 10
-        const val COL_CAT_N2_CENCOSUD = 11
-        const val COL_CAT_N3_CENCOSUD = 12
-        const val COL_CAT_N4_CENCOSUD = 13
-        const val COL_CAT_N1_PROVEEDOR = 14
-        const val COL_CAT_N2_PROVEEDOR = 15
-        const val COL_CAT_N3_PROVEEDOR = 16
-        const val COL_CAT_N4_PROVEEDOR = 17
-        const val COL_CODIGO_BARRA = 18
-    }
+    // Mapea columnas por NOMBRE de encabezado (no por posición fija), porque
+    // distintos archivos "ean*.xlsx" pueden tener distinto orden de columnas.
+    private data class ColumnMap(
+        val codCencosud: Int? = null,
+        val codProveedor: Int? = null,
+        val eanPrincipal: Int? = null,
+        val descripcion: Int? = null,
+        val marca: Int? = null,
+        val unBase: Int? = null,
+        val unPedido: Int? = null,
+        val conversion: Int? = null,
+        val estado: Int? = null,
+        val codigoBarra: Int? = null,
+        val catCencosud: List<Int?> = listOf(null, null, null, null),
+        val catProveedor: List<Int?> = listOf(null, null, null, null),
+    )
 
     suspend fun parseAndSave(inputStream: InputStream): Result<Int> {
         return try {
@@ -72,44 +67,99 @@ class EanExcelParser @Inject constructor(
     private fun parse(inputStream: InputStream): List<EanProductEntity> {
         val workbook = XSSFWorkbook(inputStream)
         val sheet = workbook.getSheetAt(0)
-        val products = mutableListOf<EanProductEntity>()
-
-        var rowNum = 0
-        for (row in sheet) {
-            rowNum++
-            if (rowNum == 1) continue // Skip header row
-
-            val product = parseRow(row)
-            if (product != null) {
-                products.add(product)
-            }
+        val rows = sheet.iterator()
+        if (!rows.hasNext()) {
+            workbook.close()
+            return emptyList()
         }
-
+        val columnMap = buildColumnMap(rows.next())
+        val products = mutableListOf<EanProductEntity>()
+        while (rows.hasNext()) {
+            val product = parseRow(rows.next(), columnMap)
+            if (product != null) products.add(product)
+        }
         workbook.close()
         return products
     }
 
-    private fun parseRow(row: Row): EanProductEntity? {
-        val codCencosud = getStringCellValue(row.getCell(COL_COD_CENCOSUD))
-        val codProveedor = getStringCellValue(row.getCell(COL_COD_PROVEEDOR))
-        val eanPrincipal = getStringCellValue(row.getCell(COL_EAN_PRINCIPAL))
-        val descripcion = getStringCellValue(row.getCell(COL_DESCRIPCION))
-        val marca = getStringCellValue(row.getCell(COL_MARCA))
-        val unBase = getStringCellValue(row.getCell(COL_UN_BASE))
-        val unPedido = getStringCellValue(row.getCell(COL_UN_PEDIDO))
-        val conversion = getStringCellValue(row.getCell(COL_CONVERSION))
-        val estado = getStringCellValue(row.getCell(COL_ESTADO))
-        val catN1Cencosud = getStringCellValue(row.getCell(COL_CAT_N1_CENCOSUD))
-        val catN2Cencosud = getStringCellValue(row.getCell(COL_CAT_N2_CENCOSUD))
-        val catN3Cencosud = getStringCellValue(row.getCell(COL_CAT_N3_CENCOSUD))
-        val catN4Cencosud = getStringCellValue(row.getCell(COL_CAT_N4_CENCOSUD))
-        val catN1Proveedor = getStringCellValue(row.getCell(COL_CAT_N1_PROVEEDOR))
-        val catN2Proveedor = getStringCellValue(row.getCell(COL_CAT_N2_PROVEEDOR))
-        val catN3Proveedor = getStringCellValue(row.getCell(COL_CAT_N3_PROVEEDOR))
-        val catN4Proveedor = getStringCellValue(row.getCell(COL_CAT_N4_PROVEEDOR))
-        val codigoBarra = getStringCellValue(row.getCell(COL_CODIGO_BARRA))
+    private fun buildColumnMap(headerRow: Row): ColumnMap {
+        var codCencosud: Int? = null
+        var codProveedor: Int? = null
+        var eanPrincipal: Int? = null
+        var descripcion: Int? = null
+        var marca: Int? = null
+        var unBase: Int? = null
+        var unPedido: Int? = null
+        var conversion: Int? = null
+        var estado: Int? = null
+        var codigoBarra: Int? = null
+        val catCencosud = mutableListOf<Int?>(null, null, null, null)
+        val catProveedor = mutableListOf<Int?>(null, null, null, null)
 
-        // Skip rows with no meaningful data
+        for (cell in headerRow) {
+            val col = cell.columnIndex
+            val h = normalizeSearch(getStringCellValue(cell))
+            when {
+                "cat" in h -> {
+                    val level = Regex("""\d""").find(h)?.value?.toIntOrNull()
+                    if (level != null && level in 1..4) {
+                        if ("proveedor" in h) catProveedor[level - 1] = col
+                        else catCencosud[level - 1] = col
+                    }
+                }
+                "barra" in h -> codigoBarra = col
+                "cencosud" in h -> codCencosud = col
+                "proveedor" in h -> codProveedor = col
+                "marca" in h -> marca = col
+                "estado" in h -> estado = col
+                "conversion" in h || "convers" in h -> conversion = col
+                "pedido" in h -> unPedido = col
+                "base" in h -> unBase = col
+                "descrip" in h -> descripcion = col
+                "ean" in h -> eanPrincipal = col
+            }
+        }
+        return ColumnMap(
+            codCencosud = codCencosud,
+            codProveedor = codProveedor,
+            eanPrincipal = eanPrincipal,
+            descripcion = descripcion,
+            marca = marca,
+            unBase = unBase,
+            unPedido = unPedido,
+            conversion = conversion,
+            estado = estado,
+            codigoBarra = codigoBarra,
+            catCencosud = catCencosud,
+            catProveedor = catProveedor,
+        )
+    }
+
+    private fun parseRow(row: Row, map: ColumnMap): EanProductEntity? {
+        val codCencosud = map.codCencosud?.let { getStringCellValue(row.getCell(it)) } ?: ""
+        val codProveedor = map.codProveedor?.let { getStringCellValue(row.getCell(it)) } ?: ""
+        val rawEan = map.eanPrincipal?.let { getStringCellValue(row.getCell(it)) } ?: ""
+        val descripcion = map.descripcion?.let { getStringCellValue(row.getCell(it)) } ?: ""
+        val marca = map.marca?.let { getStringCellValue(row.getCell(it)) } ?: ""
+        val unBase = map.unBase?.let { getStringCellValue(row.getCell(it)) } ?: ""
+        val unPedido = map.unPedido?.let { getStringCellValue(row.getCell(it)) } ?: ""
+        val conversion = map.conversion?.let { getStringCellValue(row.getCell(it)) } ?: ""
+        val estado = map.estado?.let { getStringCellValue(row.getCell(it)) } ?: ""
+        val catN1Cencosud = map.catCencosud[0]?.let { getStringCellValue(row.getCell(it)) } ?: ""
+        val catN2Cencosud = map.catCencosud[1]?.let { getStringCellValue(row.getCell(it)) } ?: ""
+        val catN3Cencosud = map.catCencosud[2]?.let { getStringCellValue(row.getCell(it)) } ?: ""
+        val catN4Cencosud = map.catCencosud[3]?.let { getStringCellValue(row.getCell(it)) } ?: ""
+        val catN1Proveedor = map.catProveedor[0]?.let { getStringCellValue(row.getCell(it)) } ?: ""
+        val catN2Proveedor = map.catProveedor[1]?.let { getStringCellValue(row.getCell(it)) } ?: ""
+        val catN3Proveedor = map.catProveedor[2]?.let { getStringCellValue(row.getCell(it)) } ?: ""
+        val catN4Proveedor = map.catProveedor[3]?.let { getStringCellValue(row.getCell(it)) } ?: ""
+        val codigoBarra = map.codigoBarra?.let { getStringCellValue(row.getCell(it)) } ?: ""
+
+        // El EAN real suele estar en "Código de Barra" (a veces con ceros
+        // iniciales y asteriscos). Si está presente y es numérico, se prefiere.
+        val cleanedBarra = codigoBarra.replace(Regex("""\D"""), "")
+        val eanPrincipal = if (cleanedBarra.isNotBlank()) cleanedBarra else rawEan
+
         if (eanPrincipal.isBlank() && codCencosud.isBlank() && codigoBarra.isBlank() && descripcion.isBlank()) {
             return null
         }
@@ -161,7 +211,10 @@ class EanExcelParser @Inject constructor(
     suspend fun loadFromAssets(): Result<Int> {
         return try {
             val assetFiles = (context.assets.list("") ?: emptyArray())
-                .filter { it.startsWith(EAN_ASSET_PREFIX) && it.endsWith(EAN_ASSET_SUFFIX) }
+                .filter {
+                    it.startsWith(EAN_ASSET_PREFIX, ignoreCase = true) &&
+                        it.endsWith(EAN_ASSET_SUFFIX, ignoreCase = true)
+                }
                 .sorted()
             if (assetFiles.isEmpty()) {
                 return Result.failure(IllegalStateException("No se encontraron archivos EAN en assets"))
