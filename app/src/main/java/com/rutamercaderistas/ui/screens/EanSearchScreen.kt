@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -62,6 +63,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -78,7 +80,23 @@ import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.EanProductEntity
 import com.rutamercaderistas.ui.components.IosModal
+import com.rutamercaderistas.services.brandNote
+import com.rutamercaderistas.services.normalizeSearch
+import com.rutamercaderistas.ui.theme.AccentBlue
+import com.rutamercaderistas.ui.theme.AccentBlueSoft
+import com.rutamercaderistas.ui.theme.AccentGreen
+import com.rutamercaderistas.ui.theme.AccentGreenSoft
+import com.rutamercaderistas.ui.theme.AccentOrange
+import com.rutamercaderistas.ui.theme.AccentOrangeSoft
 import com.rutamercaderistas.ui.theme.LocalAppDimens
+import com.rutamercaderistas.ui.theme.StoreColorFuchsia
+import com.rutamercaderistas.ui.theme.StoreColorFuchsiaSoft
+import com.rutamercaderistas.ui.theme.StoreColorPurple
+import com.rutamercaderistas.ui.theme.StoreColorPurpleSoft
+import com.rutamercaderistas.ui.theme.StoreColorRed
+import com.rutamercaderistas.ui.theme.StoreColorRedSoft
+import com.rutamercaderistas.ui.theme.StoreColorYellow
+import com.rutamercaderistas.ui.theme.StoreColorYellowSoft
 import com.rutamercaderistas.ui.theme.rs
 import com.rutamercaderistas.viewmodel.EanSearchUiState
 import com.rutamercaderistas.viewmodel.EanSearchViewModel
@@ -88,6 +106,24 @@ private val barcodeCache = LruCache<String, Bitmap>(64)
 private sealed interface EanResultRow
 private data class EanBrandRow(val brand: String) : EanResultRow
 private data class EanProductRow(val product: EanProductEntity) : EanResultRow
+
+// Paleta de acentos por marca: color estable derivado del nombre para que cada
+// marca sea reconocible por color en la interfaz (punto en el encabezado y chip).
+private val BRAND_PALETTE = listOf(
+    AccentBlue to AccentBlueSoft,
+    AccentGreen to AccentGreenSoft,
+    AccentOrange to AccentOrangeSoft,
+    StoreColorPurple to StoreColorPurpleSoft,
+    StoreColorFuchsia to StoreColorFuchsiaSoft,
+    StoreColorRed to StoreColorRedSoft,
+    StoreColorYellow to StoreColorYellowSoft,
+)
+
+private fun brandPair(name: String): Pair<Color, Color> {
+    val h = normalizeSearch(name).hashCode()
+    val idx = if (h < 0) -h else h
+    return BRAND_PALETTE[idx % BRAND_PALETTE.size]
+}
 
 @Composable
 fun EanSearchScreen(
@@ -486,11 +522,7 @@ private fun EanProductCard(
                         horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
                     ) {
                         if (product.marca.isNotBlank()) {
-                            Text(
-                                text = product.marca,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            BrandChip(name = product.marca)
                         }
                         if (product.estado.isNotBlank()) {
                             Text(
@@ -524,19 +556,74 @@ private fun EanProductCard(
 @Composable
 private fun EanBrandHeader(title: String) {
     val dimens = LocalAppDimens.current
-    val headerBg = MaterialTheme.colorScheme.background.let { c ->
-        Color(c.red * 0.85f, c.green * 0.85f, c.blue * 0.85f, c.alpha)
-    }
-    Text(
-        text = title,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurface,
+    val s = rs()
+    val (accent, soft) = brandPair(title)
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(headerBg)
-            .padding(horizontal = dimens.spacingMd, vertical = 4.dp)
-            .semantics { heading() },
-    )
+            .padding(horizontal = dimens.spacingMd, vertical = 4.dp * s)
+            .clip(RoundedCornerShape(12.dp))
+            .background(soft),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp * s, vertical = 8.dp * s),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(12.dp * s)
+                    .clip(CircleShape)
+                    .background(accent),
+            )
+            Spacer(modifier = Modifier.width(8.dp * s))
+            Column {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.semantics { heading() },
+                )
+                val note = brandNote(title)
+                if (note != null) {
+                    Text(
+                        text = note,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BrandChip(name: String) {
+    val s = rs()
+    val (accent, soft) = brandPair(name)
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(soft)
+            .padding(horizontal = 8.dp * s, vertical = 3.dp * s),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp * s)
+                .clip(CircleShape)
+                .background(accent),
+        )
+        Spacer(modifier = Modifier.width(5.dp * s))
+        Text(
+            text = name,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
 }
 
 @Composable

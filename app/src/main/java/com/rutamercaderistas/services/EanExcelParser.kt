@@ -13,7 +13,7 @@ import java.io.InputStream
 import java.text.Normalizer
 import javax.inject.Inject
 
-const val EAN_DATA_VERSION = 2
+const val EAN_DATA_VERSION = 4
 
 // Prefijo/sufijo de los archivos Excel de catálogo EAN en assets.
 // Para agregar más productos basta con soltar otro archivo "ean*.xlsx"
@@ -21,6 +21,38 @@ const val EAN_DATA_VERSION = 2
 // la app los combina automáticamente al importar.
 private const val EAN_ASSET_PREFIX = "ean"
 private const val EAN_ASSET_SUFFIX = ".xlsx"
+
+// Marca por defecto según el nombre del archivo de origen (p. ej. "ean_loveco.xlsx"
+// → "Love Co") cuando el Excel no trae columna de marca. Permite que los productos
+// recién agregados figuren bajo su marca real en la búsqueda EAN.
+private val EAN_FILE_BRANDS = mapOf(
+    "loveco" to "Love Co",
+)
+
+// Alias de marca: la empresa ve algunas marcas con un nombre distinto al del
+// catálogo (p. ej. "Lola" → "Kobbo", siendo Kobbo su representación superior).
+// Se aplica al importar para que agrupen y se muestren con el nombre correcto.
+private val BRAND_ALIASES = mapOf(
+    "lola" to "Kobbo",
+)
+
+// Nota aclaratoria para marcas canónicas (p. ej. "Kobbo" es la representación
+// superior de "Lola Cosmetic"). Se muestra bajo el nombre en la interfaz EAN.
+private val BRAND_CANONICAL_NOTES = mapOf(
+    "kobbo" to "Lola Cosmetic",
+)
+
+fun brandNote(canonical: String): String? = BRAND_CANONICAL_NOTES[normalizeSearch(canonical)]
+
+private fun brandFromFilename(fileName: String): String {
+    val base = fileName.removePrefix(EAN_ASSET_PREFIX)
+        .removePrefix("_")
+        .removeSuffix(EAN_ASSET_SUFFIX)
+        .trim()
+        .lowercase()
+    return EAN_FILE_BRANDS[base]
+        ?: base.replace("_", " ").replaceFirstChar { it.uppercase() }.trim()
+}
 
 fun normalizeSearch(text: String): String {
     val normalized = Normalizer.normalize(text, Normalizer.Form.NFD)
@@ -64,7 +96,7 @@ class EanExcelParser @Inject constructor(
         }
     }
 
-    private fun parse(inputStream: InputStream): List<EanProductEntity> {
+    private fun parse(inputStream: InputStream, defaultBrand: String? = null): List<EanProductEntity> {
         val workbook = XSSFWorkbook(inputStream)
         val sheet = workbook.getSheetAt(0)
         val rows = sheet.iterator()
@@ -75,7 +107,7 @@ class EanExcelParser @Inject constructor(
         val columnMap = buildColumnMap(rows.next())
         val products = mutableListOf<EanProductEntity>()
         while (rows.hasNext()) {
-            val product = parseRow(rows.next(), columnMap)
+            val product = parseRow(rows.next(), columnMap, defaultBrand)
             if (product != null) products.add(product)
         }
         workbook.close()
@@ -135,12 +167,15 @@ class EanExcelParser @Inject constructor(
         )
     }
 
-    private fun parseRow(row: Row, map: ColumnMap): EanProductEntity? {
+    private fun parseRow(row: Row, map: ColumnMap, defaultBrand: String? = null): EanProductEntity? {
         val codCencosud = map.codCencosud?.let { getStringCellValue(row.getCell(it)) } ?: ""
         val codProveedor = map.codProveedor?.let { getStringCellValue(row.getCell(it)) } ?: ""
         val rawEan = map.eanPrincipal?.let { getStringCellValue(row.getCell(it)) } ?: ""
         val descripcion = map.descripcion?.let { getStringCellValue(row.getCell(it)) } ?: ""
-        val marca = map.marca?.let { getStringCellValue(row.getCell(it)) } ?: ""
+        val marcaRaw = map.marca?.let { getStringCellValue(row.getCell(it)) }?.takeIf { it.isNotBlank() }
+            ?: defaultBrand?.takeIf { it.isNotBlank() }
+            ?: ""
+        val marca = BRAND_ALIASES[normalizeSearch(marcaRaw)] ?: marcaRaw
         val unBase = map.unBase?.let { getStringCellValue(row.getCell(it)) } ?: ""
         val unPedido = map.unPedido?.let { getStringCellValue(row.getCell(it)) } ?: ""
         val conversion = map.conversion?.let { getStringCellValue(row.getCell(it)) } ?: ""
@@ -222,7 +257,7 @@ class EanExcelParser @Inject constructor(
             val all = mutableListOf<EanProductEntity>()
             for (file in assetFiles) {
                 context.assets.open(file).use { stream ->
-                    all.addAll(parse(stream))
+                    all.addAll(parse(stream, brandFromFilename(file)))
                 }
             }
             if (all.isNotEmpty()) {
