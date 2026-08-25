@@ -70,11 +70,7 @@ interface EanProductDao {
     @Query("SELECT * FROM ean_products WHERE marca_norm LIKE '%' || :query || '%' ORDER BY descripcionProducto LIMIT 50")
     fun searchByMarca(query: String): Flow<List<EanProductEntity>>
 
-    // Obtener todos (para debug/export)
+    // Obtener todos
     @Query("SELECT * FROM ean_products ORDER BY descripcionProducto")
     fun getAll(): Flow<List<EanProductEntity>>
-
-    // Obtener todos paginados (la vista sin búsqueda muestra de a bloques)
-    @Query("SELECT * FROM ean_products ORDER BY descripcionProducto LIMIT :limit")
-    fun getAll(limit: Int): Flow<List<EanProductEntity>>
 }

@@ -1,6 +1,18 @@
 package com.rutamercaderistas.data.network
 
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+
+private val DATE_FORMATS = listOf(
+    DateTimeFormatter.ISO_LOCAL_DATE,
+    DateTimeFormatter.ofPattern("MM-dd-yy"),
+    DateTimeFormatter.ofPattern("MM-dd-yyyy"),
+    DateTimeFormatter.ofPattern("dd-MM-yy"),
+    DateTimeFormatter.ofPattern("dd-MM-yyyy"),
+    DateTimeFormatter.ofPattern("MM/dd/yy"),
+    DateTimeFormatter.ofPattern("dd/MM/yy"),
+    DateTimeFormatter.ofPattern("yyyy/MM/dd"),
+)
 
 fun parseCsvLine(line: String): List<String>? {
     if (line.isBlank()) return null
@@ -33,9 +45,12 @@ fun parseCsvLine(line: String): List<String>? {
 
 fun parseDate(dateStr: String): LocalDate? {
     if (dateStr.isBlank()) return null
-    return try {
-        LocalDate.parse(dateStr.trim())
-    } catch (_: Exception) {
-        null
+    val s = dateStr.trim()
+    for (fmt in DATE_FORMATS) {
+        try {
+            return LocalDate.parse(s, fmt)
+        } catch (_: Exception) {
+        }
     }
+    return null
 }

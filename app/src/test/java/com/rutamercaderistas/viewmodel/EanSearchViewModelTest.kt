@@ -48,7 +48,7 @@ class EanSearchViewModelTest {
         )
         coEvery { dao.count() } returns 0
         coEvery { dao.hasUnnormalized() } returns 0
-        every { dao.getAll(any()) } returns flowOf(sample)
+        every { dao.getAll() } returns flowOf(sample)
         every { dao.searchAll(any()) } returns flowOf(emptyList())
         coEvery { parser.loadFromAssets() } returns Result.success(2)
         coEvery { parser.getEanDataVersion() } returns 0
@@ -75,7 +75,7 @@ class EanSearchViewModelTest {
         )
         coEvery { dao.count() } returns 5
         coEvery { dao.hasUnnormalized() } returns 0
-        every { dao.getAll(any()) } returns flowOf(emptyList())
+        every { dao.getAll() } returns flowOf(emptyList())
         every { dao.searchAll(any()) } returns flowOf(found)
         coEvery { parser.loadFromAssets() } returns Result.success(5)
         coEvery { parser.getEanDataVersion() } returns EAN_DATA_VERSION

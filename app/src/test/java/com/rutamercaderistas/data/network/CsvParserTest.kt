@@ -70,6 +70,17 @@ class CsvParserTest {
     }
 
     @Test
+    fun `parseDate parses MM-dd-yy from promo CSV`() {
+        assertEquals(LocalDate.of(2026, 8, 25), parseDate("08-25-26"))
+        assertEquals(LocalDate.of(2026, 9, 21), parseDate("09-21-26"))
+    }
+
+    @Test
+    fun `parseDate parses MM-dd-yyyy`() {
+        assertEquals(LocalDate.of(2026, 11, 7), parseDate("11-07-2026"))
+    }
+
+    @Test
     fun `parseDate returns null for blank input`() {
         assertNull(parseDate(""))
         assertNull(parseDate("  "))
@@ -77,7 +88,7 @@ class CsvParserTest {
 
     @Test
     fun `parseDate returns null for invalid format`() {
-        assertNull(parseDate("11-07-2026"))
+        assertNull(parseDate("32-40-2026"))
         assertNull(parseDate("not-a-date"))
     }
 }

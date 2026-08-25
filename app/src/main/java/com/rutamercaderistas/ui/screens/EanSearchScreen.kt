@@ -133,7 +133,6 @@ fun EanSearchScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val dimens = LocalAppDimens.current
     val context = LocalContext.current
-    val browseLimit by viewModel.browseLimitFlow.collectAsStateWithLifecycle()
     val catalogMeta by viewModel.catalogMeta.collectAsStateWithLifecycle()
 
     var zoomProduct by remember { mutableStateOf<EanProductEntity?>(null) }
@@ -377,18 +376,6 @@ fun EanSearchScreen(
                             }
                     }
 
-                    }
-
-                    if (value.query.isBlank() && value.results.size >= browseLimit) {
-                        Button(
-                            onClick = { viewModel.loadMore() },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = dimens.touchMin)
-                                .padding(top = dimens.spacingSm),
-                        ) {
-                            Text(stringResource(R.string.ver_mas, 100))
-                        }
                     }
 
                     catalogMeta?.let { (version, count) ->
