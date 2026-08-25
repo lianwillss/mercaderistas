@@ -14,7 +14,7 @@ import java.io.InputStream
 import java.text.Normalizer
 import javax.inject.Inject
 
-const val EAN_DATA_VERSION = 7
+const val EAN_DATA_VERSION = 8
 
 // Prefijo/sufijo de los archivos Excel de catálogo EAN en assets.
 // Para agregar más productos basta con soltar otro archivo "ean*.xlsx"
@@ -87,14 +87,27 @@ class EanExcelParser @Inject constructor(
     suspend fun parseAndSave(inputStream: InputStream): Result<Int> {
         return try {
             val products = parse(inputStream)
-            if (products.isNotEmpty()) {
+            val deduped = dedupe(products)
+            if (deduped.isNotEmpty()) {
                 eanProductDao.clearAll()
-                eanProductDao.insertAll(products)
+                eanProductDao.insertAll(deduped)
             }
-            Result.success(products.size)
+            Result.success(deduped.size)
         } catch (e: Exception) {
             Timber.e(e, "Error parsing EAN Excel file")
             Result.failure(e)
+        }
+    }
+
+    // Evita productos duplicados al combinar varios archivos "ean*.xlsx" (o
+    // dentro de uno solo). La clave es el EAN; si el EAN está vacío se usa el
+    // SKU Cencosud. Los productos sin ninguno de los dos no se deduplican.
+    private fun dedupe(products: List<EanProductEntity>): List<EanProductEntity> {
+        val seen = mutableSetOf<String>()
+        return products.filter { p ->
+            val key = p.eanPrincipal.ifBlank { p.codCencosud }
+            if (key.isBlank()) return@filter true
+            seen.add(key)
         }
     }
 
@@ -193,6 +206,9 @@ class EanExcelParser @Inject constructor(
             ?: defaultBrand?.takeIf { it.isNotBlank() }
             ?: ""
         val marca = BRAND_ALIASES[normalizeSearch(marcaRaw)] ?: marcaRaw
+        // Colapsar espacios duplicados (p. ej. "DE  RAIZ" → "DE RAIZ") para que
+        // la marca se muestre y agrupe correctamente.
+        val marcaClean = marca.replace(Regex("\\s+"), " ").trim()
         val unBase = map.unBase?.let { getStringCellValue(row.getCell(it)) } ?: ""
         val unPedido = map.unPedido?.let { getStringCellValue(row.getCell(it)) } ?: ""
         val conversion = map.conversion?.let { getStringCellValue(row.getCell(it)) } ?: ""
@@ -210,7 +226,11 @@ class EanExcelParser @Inject constructor(
         // El EAN real suele estar en "Código de Barra" (a veces con ceros
         // iniciales y asteriscos). Si está presente y es numérico, se prefiere.
         val cleanedBarra = codigoBarra.replace(Regex("""\D"""), "")
-        val eanPrincipal = if (cleanedBarra.isNotBlank()) cleanedBarra else rawEan
+        val eanRaw = if (cleanedBarra.isNotBlank()) cleanedBarra else rawEan
+        // Un EAN de 12 dígitos suele ser un UPC-A; se normaliza a EAN-13 anteponiendo
+        // 0 para que el código de barras se genere correctamente y la búsqueda por el
+        // código escaneado (12 dígitos) lo encuentre como subcadena del EAN-13.
+        val eanPrincipal = if (eanRaw.length == 12 && eanRaw.all { it.isDigit() }) "0$eanRaw" else eanRaw
 
         if (eanPrincipal.isBlank() && codCencosud.isBlank() && codigoBarra.isBlank() && descripcion.isBlank()) {
             return null
@@ -222,8 +242,8 @@ class EanExcelParser @Inject constructor(
             eanPrincipal = eanPrincipal,
             descripcionProducto = descripcion,
             descripcionNorm = normalizeSearch(descripcion),
-            marca = marca,
-            marcaNorm = normalizeSearch(marca),
+            marca = marcaClean,
+            marcaNorm = normalizeSearch(marcaClean),
             unBase = unBase,
             unPedido = unPedido,
             conversion = conversion,
@@ -281,11 +301,12 @@ class EanExcelParser @Inject constructor(
                     Timber.e(e, "Error parseando catálogo EAN: $file")
                 }
             }
-            if (all.isNotEmpty()) {
+            val deduped = dedupe(all)
+            if (deduped.isNotEmpty()) {
                 eanProductDao.clearAll()
-                eanProductDao.insertAll(all)
+                eanProductDao.insertAll(deduped)
             }
-            Result.success(all.size)
+            Result.success(deduped.size)
         } catch (e: Exception) {
             Timber.e(e, "Error loading EAN file from assets")
             Result.failure(e)

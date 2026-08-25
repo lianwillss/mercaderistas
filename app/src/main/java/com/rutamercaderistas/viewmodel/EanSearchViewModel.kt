@@ -13,6 +13,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -41,6 +42,15 @@ class EanSearchViewModel @Inject constructor(
     private var debounceJob: Job? = null
     private val debounceMs = 250L
 
+    // Paginación de la vista sin búsqueda (la BD puede superar los 100 productos).
+    private val browseLimit = MutableStateFlow(100)
+    val browseLimitFlow: StateFlow<Int> = browseLimit
+    fun loadMore() { browseLimit.value += 100 }
+
+    // Metadatos del catálogo para mostrar en la interfaz (versión y nº de productos).
+    private val _catalogMeta = MutableStateFlow<Pair<Int, Int>?>(null)
+    val catalogMeta: StateFlow<Pair<Int, Int>?> = _catalogMeta
+
     init {
         loadDatabase()
     }
@@ -58,11 +68,14 @@ class EanSearchViewModel @Inject constructor(
                 val result = eanExcelParser.loadFromAssets()
                 result.onSuccess { count ->
                     eanExcelParser.setEanDataVersion(EAN_DATA_VERSION)
+                    _catalogMeta.value = EAN_DATA_VERSION to count
                     _uiState.value = EanSearchUiState.Loading("Base de datos lista ($count productos)")
                 }.onFailure { e ->
                     _uiState.value = EanSearchUiState.Error("Error cargando base de datos: ${e.message}")
                     return@launch
                 }
+            } else {
+                _catalogMeta.value = EAN_DATA_VERSION to eanProductDao.count()
             }
             observeSearch("")
         }
@@ -72,7 +85,7 @@ class EanSearchViewModel @Inject constructor(
         observeJob?.cancel()
         val normalized = normalizeSearch(query)
         val searchFlow = if (query.isBlank()) {
-            eanProductDao.getAll().map { it.take(100) }
+            browseLimit.flatMapLatest { limit -> eanProductDao.getAll(limit) }
         } else {
             eanProductDao.searchAll(normalized).map { it.take(50) }
         }
@@ -118,6 +131,7 @@ class EanSearchViewModel @Inject constructor(
             val result = eanExcelParser.loadFromAssets()
             result.onSuccess { count ->
                 eanExcelParser.setEanDataVersion(EAN_DATA_VERSION)
+                _catalogMeta.value = EAN_DATA_VERSION to count
                 _uiState.value = EanSearchUiState.Loading("Catálogo actualizado ($count productos)")
                 observeSearch("")
             }.onFailure { e ->

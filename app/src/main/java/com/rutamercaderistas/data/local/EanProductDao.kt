@@ -73,4 +73,8 @@ interface EanProductDao {
     // Obtener todos (para debug/export)
     @Query("SELECT * FROM ean_products ORDER BY descripcionProducto")
     fun getAll(): Flow<List<EanProductEntity>>
+
+    // Obtener todos paginados (la vista sin búsqueda muestra de a bloques)
+    @Query("SELECT * FROM ean_products ORDER BY descripcionProducto LIMIT :limit")
+    fun getAll(limit: Int): Flow<List<EanProductEntity>>
 }

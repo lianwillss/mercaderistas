@@ -287,4 +287,5 @@
     <string name="ean_loading_cd">Cargando catálogo</string>
     <string name="ean_scanning_cd">Iniciando escáner</string>
     <string name="ean_search_label">Buscar producto por nombre, EAN o SKU</string>
+    <string name="ean_catalog_meta">Catálogo v%d · %d productos</string>
 </resources>

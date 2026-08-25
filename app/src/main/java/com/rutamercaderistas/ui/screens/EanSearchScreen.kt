@@ -32,7 +32,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -134,6 +133,8 @@ fun EanSearchScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val dimens = LocalAppDimens.current
     val context = LocalContext.current
+    val browseLimit by viewModel.browseLimitFlow.collectAsStateWithLifecycle()
+    val catalogMeta by viewModel.catalogMeta.collectAsStateWithLifecycle()
 
     var zoomProduct by remember { mutableStateOf<EanProductEntity?>(null) }
 
@@ -192,13 +193,6 @@ fun EanSearchScreen(
                         .weight(1f)
                         .semantics { heading() },
                 )
-                IconButton(onClick = { viewModel.forceReload() }) {
-                    Icon(
-                        imageVector = Icons.Filled.Refresh,
-                        contentDescription = stringResource(R.string.ean_refresh_cd),
-                        tint = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
             }
 
             when (val state = uiState) {
@@ -258,7 +252,7 @@ fun EanSearchScreen(
                     val value = state
                     Column(
                         modifier = Modifier
-                            .fillMaxWidth()
+                            .fillMaxSize()
                             .padding(horizontal = dimens.spacingMd, vertical = dimens.spacingSm),
                     ) {
                         Row(
@@ -330,22 +324,19 @@ fun EanSearchScreen(
                         }
                     }
 
-                    if (value.query.isNotEmpty() || value.results.isNotEmpty()) {
-                        Text(
-                            text = stringResource(R.string.ean_results_count, value.results.size),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier
-                                .padding(
-                                    horizontal = dimens.spacingMd,
-                                    vertical = dimens.spacingXs,
-                                )
-                                .semantics { liveRegion = LiveRegionMode.Polite },
-                        )
-                    }
+                        if (value.query.isNotEmpty() || value.results.isNotEmpty()) {
+                            Text(
+                                text = stringResource(R.string.ean_results_count, value.results.size),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .padding(vertical = dimens.spacingXs)
+                                    .semantics { liveRegion = LiveRegionMode.Polite },
+                            )
+                        }
 
                     if (value.query.isNotBlank() && value.results.isEmpty()) {
-                        EanEmptyState(query = value.query)
+                        Box(modifier = Modifier.weight(1f)) { EanEmptyState(query = value.query) }
                     } else {
                         val rows = remember(value.results) {
                             buildList<EanResultRow> {
@@ -358,9 +349,11 @@ fun EanSearchScreen(
                             }
                         }
                         LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
                             contentPadding = PaddingValues(
-                                horizontal = dimens.spacingMd,
+                                horizontal = 0.dp,
                                 vertical = dimens.spacingSm,
                             ),
                             verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
@@ -383,8 +376,34 @@ fun EanSearchScreen(
                                     )
                                 }
                             }
+                    }
+
+                    }
+
+                    if (value.query.isBlank() && value.results.size >= browseLimit) {
+                        Button(
+                            onClick = { viewModel.loadMore() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = dimens.touchMin)
+                                .padding(top = dimens.spacingSm),
+                        ) {
+                            Text(stringResource(R.string.ver_mas, 100))
                         }
                     }
+
+                    catalogMeta?.let { (version, count) ->
+                        Text(
+                            text = stringResource(R.string.ean_catalog_meta, version, count),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = dimens.spacingXs),
+                        )
+                    }
+
                 }
 
                 is EanSearchUiState.BarcodeResult -> {
