@@ -26,7 +26,7 @@ App Android (Kotlin + Compose + Hilt + Room) de rutas para mercaderistas: descar
 
 ## PDF de marcas (delicado)
 
-- Manual empaquetado: `app/src/main/res/raw/manual_marcas.pdf` (106 págs, "MANUAL 3.0"). `MANUAL3.0.pdf` en la raíz es la fuente sin trackear; al actualizar, reemplazar el raw y reverificar páginas.
+- Manual empaquetado: `app/src/main/res/raw/manual_marcas.pdf` (107 págs, "MANUAL 4.0"). `manual.4.0.pdf` en la raíz es la fuente sin trackear; al actualizar, reemplazar el raw y reverificar páginas.
 - `models/BrandReference.kt`: mapa `brandPages` (marca → página) + `getPageRange()`. Los rangos se calculan desde los inicios ordenados y el fallback recorta al siguiente inicio conocido (`knownBrandStarts`) — **no** `page..page+PAGES_PER_BRAND`. Nunca ampliar un rango para que invada marcas vecinas (bug histórico: COMERCIAL SZ 46 invadía CORRALES DEL SUR/CUK).
 - La normalización quita tildes/espacios (`normalizeMarca`). Si una marca del Excel no matchea el mapa, agregar alias en `brandPages` (ej. "MORETTA" → misma página que "MORETTA WINES").
 - Para verificar contra el Excel real: `curl -sL "<DRIVE_EXPORT_URL de Constants.kt>"` y leer con `openpyxl` (hoja "RUTA RUTERO", columna CLIENTE).

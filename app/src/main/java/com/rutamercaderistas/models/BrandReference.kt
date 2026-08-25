@@ -44,18 +44,20 @@ class BrandReference @Inject constructor(
         "JAPI JANE" to 71, "KOBBO" to 72,
         "LA CABRESA" to 75, "LA FERMENTISTA" to 76,
         "LOVE CO" to 77,
-        "MAILEMU MIEL" to 79, "MENESS" to 80,
-        "MIEL TRAPENSE" to 81, "MIEL TRAPENSES" to 81, "MORETTA WINES" to 82, "MORETTA" to 82,
-        "NAT NATURAL" to 83,
-        "OLIMPIA" to 85, "FRANUI" to 85,
-        "PATPOT CHIPS" to 86, "PEPILU" to 87,
-        "PROPAL" to 88,
-        "QUINTAL" to 89,
-        "SOHO" to 91, "SUK" to 94,
-        "TALLOW" to 97, "THE POWER OF FOOD" to 98, "TNOGAL" to 99,
-        "UP WINE" to 101,
-        "VEG MONKEY" to 102,
-        "WANKUN" to 103, "WILD LAMA" to 104, "JOCKEYS" to 105
+        "MAILEMU MIEL" to 79,
+        "MANADA" to 80,
+        "MENESS" to 81,
+        "MIEL TRAPENSE" to 82, "MIEL TRAPENSES" to 82, "MORETTA WINES" to 83, "MORETTA" to 83,
+        "NAT NATURAL" to 84,
+        "OLIMPIA" to 86, "FRANUI" to 86,
+        "PATPOT CHIPS" to 87, "PEPILU" to 88,
+        "PROPAL" to 89,
+        "QUINTAL" to 90,
+        "SOHO" to 92, "SUK" to 95,
+        "TALLOW" to 98, "THE POWER OF FOOD" to 99, "TNOGAL" to 100,
+        "UP WINE" to 102,
+        "VEG MONKEY" to 103,
+        "WANKUN" to 104, "WILD LAMA" to 105
     )
 
     private val normalizedPages: Map<String, Int> by lazy {
