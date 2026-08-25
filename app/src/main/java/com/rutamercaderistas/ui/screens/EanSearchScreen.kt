@@ -321,8 +321,7 @@ fun EanSearchScreen(
                                     .fillMaxWidth()
                                     .heightIn(min = dimens.touchMin),
                             )
-                        }
-                    }
+                            }
 
                         if (value.query.isNotEmpty() || value.results.isNotEmpty()) {
                             Text(
@@ -402,6 +401,8 @@ fun EanSearchScreen(
                                 .fillMaxWidth()
                                 .padding(top = dimens.spacingXs),
                         )
+                    }
+
                     }
 
                 }
