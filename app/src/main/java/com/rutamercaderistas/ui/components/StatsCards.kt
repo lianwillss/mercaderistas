@@ -223,14 +223,14 @@ private fun StatCard(
                                 Text(
                                     text = "$promo",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = PriceOrange,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
                                 )
                             }
                             Text(
                                 text = stringResource(R.string.promociones_word),
                                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                                color = PriceOrange,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1,
                             )
                         }

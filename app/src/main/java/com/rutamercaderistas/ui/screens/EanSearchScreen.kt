@@ -54,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
@@ -458,7 +459,6 @@ private fun EanProductCard(
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.semantics { heading() },
             )
 
             if (product.eanPrincipal.isNotBlank()) {
@@ -470,6 +470,7 @@ private fun EanProductCard(
                         .heightIn(min = 96.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .clickable(
+                            role = Role.Button,
                             onClickLabel = stringResource(R.string.ean_zoom_cd),
                             onClick = { onBarcodeClick(product) },
                         ),
@@ -528,7 +529,7 @@ private fun EanProductCard(
                             Text(
                                 text = product.estado,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.outline,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -543,7 +544,7 @@ private fun EanProductCard(
                     Text(
                         text = categorias.joinToString("  ›  "),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )

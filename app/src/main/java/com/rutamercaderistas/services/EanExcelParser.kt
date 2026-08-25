@@ -7,13 +7,14 @@ import com.rutamercaderistas.data.local.EanProductEntity
 import org.apache.poi.ss.usermodel.Cell
 import org.apache.poi.ss.usermodel.CellType
 import org.apache.poi.ss.usermodel.Row
+import org.apache.poi.ss.usermodel.Sheet
 import org.apache.poi.xssf.usermodel.XSSFWorkbook
 import timber.log.Timber
 import java.io.InputStream
 import java.text.Normalizer
 import javax.inject.Inject
 
-const val EAN_DATA_VERSION = 5
+const val EAN_DATA_VERSION = 7
 
 // Prefijo/sufijo de los archivos Excel de catálogo EAN en assets.
 // Para agregar más productos basta con soltar otro archivo "ean*.xlsx"
@@ -99,7 +100,7 @@ class EanExcelParser @Inject constructor(
 
     private fun parse(inputStream: InputStream, defaultBrand: String? = null): List<EanProductEntity> {
         val workbook = XSSFWorkbook(inputStream)
-        val sheet = workbook.getSheetAt(0)
+        val sheet = selectSheet(workbook)
         val rows = sheet.iterator()
         if (!rows.hasNext()) {
             workbook.close()
@@ -113,6 +114,21 @@ class EanExcelParser @Inject constructor(
         }
         workbook.close()
         return products
+    }
+
+    // Algunos catálogos traen varias hojas (p. ej. un resumen "DT" y los datos
+    // reales en "DATA"). Elegimos la primera hoja cuyo encabezado declara una
+    // columna de código (EAN o Código de Barra); sin consumir su fila (para no
+    // descartarla al iterar después). No basta con "marca", pues una hoja-resumen
+    // puede tener una fila "Marca: X" que no es encabezado de catálogo.
+    private fun selectSheet(workbook: XSSFWorkbook): Sheet {
+        for (i in 0 until workbook.numberOfSheets) {
+            val sheet = workbook.getSheetAt(i)
+            val firstRow = sheet.getRow(sheet.firstRowNum) ?: continue
+            val map = buildColumnMap(firstRow)
+            if (map.eanPrincipal != null || map.codigoBarra != null) return sheet
+        }
+        return workbook.getSheetAt(0)
     }
 
     private fun buildColumnMap(headerRow: Row): ColumnMap {
@@ -257,8 +273,12 @@ class EanExcelParser @Inject constructor(
             }
             val all = mutableListOf<EanProductEntity>()
             for (file in assetFiles) {
-                context.assets.open(file).use { stream ->
-                    all.addAll(parse(stream, brandFromFilename(file)))
+                try {
+                    context.assets.open(file).use { stream ->
+                        all.addAll(parse(stream, brandFromFilename(file)))
+                    }
+                } catch (e: Exception) {
+                    Timber.e(e, "Error parseando catálogo EAN: $file")
                 }
             }
             if (all.isNotEmpty()) {
