@@ -41,30 +41,23 @@ interface EanProductDao {
     @Query("SELECT * FROM ean_products WHERE codigoBarra LIKE '%' || :query || '%' ORDER BY descripcionProducto LIMIT 50")
     fun searchByCodigoBarra(query: String): Flow<List<EanProductEntity>>
 
-    // Búsqueda general (códigos + nombre/marca normalizados, sin tildes)
+    // Devuelve candidatos que contienen un único token (compacto) en cualquier
+    // columna. El ViewModel combina los candidatos de varios tokens y filtra por
+    // AND, permitiendo coincidencias en cualquier orden ("nat pistacho" →
+    // "NAT ROMERO PISTACHO"). LIMIT alto para no descartar antes del filtro.
     @Query("""
         SELECT * FROM ean_products
-        WHERE eanPrincipal LIKE '%' || :query || '%'
-           OR codCencosud LIKE '%' || :query || '%'
-           OR codProveedor LIKE '%' || :query || '%'
-           OR codigoBarra LIKE '%' || :query || '%'
-           OR descripcion_norm LIKE '%' || :query || '%'
-           OR marca_norm LIKE '%' || :query || '%'
-        ORDER BY
-            CASE
-                WHEN eanPrincipal = :query THEN 0
-                WHEN codCencosud = :query THEN 1
-                WHEN codProveedor = :query THEN 2
-                WHEN codigoBarra = :query THEN 3
-                WHEN descripcion_norm = :query THEN 4
-                WHEN descripcion_norm LIKE :query || '%' THEN 5
-                WHEN descripcion_norm LIKE '%' || :query || '%' THEN 6
-                ELSE 7
-            END,
-            descripcionProducto
-        LIMIT 50
+        WHERE eanPrincipal LIKE '%' || :token || '%'
+           OR codCencosud LIKE '%' || :token || '%'
+           OR codProveedor LIKE '%' || :token || '%'
+           OR codigoBarra LIKE '%' || :token || '%'
+           OR descripcion_norm LIKE '%' || :token || '%'
+           OR marca_norm LIKE '%' || :token || '%'
+           OR descripcion_norm_nospace LIKE '%' || :token || '%'
+           OR marca_norm_nospace LIKE '%' || :token || '%'
+        LIMIT 300
     """)
-    fun searchAll(query: String): Flow<List<EanProductEntity>>
+    fun searchCandidates(token: String): Flow<List<EanProductEntity>>
 
     // Búsqueda por marca (normalizada)
     @Query("SELECT * FROM ean_products WHERE marca_norm LIKE '%' || :query || '%' ORDER BY descripcionProducto LIMIT 50")

@@ -17,6 +17,7 @@ import timber.log.Timber
 import com.rutamercaderistas.data.result.SyncResult
 import com.rutamercaderistas.data.result.messageOrNull
 import com.rutamercaderistas.models.BrandReference
+import com.rutamercaderistas.models.EntradaRuta
 import com.rutamercaderistas.services.RuteroManager
 import com.rutamercaderistas.services.RuteroRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -33,11 +34,27 @@ sealed interface SyncState {
     data class Syncing(val phase: String? = null) : SyncState
 }
 
+data class PlanillaChanges(
+    val added: List<String> = emptyList(),
+    val removed: List<String> = emptyList(),
+    val moved: List<MovedLocales> = emptyList(),
+) {
+    val isEmpty: Boolean get() = added.isEmpty() && removed.isEmpty() && moved.isEmpty()
+}
+
+data class MovedLocales(
+    val local: String,
+    val fromDays: String,
+    val toDays: String,
+)
+
 @Stable
 data class SyncUiState(
     val isOnline: Boolean = false,
     val state: SyncState = SyncState.Idle,
     val snackbarMessage: String? = null,
+    val syncError: String? = null,
+    val syncChanges: PlanillaChanges? = null,
 ) {
     val isSyncing: Boolean get() = state is SyncState.Syncing
     val syncPhase: String? get() = (state as? SyncState.Syncing)?.phase
@@ -114,12 +131,12 @@ class SyncViewModel @Inject constructor(
 
     fun syncFromDrive() {
         syncJob?.cancel()
-        _state.value = _state.value.copy(state = SyncState.Syncing())
+        _state.value = _state.value.copy(state = SyncState.Syncing(), syncError = null, syncChanges = null)
         syncJob = viewModelScope.launch {
             val result = performDriveSync()
             _state.value = _state.value.copy(state = SyncState.Idle)
             result.messageOrNull()?.let { msg ->
-                _state.value = _state.value.copy(snackbarMessage = msg)
+                _state.value = _state.value.copy(syncError = msg)
             }
         }
     }
@@ -127,6 +144,7 @@ class SyncViewModel @Inject constructor(
     private suspend fun performDriveSync(): SyncResult<Boolean> {
         return withContext(Dispatchers.IO) {
             try {
+                val oldEntries = ruteroManager.loadAllEntries()
                 _state.value = _state.value.copy(state = SyncState.Syncing(phase = getApplication<Application>().getString(R.string.sync_descargando)))
                 val cacheBustedUrl = "${Constants.DRIVE_EXPORT_URL}&ts=${System.currentTimeMillis()}"
                 val bytes = downloadWithRetries(cacheBustedUrl)
@@ -145,7 +163,9 @@ class SyncViewModel @Inject constructor(
                     if (indexOk) {
                         _state.value = _state.value.copy(state = SyncState.Syncing(phase = getApplication<Application>().getString(R.string.sync_actualizando_promos)))
                         promotionRepository.refresh()
-                        _state.value = _state.value.copy(state = SyncState.Idle)
+                        val newEntries = ruteroManager.loadAllEntries()
+                        val changes = if (oldEntries.isEmpty()) PlanillaChanges() else computePlanillaChanges(oldEntries, newEntries)
+                        _state.value = _state.value.copy(state = SyncState.Idle, syncChanges = changes)
                         SyncResult.Success(true)
                     } else {
                         _state.value = _state.value.copy(state = SyncState.Idle)
@@ -166,7 +186,7 @@ class SyncViewModel @Inject constructor(
 
     fun syncFromDriveWithRouteReload(currentRoute: String?) {
         syncJob?.cancel()
-        _state.value = _state.value.copy(state = SyncState.Syncing())
+        _state.value = _state.value.copy(state = SyncState.Syncing(), syncError = null, syncChanges = null)
         syncJob = viewModelScope.launch {
             val result = performDriveSync()
             when (result) {
@@ -192,7 +212,7 @@ class SyncViewModel @Inject constructor(
                 is SyncResult.Error -> {
                     _state.value = _state.value.copy(
                         state = SyncState.Idle,
-                        snackbarMessage = result.message,
+                        syncError = result.message,
                     )
                 }
                 is SyncResult.NoChange -> {
@@ -201,7 +221,7 @@ class SyncViewModel @Inject constructor(
                 is SyncResult.Offline -> {
                     _state.value = _state.value.copy(
                         state = SyncState.Idle,
-                        snackbarMessage = getApplication<Application>().getString(R.string.sync_sin_conexion),
+                        syncError = getApplication<Application>().getString(R.string.sync_sin_conexion),
                     )
                 }
             }
@@ -210,6 +230,31 @@ class SyncViewModel @Inject constructor(
 
     fun clearSnackbar() {
         _state.value = _state.value.copy(snackbarMessage = null)
+    }
+
+    fun clearChanges() {
+        _state.value = _state.value.copy(syncChanges = null)
+    }
+
+    private fun computePlanillaChanges(old: List<EntradaRuta>, new: List<EntradaRuta>): PlanillaChanges {
+        fun key(e: EntradaRuta) = e.codigo.uppercase() + "|" + e.local.uppercase()
+        fun days(entries: List<EntradaRuta>): Set<String> = entries.map { it.rutero }.toSet()
+        val oldMap = old.groupBy(::key).mapValues { (_, v) -> days(v) to v.first().local }
+        val newMap = new.groupBy(::key).mapValues { (_, v) -> days(v) to v.first().local }
+        val added = newMap.keys.subtract(oldMap.keys).mapNotNull { newMap[it]?.second }.filter { it.isNotBlank() }
+        val removed = oldMap.keys.subtract(newMap.keys).mapNotNull { oldMap[it]?.second }.filter { it.isNotBlank() }
+        val moved = newMap.keys.intersect(oldMap.keys).mapNotNull { k ->
+            val oldVal = oldMap[k] ?: return@mapNotNull null
+            val newVal = newMap[k] ?: return@mapNotNull null
+            if (oldVal.first != newVal.first) {
+                MovedLocales(
+                    local = oldVal.second,
+                    fromDays = oldVal.first.sorted().joinToString(", "),
+                    toDays = newVal.first.sorted().joinToString(", "),
+                )
+            } else null
+        }
+        return PlanillaChanges(added = added, removed = removed, moved = moved)
     }
 
     private suspend fun downloadWithRetries(url: String, retries: Int = Constants.MAX_RETRIES): ByteArray? {

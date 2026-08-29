@@ -6,7 +6,9 @@ import java.text.Normalizer
 fun String.normalizeMarca(): String {
     val decomposed = Normalizer.normalize(this, Normalizer.Form.NFD)
     val withoutDiacritics = decomposed.replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
-    return withoutDiacritics.uppercase().replace(Regex("[\\s-]"), "")
+    return withoutDiacritics.uppercase()
+        .replace("&", "Y")
+        .replace(Regex("[\\s-]"), "")
 }
 
 fun String.cleanBrand(): String {

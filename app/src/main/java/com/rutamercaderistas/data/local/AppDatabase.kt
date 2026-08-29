@@ -12,7 +12,7 @@ import javax.inject.Singleton
 
 @Database(
     entities = [RouteEntryEntity::class, PromotionEntity::class, EanProductEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -107,9 +107,18 @@ abstract class AppDatabase : RoomDatabase() {
             db.execSQL("CREATE INDEX `index_ean_products_marca_norm` ON `ean_products` (`marca_norm`)")
         }
 
+        private val MIGRATION_5_6 = Migration(5, 6) { db ->
+            // Columnas compactas (sin espacios) para búsqueda tolerante a
+            // separadores: "bymaria" debe encontrar "by maria".
+            db.execSQL("ALTER TABLE ean_products ADD COLUMN descripcion_norm_nospace TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE ean_products ADD COLUMN marca_norm_nospace TEXT NOT NULL DEFAULT ''")
+            db.execSQL("CREATE INDEX `index_ean_products_descripcion_norm_nospace` ON `ean_products` (`descripcion_norm_nospace`)")
+            db.execSQL("CREATE INDEX `index_ean_products_marca_norm_nospace` ON `ean_products` (`marca_norm_nospace`)")
+        }
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, DB_NAME)
-                .addMigrations(MIGRATION_1_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .fallbackToDestructiveMigration()
                 .build()
     }

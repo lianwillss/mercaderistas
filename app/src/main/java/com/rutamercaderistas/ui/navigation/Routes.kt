@@ -19,3 +19,6 @@ data class PdfViewerRoute(val page: Int = 0)
 
 @Serializable
 data object EanSearchRoute
+
+@Serializable
+data object GlobalSearchRoute

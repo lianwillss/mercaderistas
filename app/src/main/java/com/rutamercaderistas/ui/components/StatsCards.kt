@@ -48,7 +48,6 @@ import com.rutamercaderistas.ui.theme.rs
 fun StatsCards(
     stats: RuteroRepository.Stats,
     modifier: Modifier = Modifier,
-    onLocalesClick: () -> Unit = {},
     onMarcasClick: () -> Unit = {},
     onCodProvClick: () -> Unit = {},
     onCodEanClick: () -> Unit = {},
@@ -58,35 +57,8 @@ fun StatsCards(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = LocalAppDimens.current.spacingSm),
-        horizontalArrangement = Arrangement.spacedBy(4.dp * rs())
+        horizontalArrangement = Arrangement.spacedBy(4.dp * rs()),
     ) {
-        StatCard(
-            icon = Icons.Rounded.Store,
-            value = stats.totalLocales,
-            label = stringResource(R.string.stats_locales_label),
-            accent = AccentBlue,
-            accentSoft = AccentBlueSoft,
-            onClick = onLocalesClick,
-            modifier = Modifier.weight(1f)
-        )
-        StatCard(
-            icon = Icons.Rounded.ShoppingBag,
-            value = stats.totalMarcas,
-            label = stringResource(R.string.stats_marcas_label),
-            accent = AccentGreen,
-            accentSoft = AccentGreenSoft,
-            onClick = onMarcasClick,
-            modifier = Modifier.weight(1f),
-            promo = marcasConPromo
-        )
-        StatCard(
-            icon = Icons.Rounded.Visibility,
-            value = stats.visitasTotales,
-            label = stringResource(R.string.stats_visitas_label),
-            accent = AccentOrange,
-            accentSoft = AccentOrangeSoft,
-            modifier = Modifier.weight(1f)
-        )
         StatCard(
             icon = Icons.Rounded.Badge,
             value = CodProvItems.size,
@@ -94,18 +66,7 @@ fun StatsCards(
             accent = AccentBlue,
             accentSoft = AccentBlueSoft,
             onClick = onCodProvClick,
-            modifier = Modifier.weight(1f)
-        )
-        StatCard(
-            painterIcon = painterResource(R.drawable.ic_barcode),
-            value = null,
-            label = stringResource(R.string.stats_cod_ean_label),
-            accent = StoreColorPurple,
-            accentSoft = StoreColorPurpleSoft,
-            actionLabel = stringResource(R.string.ean_tap_to_search),
-            actionColor = StoreColorPurple,
-            onClick = onCodEanClick,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.width(180.dp),
         )
     }
 }
@@ -259,7 +220,6 @@ private fun StatsCardsPreview() {
         com.rutamercaderistas.ui.theme.MercaderistasTheme {
             StatsCards(
                 stats = RuteroRepository.Stats(12, 45, 67),
-                onLocalesClick = {},
                 onMarcasClick = {},
                 marcasConPromo = 3,
             )
@@ -274,7 +234,6 @@ private fun StatsCardsPreviewNoPromos() {
         com.rutamercaderistas.ui.theme.MercaderistasTheme {
             StatsCards(
                 stats = RuteroRepository.Stats(8, 20, 30),
-                onLocalesClick = {},
                 onMarcasClick = {},
                 marcasConPromo = 0,
             )

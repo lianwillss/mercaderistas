@@ -14,7 +14,7 @@ import java.io.InputStream
 import java.text.Normalizer
 import javax.inject.Inject
 
-const val EAN_DATA_VERSION = 9
+const val EAN_DATA_VERSION = 11
 
 // Prefijo/sufijo de los archivos Excel de catálogo EAN en assets.
 // Para agregar más productos basta con soltar otro archivo "ean*.xlsx"
@@ -29,6 +29,7 @@ private const val EAN_ASSET_SUFFIX = ".xlsx"
 private val EAN_FILE_BRANDS = mapOf(
     "loveco" to "Love Co",
     "caso_cia" to "CASO Y CIA",
+    "nat" to "NAT NATURAL",
 )
 
 // Alias de marca: la empresa ve algunas marcas con un nombre distinto al del
@@ -61,6 +62,11 @@ fun normalizeSearch(text: String): String {
         .replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
     return normalized.lowercase().trim()
 }
+
+// Normalización compacta: igual que normalizeSearch pero sin espacios ni
+// signos, para que "bymaria" coincida con "by maria" y viceversa.
+fun compactNorm(text: String): String =
+    normalizeSearch(text).replace(Regex("[^a-z0-9]"), "")
 
 class EanExcelParser @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -242,8 +248,10 @@ class EanExcelParser @Inject constructor(
             eanPrincipal = eanPrincipal,
             descripcionProducto = descripcion,
             descripcionNorm = normalizeSearch(descripcion),
+            descripcionNormNospace = compactNorm(descripcion),
             marca = marcaClean,
             marcaNorm = normalizeSearch(marcaClean),
+            marcaNormNospace = compactNorm(marcaClean),
             unBase = unBase,
             unPedido = unPedido,
             conversion = conversion,

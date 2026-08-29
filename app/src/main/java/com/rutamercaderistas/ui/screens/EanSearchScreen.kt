@@ -70,6 +70,14 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.TextStyle
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.WriterException
 import com.journeyapps.barcodescanner.BarcodeEncoder
@@ -81,6 +89,7 @@ import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.EanProductEntity
 import com.rutamercaderistas.ui.components.IosModal
 import com.rutamercaderistas.services.brandNote
+import com.rutamercaderistas.services.compactNorm
 import com.rutamercaderistas.services.normalizeSearch
 import com.rutamercaderistas.ui.theme.AccentBlue
 import com.rutamercaderistas.ui.theme.AccentBlueSoft
@@ -134,6 +143,7 @@ fun EanSearchScreen(
     val dimens = LocalAppDimens.current
     val context = LocalContext.current
     val catalogMeta by viewModel.catalogMeta.collectAsStateWithLifecycle()
+    val searchHistory by viewModel.searchHistory.collectAsStateWithLifecycle()
 
     var zoomProduct by remember { mutableStateOf<EanProductEntity?>(null) }
 
@@ -333,8 +343,18 @@ fun EanSearchScreen(
                             )
                         }
 
+                        if (value.query.isBlank() && searchHistory.isNotEmpty()) {
+                            EanHistoryChips(
+                                history = searchHistory,
+                                onChip = { viewModel.onHistoryClick(it) },
+                                onClear = { viewModel.clearSearchHistory() },
+                            )
+                        }
+
                     if (value.query.isNotBlank() && value.results.isEmpty()) {
-                        Box(modifier = Modifier.weight(1f)) { EanEmptyState(query = value.query) }
+                        Box(modifier = Modifier.weight(1f)) {
+                            EanEmptyState(query = value.query, onClear = { viewModel.clearQuery() })
+                        }
                     } else {
                         val rows = remember(value.results) {
                             buildList<EanResultRow> {
@@ -370,6 +390,7 @@ fun EanSearchScreen(
                                     )
                                     is EanProductRow -> EanProductCard(
                                         product = row.product,
+                                        query = value.query,
                                         onBarcodeClick = { zoomProduct = row.product },
                                     )
                                 }
@@ -449,6 +470,7 @@ fun EanSearchScreen(
 @Composable
 private fun EanProductCard(
     product: EanProductEntity,
+    query: String = "",
     onBarcodeClick: (EanProductEntity) -> Unit = {},
 ) {
     val dimens = LocalAppDimens.current
@@ -460,8 +482,9 @@ private fun EanProductCard(
         shape = RoundedCornerShape(12.dp),
     ) {
         Column(modifier = Modifier.padding(dimens.spacingMd)) {
-            Text(
+            HighlightedText(
                 text = product.descripcionProducto.ifBlank { product.eanPrincipal },
+                query = query,
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 2,
@@ -504,6 +527,7 @@ private fun EanProductCard(
                         EanCodeChip(
                             label = "EAN",
                             value = product.eanPrincipal,
+                            query = query,
                             color = MaterialTheme.colorScheme.primary,
                         )
                     }
@@ -511,6 +535,7 @@ private fun EanProductCard(
                         EanCodeChip(
                             label = "SKU",
                             value = product.codCencosud,
+                            query = query,
                             color = MaterialTheme.colorScheme.secondary,
                         )
                     }
@@ -518,6 +543,7 @@ private fun EanProductCard(
                         EanCodeChip(
                             label = "Prov",
                             value = product.codProveedor,
+                            query = query,
                             color = MaterialTheme.colorScheme.tertiary,
                         )
                     }
@@ -530,7 +556,7 @@ private fun EanProductCard(
                         horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
                     ) {
                         if (product.marca.isNotBlank()) {
-                            BrandChip(name = product.marca)
+                            BrandChip(name = product.marca, query = query)
                         }
                         if (product.estado.isNotBlank()) {
                             Text(
@@ -609,7 +635,7 @@ private fun EanBrandHeader(title: String) {
 }
 
 @Composable
-private fun BrandChip(name: String) {
+private fun BrandChip(name: String, query: String = "") {
     val s = rs()
     val (accent, soft) = brandPair(name)
     Row(
@@ -626,8 +652,9 @@ private fun BrandChip(name: String) {
                 .background(accent),
         )
         Spacer(modifier = Modifier.width(5.dp * s))
-        Text(
+        HighlightedText(
             text = name,
+            query = query,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurface,
         )
@@ -635,7 +662,7 @@ private fun BrandChip(name: String) {
 }
 
 @Composable
-private fun EanCodeChip(label: String, value: String, color: Color) {
+private fun EanCodeChip(label: String, value: String, color: Color, query: String = "") {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(6.dp))
@@ -648,8 +675,9 @@ private fun EanCodeChip(label: String, value: String, color: Color) {
                 style = MaterialTheme.typography.labelSmall,
                 color = color,
             )
-            Text(
+            HighlightedText(
                 text = value,
+                query = query,
                 style = MaterialTheme.typography.labelMedium,
                 color = color,
                 maxLines = 1,
@@ -713,7 +741,7 @@ private fun BarcodeImage(ean: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun EanEmptyState(query: String) {
+private fun EanEmptyState(query: String, onClear: () -> Unit = {}) {
     val dimens = LocalAppDimens.current
     Column(
         modifier = Modifier
@@ -735,6 +763,134 @@ private fun EanEmptyState(query: String) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
+        Spacer(modifier = Modifier.height(dimens.spacingXs))
+        Text(
+            text = stringResource(R.string.ean_no_results_hint),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(dimens.spacingMd))
+        Button(
+            onClick = onClear,
+            modifier = Modifier.heightIn(min = dimens.touchMin),
+        ) {
+            Text(stringResource(R.string.ean_clear_search))
+        }
+    }
+}
+
+@Composable
+private fun HighlightedText(
+    text: String,
+    query: String,
+    style: TextStyle,
+    color: Color,
+    modifier: Modifier = Modifier,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip,
+) {
+    val tokens = remember(query) {
+        compactNorm(query).split(Regex("[^a-z0-9]+")).filter { it.isNotBlank() }
+    }
+    if (tokens.isEmpty() || text.isBlank()) {
+        Text(text = text, style = style, color = color, modifier = modifier, maxLines = maxLines, overflow = overflow)
+        return
+    }
+    val ranges = remember(text, query) { computeHighlightRanges(text, tokens) }
+    val annotated = buildAnnotatedString {
+        if (ranges.isEmpty()) {
+            append(text)
+        } else {
+            var cursor = 0
+            for (r in ranges) {
+                if (r.first > cursor) append(text.substring(cursor, r.first))
+                pushStyle(SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary))
+                append(text.substring(r.first, r.last + 1))
+                pop()
+                cursor = r.last + 1
+            }
+            if (cursor < text.length) append(text.substring(cursor))
+        }
+    }
+    Text(text = annotated, style = style, color = color, modifier = modifier, maxLines = maxLines, overflow = overflow)
+}
+
+private fun computeHighlightRanges(text: String, tokens: List<String>): List<IntRange> {
+    val normBuilder = StringBuilder()
+    val map = mutableListOf<IntRange>()
+    text.forEachIndexed { i, c ->
+        val n = compactNorm(c.toString())
+        if (n.isNotEmpty()) {
+            map.add(i..i)
+            normBuilder.append(n)
+        }
+    }
+    val norm = normBuilder.toString()
+    val found = mutableListOf<IntRange>()
+    for (tok in tokens) {
+        if (tok.isBlank()) continue
+        var from = 0
+        while (from <= norm.length - tok.length) {
+            val idx = norm.indexOf(tok, from)
+            if (idx < 0) break
+            val startOrig = map[idx].first
+            val endOrig = map[idx + tok.length - 1].last
+            found.add(startOrig..endOrig)
+            from = idx + tok.length
+        }
+    }
+    found.sortBy { it.first }
+    val merged = mutableListOf<IntRange>()
+    for (r in found) {
+        val last = merged.lastOrNull()
+        if (last != null && r.first <= last.last + 1) {
+            merged[merged.lastIndex] = last.first..maxOf(last.last, r.last)
+        } else {
+            merged.add(r)
+        }
+    }
+    return merged
+}
+
+@Composable
+private fun EanHistoryChips(
+    history: List<String>,
+    onChip: (String) -> Unit,
+    onClear: () -> Unit,
+) {
+    val dimens = LocalAppDimens.current
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = stringResource(R.string.ean_recent_searches),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(onClick = onClear, contentPadding = PaddingValues(0.dp)) {
+                Text(
+                    text = stringResource(R.string.ean_clear_history),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+            contentPadding = PaddingValues(vertical = dimens.spacingXs),
+        ) {
+            items(history) { q ->
+                SuggestionChip(
+                    onClick = { onChip(q) },
+                    label = { Text(q) },
+                )
+            }
+        }
     }
 }
 

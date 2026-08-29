@@ -15,6 +15,8 @@ import androidx.room.PrimaryKey
         Index(value = ["marca"]),
         Index(value = ["descripcion_norm"]),
         Index(value = ["marca_norm"]),
+        Index(value = ["descripcion_norm_nospace"]),
+        Index(value = ["marca_norm_nospace"]),
     ]
 )
 data class EanProductEntity(
@@ -26,6 +28,8 @@ data class EanProductEntity(
     @ColumnInfo(name = "descripcion_norm") val descripcionNorm: String = "",
     val marca: String = "",
     @ColumnInfo(name = "marca_norm") val marcaNorm: String = "",
+    @ColumnInfo(name = "descripcion_norm_nospace") val descripcionNormNospace: String = "",
+    @ColumnInfo(name = "marca_norm_nospace") val marcaNormNospace: String = "",
     val unBase: String = "",
     val unPedido: String = "",
     val conversion: String = "",

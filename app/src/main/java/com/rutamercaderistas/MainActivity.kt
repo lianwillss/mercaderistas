@@ -8,6 +8,7 @@ import com.rutamercaderistas.R
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -126,10 +127,15 @@ class MainActivity : ComponentActivity() {
 
             MercaderistasTheme {
                 Scaffold(
-                    snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-                    contentWindowInsets = WindowInsets.safeDrawing.only(
-                        WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
-                    )
+                    snackbarHost = {
+                        SnackbarHost(
+                            hostState = snackbarHostState,
+                            modifier = Modifier.windowInsetsPadding(
+                                WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
+                            )
+                        )
+                    },
+                    contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)
                 ) { innerPadding ->
                     MainScreen(
                         routeUiState = routeUiState,
@@ -163,6 +169,7 @@ class MainActivity : ComponentActivity() {
                             }
                             ctx.startActivity(android.content.Intent.createChooser(intent, ctx.getString(R.string.compartir_local)))
                         },
+                        onDismissSyncChanges = { syncViewModel.clearChanges() },
                         onSharePromo = { promo ->
                             val text = buildString {
                                 appendLine("\uD83D\uDCE3 ${promo.productName}")

@@ -99,6 +99,22 @@ class RouteViewModelTest {
         throw AssertionError("Condición no cumplida dentro del timeout")
     }
 
+    private suspend fun awaitCoVerify(timeoutMs: Long = 5000, verification: suspend () -> Unit) {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        var lastError: Throwable? = null
+        while (System.currentTimeMillis() < deadline) {
+            testDispatcher.scheduler.advanceUntilIdle()
+            try {
+                verification()
+                return
+            } catch (e: Throwable) {
+                lastError = e
+                Thread.sleep(10)
+            }
+        }
+        throw lastError ?: AssertionError("coVerify no cumplido dentro del timeout")
+    }
+
     private fun createViewModel(): RouteViewModel {
         val vm = RouteViewModel(
             context = context,
@@ -128,7 +144,8 @@ class RouteViewModelTest {
         viewModel.selectRoute("RUTA-1")
         awaitOnMain { (viewModel.uiState.value.route as? RouteDataState.Loaded)?.selectedRoute == "RUTA-1" }
 
-        coVerify { recentRoutesStore.addRoute("RUTA-1") }
+        awaitCoVerify { coVerify { recentRoutesStore.addRoute("RUTA-1") } }
+        awaitOnMain { (viewModel.uiState.value.route as? RouteDataState.Loaded)?.allLocales?.size == 1 }
         assertEquals("RUTA-1", repository.getActiveRuteroName())
         assertEquals(1, repository.getStats().totalLocales)
     }
@@ -143,7 +160,7 @@ class RouteViewModelTest {
         viewModel.selectRoute("EMU-2")
         awaitOnMain { (viewModel.uiState.value.route as? RouteDataState.Loaded)?.selectedRoute == "EMU-2" }
 
-        coVerify { preferencesRepository.setSelectedRoute("EMU-2") }
+        awaitCoVerify { coVerify { preferencesRepository.setSelectedRoute("EMU-2") } }
     }
 
     @Test
@@ -156,7 +173,7 @@ class RouteViewModelTest {
 
         val viewModel = createViewModel()
         viewModel.selectRoute("RUTA-1")
-        awaitOnMain { viewModel.uiState.value.selectedRoute == "RUTA-1" }
+        awaitOnMain { viewModel.uiState.value.entries.isNotEmpty() }
 
         viewModel.setCurrentDay(DiaSemana.LUNES)
         awaitOnMain { viewModel.uiState.value.currentDayLocales.size == 1 }
@@ -207,9 +224,7 @@ class RouteViewModelTest {
         awaitOnMain { (viewModel.uiState.value.route as? RouteDataState.Loaded)?.selectedRoute == "RUTA-1" }
 
         viewModel.exportRoute()
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        coVerify { routeExporter.exportAsImage("RUTA-1", entries, repository.getStats()) }
+        awaitCoVerify { coVerify { routeExporter.exportAsImage("RUTA-1", entries, repository.getStats()) } }
     }
 
     @Test

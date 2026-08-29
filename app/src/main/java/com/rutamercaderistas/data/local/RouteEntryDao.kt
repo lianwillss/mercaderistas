@@ -19,6 +19,9 @@ interface RouteEntryDao {
     @Query("SELECT * FROM route_entries WHERE rutero = :ruteroName")
     suspend fun getEntriesForRoute(ruteroName: String): List<RouteEntryEntity>
 
+    @Query("SELECT * FROM route_entries")
+    suspend fun getAllEntries(): List<RouteEntryEntity>
+
     @Query("SELECT COUNT(*) FROM route_entries WHERE rutero = :ruteroName")
     suspend fun countEntriesForRoute(ruteroName: String): Int
 

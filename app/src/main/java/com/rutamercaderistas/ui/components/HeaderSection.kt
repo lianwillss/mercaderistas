@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import com.rutamercaderistas.BuildConfig
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.MoreVert
@@ -39,7 +40,17 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import androidx.datastore.preferences.core.edit
+import kotlinx.coroutines.launch
+import com.rutamercaderistas.data.preferences.PreferencesRepository
+import com.rutamercaderistas.data.preferences.prefsDataStore
+import kotlinx.coroutines.flow.map
 import androidx.compose.ui.res.stringResource
 import com.rutamercaderistas.R
 import androidx.compose.runtime.Composable
@@ -101,10 +112,16 @@ fun HeaderSection(
     onCheckUpdate: () -> Unit = {},
     promosExpiringSoon: List<PromotionEntity> = emptyList(),
     onExpiringSoonClick: () -> Unit = {},
+    onGlobalSearch: () -> Unit = {},
 ) {
     var expanded by remember { mutableStateOf(value = false) }
     val haptic = LocalHapticFeedback.current
     val dimens = LocalAppDimens.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val userScale by context.prefsDataStore.data
+        .map { it[PreferencesRepository.KEY_FONT_SCALE] ?: 1f }
+        .collectAsState(initial = 1f)
     val themeBackground = MaterialTheme.colorScheme.background
 
     val infiniteTransition = rememberInfiniteTransition()
@@ -300,6 +317,24 @@ fun HeaderSection(
                         .size(dimens.touchMin)
                         .clip(CircleShape)
                         .background(Color.White.copy(alpha = 0.2f))
+                        .clickable { onGlobalSearch() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Search,
+                        contentDescription = stringResource(R.string.busqueda_titulo),
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Box(
+                    modifier = Modifier
+                        .size(dimens.touchMin)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.2f))
                         .clickable { expanded = true },
                     contentAlignment = Alignment.Center
                 ) {
@@ -345,6 +380,41 @@ fun HeaderSection(
                             Icon(Icons.Outlined.SystemUpdate, contentDescription = stringResource(R.string.header_buscar_actualizacion))
                         }
                     )
+                    HorizontalDivider()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.header_tamano_texto),
+                            style = MaterialTheme.typography.labelLarge,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    context.prefsDataStore.edit {
+                                        it[PreferencesRepository.KEY_FONT_SCALE] = (userScale - 0.1f).coerceIn(0.8f, 1.8f)
+                                    }
+                                }
+                            }
+                        ) {
+                            Text("A−", style = MaterialTheme.typography.labelLarge)
+                        }
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    context.prefsDataStore.edit {
+                                        it[PreferencesRepository.KEY_FONT_SCALE] = (userScale + 0.1f).coerceIn(0.8f, 1.8f)
+                                    }
+                                }
+                            }
+                        ) {
+                            Text("A+", style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
                 }
             }
         }

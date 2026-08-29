@@ -35,7 +35,7 @@ class BrandReference @Inject constructor(
         "ABEJA DORADA" to 8, "ALUSWEET" to 9, "TAGATOSA" to 10, "ASMODEE" to 11,
         "BAGNO" to 16, "BERRYSUR" to 18, "BESHOS" to 19, "BIGU" to 20,
         "BREDEN MASTER" to 24, "BY MARIA" to 26, "CALIFORNIA" to 27, "CALLAQUI" to 28,
-        "CASO Y CIA" to 32, "JUMEX" to 32, "SCRUB" to 32, "SCRUB DADDY" to 32,
+        "CASO Y CIA" to 32, "CASO & CIA" to 32, "JUMEX" to 32, "SCRUB" to 32, "SCRUB DADDY" to 32,
         "SUPERZINGS" to 32, "APPLIED NUTRITION" to 32,
         "CINNABON" to 45, "COMERCIAL SZ" to 46, "ETNIKER" to 46,
         "CORRALES DEL SUR" to 47, "CUK" to 51,
@@ -68,14 +68,11 @@ class BrandReference @Inject constructor(
 
     private val brandRanges: Map<String, IntRange> by lazy {
         val sorted = brandPages.entries.sortedBy { it.value }
+        val distinctStarts = sorted.map { it.value }.distinct().sorted()
         val result = mutableMapOf<String, IntRange>()
-        for (i in sorted.indices) {
-            val (name, start) = sorted[i]
-            val end = if (i < sorted.lastIndex) {
-                sorted[i + 1].value - 1
-            } else {
-                start + PAGES_PER_BRAND - 1
-            }
+        for ((name, start) in sorted) {
+            val end = distinctStarts.firstOrNull { it > start }?.minus(1)
+                ?: (start + PAGES_PER_BRAND - 1)
             result[name] = start..end.coerceAtLeast(start)
         }
         result

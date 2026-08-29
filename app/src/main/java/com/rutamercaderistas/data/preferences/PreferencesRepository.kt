@@ -7,10 +7,13 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import org.json.JSONArray
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -27,6 +30,9 @@ class PreferencesRepository @Inject constructor(
         private val KEY_DRIVE_URL = stringPreferencesKey("drive_url")
         private val KEY_TRANSPORT_MODE = stringPreferencesKey("transport_mode")
         private val KEY_LAST_VERSION_CODE = intPreferencesKey("last_version_code")
+        internal val KEY_FONT_SCALE = floatPreferencesKey("font_scale")
+        private val KEY_SEARCH_HISTORY = stringPreferencesKey("ean_search_history")
+        private const val SEARCH_HISTORY_MAX = 8
     }
 
     suspend fun getSelectedRoute(): String? =
@@ -78,5 +84,41 @@ class PreferencesRepository @Inject constructor(
 
     suspend fun setLastVersionCode(value: Int) {
         context.prefsDataStore.edit { it[KEY_LAST_VERSION_CODE] = value }
+    }
+
+    fun getFontScaleFlow(): Flow<Float> =
+        context.prefsDataStore.data.map { it[KEY_FONT_SCALE] ?: 1f }
+
+    suspend fun setFontScale(value: Float) {
+        context.prefsDataStore.edit { it[KEY_FONT_SCALE] = value.coerceIn(0.8f, 1.8f) }
+    }
+
+    fun getSearchHistoryFlow(): Flow<List<String>> =
+        context.prefsDataStore.data.map { prefs ->
+            prefs[KEY_SEARCH_HISTORY]?.let { raw ->
+                runCatching { JSONArray(raw) }
+                    .getOrElse { JSONArray() }
+                    .let { arr -> List(arr.length()) { i -> arr.getString(i) } }
+            } ?: emptyList()
+        }
+
+    suspend fun addSearchQuery(query: String) {
+        val q = query.trim()
+        if (q.isBlank()) return
+        context.prefsDataStore.edit { prefs ->
+            val existing = prefs[KEY_SEARCH_HISTORY]
+                ?.let { runCatching { JSONArray(it) }.getOrNull() } ?: JSONArray()
+            val list = (0 until existing.length()).map { existing.getString(it) }.toMutableList()
+            list.remove(q)
+            list.add(0, q)
+            val trimmed = list.take(SEARCH_HISTORY_MAX)
+            val next = JSONArray()
+            trimmed.forEach { next.put(it) }
+            prefs[KEY_SEARCH_HISTORY] = next.toString()
+        }
+    }
+
+    suspend fun clearSearchHistory() {
+        context.prefsDataStore.edit { it.remove(KEY_SEARCH_HISTORY) }
     }
 }

@@ -8,13 +8,28 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Scaffold
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
@@ -25,14 +40,21 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavHostController
 import androidx.navigation.toRoute
 import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.ui.navigation.AllLocalesRoute
 import com.rutamercaderistas.ui.navigation.EanSearchRoute
+import com.rutamercaderistas.ui.navigation.GlobalSearchRoute
 import com.rutamercaderistas.ui.navigation.MainRoute
 import com.rutamercaderistas.ui.navigation.ManualRoute
 import com.rutamercaderistas.ui.navigation.PromotionsRoute
+import androidx.compose.ui.platform.LocalConfiguration
+import com.rutamercaderistas.ui.components.AppBottomBar
+import com.rutamercaderistas.ui.components.AppNavigationRail
+import com.rutamercaderistas.ui.components.BottomBarKey
+import com.rutamercaderistas.ui.components.CodProvModal
 import com.rutamercaderistas.models.DiaSemana
 
 import com.rutamercaderistas.viewmodel.RouteUiState
@@ -41,6 +63,13 @@ import com.rutamercaderistas.viewmodel.SyncUiState
 private val slideUpEnter: EnterTransition = slideInVertically { it }
 private val slideDownEnter: EnterTransition = slideInVertically { -it }
 private val slideDownExit: ExitTransition = slideOutVertically { it }
+
+private fun NavHostController.navigateTopLevel(route: Any) {
+    navigate(route) {
+        popUpTo(graph.startDestinationId) { saveState = true }
+        launchSingleTop = true
+    }
+}
 
 @Composable
 fun MainScreen(
@@ -60,6 +89,7 @@ fun MainScreen(
     onAddressClick: (String) -> Unit,
     onShareLocal: (String) -> Unit,
     onSharePromo: (PromotionEntity) -> Unit,
+    onDismissSyncChanges: () -> Unit = {},
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -70,26 +100,73 @@ fun MainScreen(
         lightNavIcons = true,
     )
 
-    NavHost(
-        navController = navController,
-        startDestination = MainRoute,
-        modifier = modifier.fillMaxSize(),
-    ) {
+    val onGlobalSearch = { navController.navigate(GlobalSearchRoute) }
+
+    var showCodProv by remember { mutableStateOf(false) }
+
+    val dest = backStackEntry?.destination
+    val currentKey = when {
+        dest?.hasRoute<PromotionsRoute>() == true -> BottomBarKey.MARCAS
+        dest?.hasRoute<AllLocalesRoute>() == true -> BottomBarKey.VISITAS
+        dest?.hasRoute<EanSearchRoute>() == true -> BottomBarKey.EAN
+        else -> BottomBarKey.MAIN
+    }
+
+    val onBottomNav: (BottomBarKey) -> Unit = { key ->
+        when (key) {
+            BottomBarKey.MAIN -> navController.navigateTopLevel(MainRoute)
+            BottomBarKey.MARCAS -> navController.navigateTopLevel(PromotionsRoute)
+            BottomBarKey.VISITAS -> navController.navigateTopLevel(AllLocalesRoute())
+            BottomBarKey.EAN -> navController.navigateTopLevel(EanSearchRoute)
+            else -> {}
+        }
+    }
+
+    val isCompactWidth = LocalConfiguration.current.screenWidthDp < 600
+
+    Scaffold(
+        bottomBar = if (isCompactWidth) {
+            {
+                AppBottomBar(
+                    selectedKey = currentKey,
+                    onNavigate = onBottomNav,
+                    onCodProvClick = { showCodProv = true },
+                    stats = routeUiState.stats,
+                    marcasConPromo = routeUiState.marcasConPromo,
+                )
+            }
+        } else {
+            {}
+        },
+        contentWindowInsets = if (isCompactWidth) {
+            WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
+        } else {
+            WindowInsets(0.dp)
+        },
+    ) { scaffoldPadding ->
+        Row(modifier = Modifier.fillMaxSize()) {
+            if (!isCompactWidth) {
+                AppNavigationRail(
+                    selectedKey = currentKey,
+                    onNavigate = onBottomNav,
+                    onCodProvClick = { showCodProv = true },
+                    stats = routeUiState.stats,
+                    marcasConPromo = routeUiState.marcasConPromo,
+                )
+            }
+            NavHost(
+                navController = navController,
+                startDestination = MainRoute,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f)
+                    .padding(scaffoldPadding),
+            ) {
         composable<MainRoute> {
             MainRouteContent(
                 routeState = routeUiState,
                 syncState = syncUiState,
                 onCheckUpdate = onCheckUpdate,
-                onNavigateToAllLocales = {
-                    navController.navigate(AllLocalesRoute()) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToPromotions = {
-                    navController.navigate(PromotionsRoute) {
-                        launchSingleTop = true
-                    }
-                },
                 onNavigateToManual = {
                     navController.navigate(ManualRoute) {
                         launchSingleTop = true
@@ -105,11 +182,8 @@ fun MainScreen(
                 onBrandClick = onBrandClick,
                 onAddressClick = onAddressClick,
                 onShareLocal = onShareLocal,
-                onCodEanClick = {
-                    navController.navigate(EanSearchRoute) {
-                        launchSingleTop = true
-                    }
-                },
+                onGlobalSearch = onGlobalSearch,
+                onDismissSyncChanges = onDismissSyncChanges,
             )
         }
         composable<AllLocalesRoute>(
@@ -124,6 +198,7 @@ fun MainScreen(
                 onClose = { navController.popBackStack() },
                 onAddressClick = onAddressClick,
                 initialSearch = args.brand,
+                onGlobalSearch = onGlobalSearch,
             )
         }
         composable<PromotionsRoute>(
@@ -132,24 +207,46 @@ fun MainScreen(
             popEnterTransition = { slideDownEnter },
             popExitTransition = { slideDownExit },
         ) {
-            PromotionsOverviewScreen(
-                promotionsByBrand = routeUiState.promotionsByBrand,
-                chainToLocales = routeUiState.chainToLocales,
-                onClose = { navController.popBackStack() },
-                onRefresh = onRefreshPromotions,
-                isRefreshing = routeUiState.isPromotionsLoading,
-                onPromoClick = { brandName ->
-                    navController.navigate(AllLocalesRoute(brand = brandName)) {
-                        popUpTo<MainRoute> { inclusive = false }
-                    }
-                },
-                promotionErrorMessage = routeUiState.promotionErrorMessage,
-                onDismissError = onClearPromotionError,
-                routeBrands = routeUiState.routeBrands,
-                routeChains = routeUiState.routeChains,
-                onSharePromo = onSharePromo,
-            )
+            BoxWithConstraints {
+                val isWide = maxWidth >= 600.dp
+                if (isWide) {
+                    PromotionsListDetailScreen(
+                        promotionsByBrand = routeUiState.promotionsByBrand,
+                        allLocales = routeUiState.allLocales,
+                        chainToLocales = routeUiState.chainToLocales,
+                        onAddressClick = onAddressClick,
+                        onSharePromo = onSharePromo,
+                        onRefresh = onRefreshPromotions,
+                        isRefreshing = routeUiState.isPromotionsLoading,
+                        promotionErrorMessage = routeUiState.promotionErrorMessage,
+                        onDismissError = onClearPromotionError,
+                        routeBrands = routeUiState.routeBrands,
+                        routeChains = routeUiState.routeChains,
+                        onGlobalSearch = onGlobalSearch,
+                    )
+                } else {
+                    PromotionsOverviewScreen(
+                        promotionsByBrand = routeUiState.promotionsByBrand,
+                        chainToLocales = routeUiState.chainToLocales,
+                        onClose = { navController.popBackStack() },
+                        onRefresh = onRefreshPromotions,
+                        isRefreshing = routeUiState.isPromotionsLoading,
+                        onPromoClick = { brandName ->
+                            navController.navigate(AllLocalesRoute(brand = brandName)) {
+                                popUpTo<MainRoute> { inclusive = false }
+                            }
+                        },
+                        promotionErrorMessage = routeUiState.promotionErrorMessage,
+                        onDismissError = onClearPromotionError,
+                        routeBrands = routeUiState.routeBrands,
+                        routeChains = routeUiState.routeChains,
+                        onSharePromo = onSharePromo,
+                        onGlobalSearch = onGlobalSearch,
+                    )
         }
+    }
+        }
+
         composable<ManualRoute>(
             enterTransition = { slideUpEnter },
             exitTransition = { slideDownExit },
@@ -166,7 +263,28 @@ fun MainScreen(
         ) {
             EanSearchScreen(onBack = { navController.popBackStack() })
         }
+        composable<GlobalSearchRoute>(
+            enterTransition = { slideUpEnter },
+            exitTransition = { slideDownExit },
+            popEnterTransition = { slideDownEnter },
+            popExitTransition = { slideDownExit },
+        ) {
+            GlobalSearchScreen(
+                locales = routeUiState.allLocales,
+                promotions = routeUiState.promotionsByBrand.values.flatten(),
+                onAddressClick = onAddressClick,
+                onBrandClick = onBrandClick,
+                onBack = { navController.popBackStack() },
+            )
+        }
     }
+    }
+    }
+
+    CodProvModal(
+        visible = showCodProv,
+        onDismiss = { showCodProv = false },
+    )
 }
 
 @Composable

@@ -32,6 +32,8 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -54,12 +56,14 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import com.rutamercaderistas.R
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.ui.components.BrandCard
+import com.rutamercaderistas.ui.components.GlobalSearchAction
 import com.rutamercaderistas.ui.components.ScreenHeader
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.UrgencyOrange
@@ -75,7 +79,7 @@ import java.time.LocalDate
 fun PromotionsOverviewScreen(
     promotionsByBrand: Map<String, List<PromotionEntity>>,
     chainToLocales: Map<String, String> = emptyMap(),
-    onClose: () -> Unit,
+    onClose: () -> Unit = {},
     onRefresh: () -> Unit = {},
     isRefreshing: Boolean = false,
     onPromoClick: (brand: String) -> Unit = {},
@@ -84,11 +88,14 @@ fun PromotionsOverviewScreen(
     onDismissError: () -> Unit = {},
     routeBrands: Set<String> = emptySet(),
     routeChains: Set<String> = emptySet(),
+    showBack: Boolean = true,
+    onGlobalSearch: () -> Unit = {},
 ) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var soloMisMarcas by rememberSaveable { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val dimens = LocalAppDimens.current
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(rememberTopAppBarState())
 
     LaunchedEffect(promotionErrorMessage) {
         if (promotionErrorMessage != null) {
@@ -183,12 +190,15 @@ fun PromotionsOverviewScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
+            .nestedScroll(scrollBehavior.nestedScrollConnection)
     ) {
         ScreenHeader(
             onBack = onClose,
             title = stringResource(R.string.promociones_title),
             modifier = Modifier.background(MaterialTheme.colorScheme.surface),
-            verticalPadding = dimens.spacingLg,
+            scrollBehavior = scrollBehavior,
+            showBack = showBack,
+            trailingContent = { GlobalSearchAction(onGlobalSearch) },
         )
 
         Column(

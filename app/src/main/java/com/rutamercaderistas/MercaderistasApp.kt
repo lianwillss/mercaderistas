@@ -11,6 +11,7 @@ import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.viewmodel.UpdateViewModel
 import dagger.hilt.android.HiltAndroidApp
 import io.sentry.android.core.SentryAndroid
+import io.sentry.android.timber.SentryTimberIntegration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -52,6 +53,7 @@ class MercaderistasApp : Application(), Configuration.Provider {
                 options.dsn = dsn
                 options.tracesSampleRate = 0.2
                 options.environment = BuildConfig.BUILD_TYPE
+                options.addIntegration(SentryTimberIntegration())
             }
         } catch (e: Exception) {
             Timber.w(e, "Sentry initialization failed")

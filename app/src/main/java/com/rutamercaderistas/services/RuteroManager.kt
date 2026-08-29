@@ -126,4 +126,11 @@ class RuteroManager(
         emptyList()
     }
 
+    /**
+     * Carga todas las entradas de la planilla desde Room (para detectar cambios).
+     */
+    suspend fun loadAllEntries(): List<EntradaRuta> = withContext(Dispatchers.IO) {
+        routeEntryDao.getAllEntries().toDomain()
+    }
+
 }

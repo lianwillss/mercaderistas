@@ -102,4 +102,25 @@ val AppTypography = Typography(
         lineHeight = 14.sp,
         letterSpacing = 0.5.sp,
     ),
+    displaySmall = TextStyle(
+        fontFamily = InterFont,
+        fontWeight = FontWeight.Bold,
+        fontSize = 36.sp,
+        lineHeight = 44.sp,
+        letterSpacing = 0.sp,
+    ),
+    displayMedium = TextStyle(
+        fontFamily = InterFont,
+        fontWeight = FontWeight.Bold,
+        fontSize = 45.sp,
+        lineHeight = 52.sp,
+        letterSpacing = 0.sp,
+    ),
+    displayLarge = TextStyle(
+        fontFamily = InterFont,
+        fontWeight = FontWeight.Bold,
+        fontSize = 57.sp,
+        lineHeight = 64.sp,
+        letterSpacing = (-0.25).sp,
+    ),
 )

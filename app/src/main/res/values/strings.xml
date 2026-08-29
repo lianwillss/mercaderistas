@@ -1,6 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Ruta Mercaderistas</string>
+    <string name="reintentar">Reintentar</string>
+    <string name="sync_error_banner_cd">Error de sincronización</string>
+    <string name="sync_cambios_titulo">Cambios en la planilla</string>
+    <string name="sync_cambios_agregados">%1$d agregados</string>
+    <string name="sync_cambios_eliminados">%1$d quitados</string>
+    <string name="sync_cambios_movidos">%1$d movidos de día</string>
+    <string name="sync_cambios_cd">Cambios detectados en la planilla</string>
+    <string name="empty_state_titulo">Aún no hay datos</string>
+    <string name="empty_state_subtitulo">Sincronizá con la planilla para cargar tu ruta del día.</string>
+    <string name="empty_state_offline">No hay conexión. Conectate a internet para sincronizar la planilla.</string>
+    <string name="empty_state_accion">Sincronizar ahora</string>
+    <string name="empty_state_cd">Estado vacío: no hay datos cargados</string>
+    <string name="header_tamano_texto">Tamaño del texto</string>
     <string name="cargar_archivo">Cargar archivo Excel</string>
     <string name="sin_visitas">Sin visitas este día</string>
     <string name="cargando">Leyendo ruta…</string>
@@ -43,6 +56,7 @@
 
     <!-- Header -->
     <string name="header_rutero">RUTERO</string>
+    <string name="rutero_title">Rutero</string>
     <string name="header_en_linea">En línea · Actualizado %s</string>
     <string name="header_sin_conexion">Sin conexión</string>
     <string name="header_por_vencer">Por vencer (%d)</string>
@@ -86,6 +100,7 @@
 
     <!-- Promotions -->
     <string name="promociones_title">Promociones</string>
+    <string name="selecciona_marca_detalle">Selecciona una marca para ver sus locales</string>
     <string name="marcas_con_promociones">%d marcas con promociones</string>
     <string name="solo_mis_marcas">Solo mis marcas</string>
     <string name="solo_hoy">Solo hoy</string>
@@ -111,6 +126,14 @@
     <string name="todos_locales">Todos los locales</string>
     <string name="locales_count">%d locales</string>
     <string name="sin_numero">S/N</string>
+
+    <!-- Búsqueda global -->
+    <string name="busqueda_titulo">Buscar</string>
+    <string name="busqueda_hint">Locales y promociones</string>
+    <string name="busqueda_instruccion">Escribe para buscar en locales y promociones.</string>
+    <string name="busqueda_locales">Locales</string>
+    <string name="busqueda_promociones">Promociones</string>
+    <string name="busqueda_sin_resultados">Sin resultados</string>
 
     <!-- Manual -->
     <string name="manual_usuario_title">Manual de usuario</string>
@@ -288,4 +311,9 @@
     <string name="ean_scanning_cd">Iniciando escáner</string>
     <string name="ean_search_label">Buscar producto por nombre, EAN o SKU</string>
     <string name="ean_catalog_meta">Catálogo v%d · %d productos</string>
+    <string name="ean_no_results_hint">Revisa la ortografía o prueba con menos palabras.</string>
+    <string name="ean_clear_search">Limpiar búsqueda</string>
+    <string name="ean_recent_searches">Búsquedas recientes</string>
+    <string name="ean_clear_history">Limpiar historial</string>
+    <string name="ean_recent_chip_cd">Buscar %s</string>
 </resources>

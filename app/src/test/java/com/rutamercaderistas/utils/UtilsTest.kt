@@ -43,6 +43,23 @@ class UtilsTest {
         assertEquals("SANJOSE", "⭐ San José".cleanBrand())
     }
 
+    // ── normalizeMarca ──
+
+    @Test
+    fun `normalizeMarca treats ampersand as Y`() {
+        assertEquals("CASOYCIA", "CASO & CIA".normalizeMarca())
+    }
+
+    @Test
+    fun `normalizeMarca equates CASO Y CIA with CASO and CIA`() {
+        assertEquals("CASO Y CIA".normalizeMarca(), "CASO & CIA".normalizeMarca())
+    }
+
+    @Test
+    fun `normalizeMarca lowercases and strips spaces for ampersand brand`() {
+        assertEquals("CASOYCIA", "caso&cia".normalizeMarca())
+    }
+
     // ── normalizeChain ──
 
     @Test

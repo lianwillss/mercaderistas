@@ -54,22 +54,30 @@ import androidx.compose.ui.res.stringResource
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.R
 import com.rutamercaderistas.models.LocalDelDia
+import com.rutamercaderistas.ui.components.GlobalSearchAction
 import com.rutamercaderistas.ui.components.ScreenHeader
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.ui.theme.rs
 import com.rutamercaderistas.ui.theme.storeColor
 import com.rutamercaderistas.ui.theme.storeSoftColor
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AllLocalesScreen(
     locales: List<LocalDelDia>,
     onClose: () -> Unit,
     onAddressClick: (String) -> Unit,
     initialSearch: String = "",
+    onGlobalSearch: () -> Unit = {},
 ) {
     var searchQuery by rememberSaveable { mutableStateOf(initialSearch) }
     val dimens = LocalAppDimens.current
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(rememberTopAppBarState())
 
     LaunchedEffect(initialSearch) {
         if (initialSearch.isNotBlank()) searchQuery = initialSearch
@@ -96,11 +104,13 @@ fun AllLocalesScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
+            .nestedScroll(scrollBehavior.nestedScrollConnection)
     ) {
         ScreenHeader(
             onBack = onClose,
             title = stringResource(R.string.todos_locales),
-            verticalPadding = dimens.spacingMd,
+            scrollBehavior = scrollBehavior,
+            trailingContent = { GlobalSearchAction(onGlobalSearch) },
         )
 
         TextField(

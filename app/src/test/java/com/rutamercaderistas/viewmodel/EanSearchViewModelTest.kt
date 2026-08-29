@@ -2,6 +2,7 @@ package com.rutamercaderistas.viewmodel
 
 import com.rutamercaderistas.data.local.EanProductDao
 import com.rutamercaderistas.data.local.EanProductEntity
+import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.services.EanExcelParser
 import com.rutamercaderistas.services.EAN_DATA_VERSION
 import io.mockk.coEvery
@@ -27,12 +28,15 @@ class EanSearchViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var dao: EanProductDao
     private lateinit var parser: EanExcelParser
+    private lateinit var prefs: PreferencesRepository
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         dao = mockk(relaxed = true)
         parser = mockk(relaxed = true)
+        prefs = mockk(relaxed = true)
+        every { prefs.getSearchHistoryFlow() } returns flowOf(emptyList())
     }
 
     @After
@@ -49,12 +53,12 @@ class EanSearchViewModelTest {
         coEvery { dao.count() } returns 0
         coEvery { dao.hasUnnormalized() } returns 0
         every { dao.getAll() } returns flowOf(sample)
-        every { dao.searchAll(any()) } returns flowOf(emptyList())
+        every { dao.searchCandidates(any()) } returns flowOf(emptyList())
         coEvery { parser.loadFromAssets() } returns Result.success(2)
         coEvery { parser.getEanDataVersion() } returns 0
         coEvery { parser.setEanDataVersion(any()) } returns Unit
 
-        val vm = EanSearchViewModel(dao, parser)
+        val vm = EanSearchViewModel(dao, parser, prefs)
         testDispatcher.scheduler.advanceUntilIdle()
 
         val state = vm.uiState.value
@@ -69,18 +73,18 @@ class EanSearchViewModelTest {
     }
 
     @Test
-    fun `search query uses searchAll`() = runTest {
+    fun `search query uses searchCandidates`() = runTest {
         val found = listOf(
             EanProductEntity(eanPrincipal = "9999999999999", descripcionProducto = "FINDME", marca = "Z"),
         )
         coEvery { dao.count() } returns 5
         coEvery { dao.hasUnnormalized() } returns 0
         every { dao.getAll() } returns flowOf(emptyList())
-        every { dao.searchAll(any()) } returns flowOf(found)
+        every { dao.searchCandidates(any()) } returns flowOf(found)
         coEvery { parser.loadFromAssets() } returns Result.success(5)
         coEvery { parser.getEanDataVersion() } returns EAN_DATA_VERSION
 
-        val vm = EanSearchViewModel(dao, parser)
+        val vm = EanSearchViewModel(dao, parser, prefs)
         testDispatcher.scheduler.advanceUntilIdle()
         vm.onQueryChange("FINDME")
         testDispatcher.scheduler.advanceUntilIdle()
@@ -88,5 +92,35 @@ class EanSearchViewModelTest {
         val state = vm.uiState.value as EanSearchUiState.Ready
         assertEquals(1, state.results.size)
         assertEquals("FINDME", state.query)
+    }
+
+    @Test
+    fun `token search matches across word order`() = runTest {
+        val product = EanProductEntity(
+            eanPrincipal = "111",
+            descripcionProducto = "NAT ROMERO PISTACHO",
+            marca = "NAT NATURAL",
+            descripcionNorm = "nat romero pistacho",
+            descripcionNormNospace = "natromeropistacho",
+            marcaNorm = "nat natural",
+            marcaNormNospace = "natnatural",
+        )
+        coEvery { dao.count() } returns 5
+        coEvery { dao.hasUnnormalized() } returns 0
+        every { dao.getAll() } returns flowOf(emptyList())
+        // Ambos tokens deben traer candidatos; el filtro AND los combina.
+        every { dao.searchCandidates("nat") } returns flowOf(listOf(product))
+        every { dao.searchCandidates("pistacho") } returns flowOf(listOf(product))
+        coEvery { parser.loadFromAssets() } returns Result.success(5)
+        coEvery { parser.getEanDataVersion() } returns EAN_DATA_VERSION
+
+        val vm = EanSearchViewModel(dao, parser, prefs)
+        testDispatcher.scheduler.advanceUntilIdle()
+        vm.onQueryChange("pistacho nat")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = vm.uiState.value as EanSearchUiState.Ready
+        assertEquals(1, state.results.size)
+        assertEquals("NAT ROMERO PISTACHO", state.results.first().descripcionProducto)
     }
 }
