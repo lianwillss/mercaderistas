@@ -45,16 +45,17 @@ import androidx.navigation.toRoute
 import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.ui.navigation.AllLocalesRoute
+import com.rutamercaderistas.ui.navigation.CodProvRoute
 import com.rutamercaderistas.ui.navigation.EanSearchRoute
 import com.rutamercaderistas.ui.navigation.GlobalSearchRoute
 import com.rutamercaderistas.ui.navigation.MainRoute
 import com.rutamercaderistas.ui.navigation.ManualRoute
 import com.rutamercaderistas.ui.navigation.PromotionsRoute
+import com.rutamercaderistas.ui.navigation.SettingsRoute
 import androidx.compose.ui.platform.LocalConfiguration
 import com.rutamercaderistas.ui.components.AppBottomBar
 import com.rutamercaderistas.ui.components.AppNavigationRail
 import com.rutamercaderistas.ui.components.BottomBarKey
-import com.rutamercaderistas.ui.components.CodProvModal
 import com.rutamercaderistas.models.DiaSemana
 
 import com.rutamercaderistas.viewmodel.RouteUiState
@@ -102,12 +103,11 @@ fun MainScreen(
 
     val onGlobalSearch = { navController.navigate(GlobalSearchRoute) }
 
-    var showCodProv by remember { mutableStateOf(false) }
-
     val dest = backStackEntry?.destination
     val currentKey = when {
         dest?.hasRoute<PromotionsRoute>() == true -> BottomBarKey.MARCAS
-        dest?.hasRoute<AllLocalesRoute>() == true -> BottomBarKey.VISITAS
+        dest?.hasRoute<AllLocalesRoute>() == true -> BottomBarKey.LOCALES
+        dest?.hasRoute<CodProvRoute>() == true -> BottomBarKey.CODPROV
         dest?.hasRoute<EanSearchRoute>() == true -> BottomBarKey.EAN
         else -> BottomBarKey.MAIN
     }
@@ -116,9 +116,9 @@ fun MainScreen(
         when (key) {
             BottomBarKey.MAIN -> navController.navigateTopLevel(MainRoute)
             BottomBarKey.MARCAS -> navController.navigateTopLevel(PromotionsRoute)
-            BottomBarKey.VISITAS -> navController.navigateTopLevel(AllLocalesRoute())
+            BottomBarKey.LOCALES -> navController.navigateTopLevel(AllLocalesRoute())
+            BottomBarKey.CODPROV -> navController.navigateTopLevel(CodProvRoute)
             BottomBarKey.EAN -> navController.navigateTopLevel(EanSearchRoute)
-            else -> {}
         }
     }
 
@@ -130,9 +130,10 @@ fun MainScreen(
                 AppBottomBar(
                     selectedKey = currentKey,
                     onNavigate = onBottomNav,
-                    onCodProvClick = { showCodProv = true },
                     stats = routeUiState.stats,
                     marcasConPromo = routeUiState.marcasConPromo,
+                    promosExpiringToday = routeUiState.promosExpiringToday,
+                    hasPlanillaChanges = syncUiState.syncChanges?.isEmpty == false,
                 )
             }
         } else {
@@ -149,9 +150,10 @@ fun MainScreen(
                 AppNavigationRail(
                     selectedKey = currentKey,
                     onNavigate = onBottomNav,
-                    onCodProvClick = { showCodProv = true },
                     stats = routeUiState.stats,
                     marcasConPromo = routeUiState.marcasConPromo,
+                    promosExpiringToday = routeUiState.promosExpiringToday,
+                    hasPlanillaChanges = syncUiState.syncChanges?.isEmpty == false,
                 )
             }
             NavHost(
@@ -184,6 +186,7 @@ fun MainScreen(
                 onShareLocal = onShareLocal,
                 onGlobalSearch = onGlobalSearch,
                 onDismissSyncChanges = onDismissSyncChanges,
+                onOpenSettings = { navController.navigate(SettingsRoute) },
             )
         }
         composable<AllLocalesRoute>(
@@ -255,6 +258,14 @@ fun MainScreen(
         ) {
             ManualScreen(onClose = { navController.popBackStack() })
         }
+        composable<SettingsRoute>(
+            enterTransition = { slideUpEnter },
+            exitTransition = { slideDownExit },
+            popEnterTransition = { slideDownEnter },
+            popExitTransition = { slideDownExit },
+        ) {
+            SettingsScreen(onBack = { navController.popBackStack() })
+        }
         composable<EanSearchRoute>(
             enterTransition = { slideUpEnter },
             exitTransition = { slideDownExit },
@@ -262,6 +273,14 @@ fun MainScreen(
             popExitTransition = { slideDownExit },
         ) {
             EanSearchScreen(onBack = { navController.popBackStack() })
+        }
+        composable<CodProvRoute>(
+            enterTransition = { slideUpEnter },
+            exitTransition = { slideDownExit },
+            popEnterTransition = { slideDownEnter },
+            popExitTransition = { slideDownExit },
+        ) {
+            CodProvScreen(onBack = { navController.popBackStack() })
         }
         composable<GlobalSearchRoute>(
             enterTransition = { slideUpEnter },
@@ -280,11 +299,6 @@ fun MainScreen(
     }
     }
     }
-
-    CodProvModal(
-        visible = showCodProv,
-        onDismiss = { showCodProv = false },
-    )
 }
 
 @Composable

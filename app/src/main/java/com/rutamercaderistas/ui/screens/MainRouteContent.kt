@@ -96,6 +96,7 @@ fun MainRouteContent(
     onShareLocal: (String) -> Unit,
     onGlobalSearch: () -> Unit = {},
     onDismissSyncChanges: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
 ) {
     val entries = routeState.entries
     val selectedRoute = routeState.selectedRoute
@@ -160,6 +161,7 @@ fun MainRouteContent(
                 promosExpiringSoon = routeState.promosExpiringSoon,
                 onExpiringSoonClick = { showExpiringSoon = true },
                 onGlobalSearch = onGlobalSearch,
+                onOpenSettings = onOpenSettings,
             )
 
             if (isSyncing) {

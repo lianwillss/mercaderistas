@@ -22,3 +22,9 @@ data object EanSearchRoute
 
 @Serializable
 data object GlobalSearchRoute
+
+@Serializable
+data object SettingsRoute
+
+@Serializable
+data object CodProvRoute

@@ -69,7 +69,7 @@
 
     <!-- Stats -->
 <string name="stats_locales_label">Locales</string>
-    <string name="stats_marcas_label">Marcas</string>
+    <string name="stats_marcas_label">Promociones</string>
     <string name="stats_marcas_subtitle">Sin promociones</string>
     <string name="promociones_count">%d PROMOCIONES</string>
     <string name="promociones_word">PROMOCIONES</string>
@@ -316,4 +316,21 @@
     <string name="ean_recent_searches">Búsquedas recientes</string>
     <string name="ean_clear_history">Limpiar historial</string>
     <string name="ean_recent_chip_cd">Buscar %s</string>
+    <string name="header_ajustes">Ajustes</string>
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_font_size">Tamaño de texto</string>
+    <string name="settings_transport_mode">Modo de transporte</string>
+    <string name="settings_transit">Transporte público</string>
+    <string name="settings_drive">Auto</string>
+    <string name="settings_bike">Bicicleta</string>
+    <string name="settings_walk">A pie</string>
+    <string name="settings_clear_ean_cache">Borrar caché del catálogo EAN</string>
+    <string name="settings_clear_ean_cache_summary">Fuerza la reimportación de los productos al abrir Cód. EAN</string>
+    <string name="settings_clear_history">Borrar historial de búsqueda</string>
+    <string name="settings_about">Acerca de</string>
+    <string name="settings_version">Versión %s</string>
+    <string name="settings_ean_cleared">Caché del catálogo EAN borrada</string>
+    <string name="settings_history_cleared">Historial de búsqueda borrado</string>
+    <string name="locale_detail_placeholder">Selecciona un local para ver el detalle</string>
+    <string name="locale_clientes">Clientes</string>
 </resources>

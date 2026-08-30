@@ -72,6 +72,9 @@ class PreferencesRepository @Inject constructor(
     suspend fun getTransportMode(): String? =
         context.prefsDataStore.data.first()[KEY_TRANSPORT_MODE]
 
+    fun getTransportModeFlow(): Flow<String?> =
+        context.prefsDataStore.data.map { it[KEY_TRANSPORT_MODE] }
+
     suspend fun setTransportMode(value: String?) {
         context.prefsDataStore.edit { prefs ->
             if (value == null) prefs.remove(KEY_TRANSPORT_MODE)

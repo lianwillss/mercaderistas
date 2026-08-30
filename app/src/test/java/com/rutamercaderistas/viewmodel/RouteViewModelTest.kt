@@ -128,6 +128,7 @@ class RouteViewModelTest {
             groupPromotions = groupPromotions,
             computeChainToLocales = computeChainToLocales,
             computeRouteBrands = computeRouteBrands,
+            defaultDispatcher = testDispatcher,
         )
         createdViewModels.add(vm)
         return vm

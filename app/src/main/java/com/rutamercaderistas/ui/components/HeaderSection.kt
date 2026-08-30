@@ -34,6 +34,7 @@ import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.DropdownMenu
@@ -113,6 +114,7 @@ fun HeaderSection(
     promosExpiringSoon: List<PromotionEntity> = emptyList(),
     onExpiringSoonClick: () -> Unit = {},
     onGlobalSearch: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
 ) {
     var expanded by remember { mutableStateOf(value = false) }
     val haptic = LocalHapticFeedback.current
@@ -378,6 +380,16 @@ fun HeaderSection(
                         },
                         leadingIcon = {
                             Icon(Icons.Outlined.SystemUpdate, contentDescription = stringResource(R.string.header_buscar_actualizacion))
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.header_ajustes)) },
+                        onClick = {
+                            expanded = false
+                            onOpenSettings()
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Outlined.Settings, contentDescription = stringResource(R.string.header_ajustes))
                         }
                     )
                     HorizontalDivider()

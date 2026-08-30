@@ -21,9 +21,11 @@ import com.rutamercaderistas.services.RuteroManager
 import com.rutamercaderistas.services.RuteroRepository
 import com.rutamercaderistas.domain.model.effectiveChain
 import com.rutamercaderistas.domain.model.normalizeChain
+import com.rutamercaderistas.di.DefaultDispatcher
 import com.rutamercaderistas.utils.cleanBrand
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -105,6 +107,7 @@ class RouteViewModel @Inject constructor(
     private val groupPromotions: GroupPromotionsUseCase,
     private val computeChainToLocales: ComputeChainToLocalesUseCase,
     private val computeRouteBrands: ComputeRouteBrandsUseCase,
+    @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RouteUiState())
@@ -138,39 +141,43 @@ class RouteViewModel @Inject constructor(
         viewModelScope.launch {
             repository.entriesFlow.collect { entries ->
                 val versionAtStart = routeVersion
-                withContext(Dispatchers.Default) {
-                    val activeDays = if (entries.isNotEmpty()) {
-                        DiaSemana.todos().filter { repository.hasAnyVisitOnDay(it) }
-                    } else emptyList()
+                try {
+                    withContext(defaultDispatcher) {
+                        val activeDays = if (entries.isNotEmpty()) {
+                            DiaSemana.todos().filter { repository.hasAnyVisitOnDay(it) }
+                        } else emptyList()
 
-                    val stats = repository.getStats()
-                    val allLocales = repository.getAllLocales()
-                    val selectedRoute = repository.getActiveRuteroName()
-                    val routeBrands = computeRouteBrands(allLocales)
-                    val routeChains = allLocales.mapNotNull { locale ->
-                        effectiveChain(locale.cadena, locale.formato).takeIf { it.isNotBlank() }
-                    }.map { normalizeChain(it) }.toSet()
-                    val chainToLocales = computeChainToLocales(allLocales)
+                        val stats = repository.getStats()
+                        val allLocales = repository.getAllLocales()
+                        val selectedRoute = repository.getActiveRuteroName()
+                        val routeBrands = computeRouteBrands(allLocales)
+                        val routeChains = allLocales.mapNotNull { locale ->
+                            effectiveChain(locale.cadena, locale.formato).takeIf { it.isNotBlank() }
+                        }.map { normalizeChain(it) }.toSet()
+                        val chainToLocales = computeChainToLocales(allLocales)
 
-                    if (versionAtStart == routeVersion) {
-                        _uiState.update { state ->
-                            val previousCurrentDayLocales = (state.route as? RouteDataState.Loaded)?.currentDayLocales ?: emptyList()
-                            state.copy(
-                                route = RouteDataState.Loaded(
-                                    selectedRoute = selectedRoute,
-                                    entries = entries,
-                                    activeDays = activeDays,
-                                    currentDayLocales = previousCurrentDayLocales,
-                                    allLocales = allLocales,
-                                    stats = stats,
-                                ),
-                                chainToLocales = chainToLocales,
-                                routeBrands = routeBrands,
-                                routeChains = routeChains,
-                                needsInitialLoad = false,
-                            )
+                        if (versionAtStart == routeVersion) {
+                            _uiState.update { state ->
+                                val previousCurrentDayLocales = (state.route as? RouteDataState.Loaded)?.currentDayLocales ?: emptyList()
+                                state.copy(
+                                    route = RouteDataState.Loaded(
+                                        selectedRoute = selectedRoute,
+                                        entries = entries,
+                                        activeDays = activeDays,
+                                        currentDayLocales = previousCurrentDayLocales,
+                                        allLocales = allLocales,
+                                        stats = stats,
+                                    ),
+                                    chainToLocales = chainToLocales,
+                                    routeBrands = routeBrands,
+                                    routeChains = routeChains,
+                                    needsInitialLoad = false,
+                                )
+                            }
                         }
                     }
+                } catch (e: Exception) {
+                    Timber.e(e, "Error observando entradas de ruta")
                 }
 
                 loadCachedPromotions()
@@ -303,7 +310,7 @@ class RouteViewModel @Inject constructor(
     fun setCurrentDay(dia: DiaSemana?) {
         if (dia == null) return
         viewModelScope.launch {
-            val locales = withContext(Dispatchers.Default) { repository.getLocalesForDay(dia) }
+            val locales = withContext(defaultDispatcher) { repository.getLocalesForDay(dia) }
             _uiState.update { state ->
                 val currentRoute = state.route
                 if (currentRoute is RouteDataState.Loaded) {
