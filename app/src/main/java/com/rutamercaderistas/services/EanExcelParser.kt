@@ -14,7 +14,7 @@ import java.io.InputStream
 import java.text.Normalizer
 import javax.inject.Inject
 
-const val EAN_DATA_VERSION = 12
+const val EAN_DATA_VERSION = 13
 
 // Prefijo/sufijo de los archivos Excel de catálogo EAN en assets.
 // Para agregar más productos basta con soltar otro archivo "ean*.xlsx"
@@ -38,6 +38,11 @@ private val EAN_FILE_BRANDS = mapOf(
 // Se aplica al importar para que agrupen y se muestren con el nombre correcto.
 private val BRAND_ALIASES = mapOf(
     "lola" to "Kobbo",
+)
+
+// Marcas excluidas del catálogo EAN (ya no se comercializan).
+private val EXCLUDED_BRANDS = setOf(
+    "cinnabon",
 )
 
 // Nota aclaratoria para marcas canónicas (p. ej. "Kobbo" es la representación
@@ -217,6 +222,7 @@ class EanExcelParser @Inject constructor(
         // Colapsar espacios duplicados (p. ej. "DE  RAIZ" → "DE RAIZ") para que
         // la marca se muestre y agrupe correctamente.
         val marcaClean = marca.replace(Regex("\\s+"), " ").trim()
+        if (normalizeSearch(marcaClean) in EXCLUDED_BRANDS) return null
         val unBase = map.unBase?.let { getStringCellValue(row.getCell(it)) } ?: ""
         val unPedido = map.unPedido?.let { getStringCellValue(row.getCell(it)) } ?: ""
         val conversion = map.conversion?.let { getStringCellValue(row.getCell(it)) } ?: ""

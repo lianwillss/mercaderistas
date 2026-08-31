@@ -20,8 +20,8 @@ android {
         applicationId "com.rutamercaderistas"
         minSdk 26
         targetSdk 35
-        versionCode 11080
-        versionName "11.80"
+        versionCode 11081
+        versionName "11.81"
         resConfigs "es"
         def sentryDsn = keystoreProperties['SENTRY_DSN']?.toString()?.trim() ?: ""
         buildConfigField "String", "SENTRY_DSN", "\"$sentryDsn\""
