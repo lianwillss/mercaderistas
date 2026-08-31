@@ -329,6 +329,8 @@
     <string name="settings_clear_history">Borrar historial de búsqueda</string>
     <string name="settings_about">Acerca de</string>
     <string name="settings_version">Versión %s</string>
+    <string name="aplicar">Aplicar</string>
+    <string name="transporte_aplicado">Modo de transporte actualizado</string>
     <string name="settings_ean_cleared">Caché del catálogo EAN borrada</string>
     <string name="settings_history_cleared">Historial de búsqueda borrado</string>
     <string name="locale_detail_placeholder">Selecciona un local para ver el detalle</string>

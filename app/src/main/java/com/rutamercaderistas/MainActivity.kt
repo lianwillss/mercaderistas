@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.map
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -95,10 +96,9 @@ class MainActivity : ComponentActivity() {
             val snackbarHostState = remember { SnackbarHostState() }
             val ctx = LocalContext.current
 
-            var transportMode by remember { mutableStateOf("transit") }
-            LaunchedEffect(Unit) {
-                transportMode = preferencesRepository.getTransportMode() ?: "transit"
-            }
+            val transportMode by preferencesRepository.getTransportModeFlow()
+                .map { it ?: "transit" }
+                .collectAsStateWithLifecycle(initialValue = "transit")
 
             LaunchedEffect(syncUiState.snackbarMessage) {
                 syncUiState.snackbarMessage?.let {

@@ -25,10 +25,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -59,6 +63,9 @@ fun SettingsScreen(
     val context = LocalContext.current
     val fontScale by viewModel.fontScale.collectAsStateWithLifecycle()
     val transportMode by viewModel.transportMode.collectAsStateWithLifecycle()
+    var stagedTransport by remember { mutableStateOf<String?>(null) }
+    val displayMode = stagedTransport ?: transportMode
+    val hasPendingChange = stagedTransport != null && stagedTransport != transportMode
 
     Column(
         modifier = Modifier
@@ -115,11 +122,11 @@ fun SettingsScreen(
             SettingsCard(title = stringResource(R.string.settings_transport_mode)) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     TRANSPORT_OPTIONS.forEach { (key, labelRes) ->
-                        val selected = transportMode == key
+                        val selected = displayMode == key
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { viewModel.setTransportMode(key) }
+                                .clickable { stagedTransport = key }
                                 .padding(vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -137,6 +144,19 @@ fun SettingsScreen(
                                     tint = MaterialTheme.colorScheme.primary,
                                 )
                             }
+                        }
+                    }
+                    if (hasPendingChange) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                stagedTransport?.let { viewModel.setTransportMode(it) }
+                                Toast.makeText(context, R.string.transporte_aplicado, Toast.LENGTH_SHORT).show()
+                                stagedTransport = null
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(stringResource(R.string.aplicar))
                         }
                     }
                 }
