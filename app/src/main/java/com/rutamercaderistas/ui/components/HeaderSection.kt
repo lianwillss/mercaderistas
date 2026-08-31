@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import com.rutamercaderistas.BuildConfig
@@ -115,6 +117,7 @@ fun HeaderSection(
     onExpiringSoonClick: () -> Unit = {},
     onGlobalSearch: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    onRefreshPositioned: (Offset) -> Unit = {},
 ) {
     var expanded by remember { mutableStateOf(value = false) }
     val haptic = LocalHapticFeedback.current
@@ -298,6 +301,9 @@ fun HeaderSection(
                         .size(dimens.touchMin)
                         .clip(CircleShape)
                         .background(Color.White.copy(alpha = 0.2f))
+                        .onGloballyPositioned { coordinates ->
+                            onRefreshPositioned(coordinates.boundsInWindow().center)
+                        }
                         .clickable {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             onRefresh()

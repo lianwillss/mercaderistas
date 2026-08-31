@@ -32,6 +32,7 @@ class PreferencesRepository @Inject constructor(
         private val KEY_LAST_VERSION_CODE = intPreferencesKey("last_version_code")
         internal val KEY_FONT_SCALE = floatPreferencesKey("font_scale")
         private val KEY_SEARCH_HISTORY = stringPreferencesKey("ean_search_history")
+        val KEY_ONBOARDING_DONE = stringPreferencesKey("onboarding_done")
         private const val SEARCH_HISTORY_MAX = 8
     }
 
@@ -123,5 +124,12 @@ class PreferencesRepository @Inject constructor(
 
     suspend fun clearSearchHistory() {
         context.prefsDataStore.edit { it.remove(KEY_SEARCH_HISTORY) }
+    }
+
+    suspend fun isOnboardingDone(): Boolean =
+        context.prefsDataStore.data.first()[KEY_ONBOARDING_DONE] != null
+
+    suspend fun setOnboardingDone() {
+        context.prefsDataStore.edit { it[KEY_ONBOARDING_DONE] = "true" }
     }
 }

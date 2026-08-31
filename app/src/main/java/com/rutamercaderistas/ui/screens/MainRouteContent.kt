@@ -55,6 +55,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
@@ -97,6 +98,7 @@ fun MainRouteContent(
     onGlobalSearch: () -> Unit = {},
     onDismissSyncChanges: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    onRefreshPositioned: (Offset) -> Unit = {},
 ) {
     val entries = routeState.entries
     val selectedRoute = routeState.selectedRoute
@@ -162,6 +164,7 @@ fun MainRouteContent(
                 onExpiringSoonClick = { showExpiringSoon = true },
                 onGlobalSearch = onGlobalSearch,
                 onOpenSettings = onOpenSettings,
+                onRefreshPositioned = onRefreshPositioned,
             )
 
             if (isSyncing) {

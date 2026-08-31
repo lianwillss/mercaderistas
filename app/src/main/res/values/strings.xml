@@ -333,4 +333,21 @@
     <string name="settings_history_cleared">Historial de búsqueda borrado</string>
     <string name="locale_detail_placeholder">Selecciona un local para ver el detalle</string>
     <string name="locale_clientes">Clientes</string>
+    <string name="onboarding_rutero_title">Aquí está tu ruta</string>
+    <string name="onboarding_rutero_desc">Tu ruta del día con todos los locales asignados. Cambia de día arriba y toca un local para ver sus marcas.</string>
+    <string name="onboarding_promociones_title">Aquí ves promociones</string>
+    <string name="onboarding_promociones_desc">Promociones por marca con vigencia. El badge indica cuántas marcas tienen promo activa.</string>
+    <string name="onboarding_locales_title">Aquí están tus locales</string>
+    <string name="onboarding_locales_desc">Todos los locales de la ruta. Búsqueda difusa que tolera errores de tipeo y acentos.</string>
+    <string name="onboarding_codprov_title">Aquí consultas Cód. Prov</string>
+    <string name="onboarding_codprov_desc">Los 11 códigos de proveedor por marca. Toca un código para copiarlo.</string>
+    <string name="onboarding_ean_title">Aquí buscas códigos EAN</string>
+    <string name="onboarding_ean_desc">Escanea o escribe un código de barras. Historial, resaltado y catálogo por marca.</string>
+    <string name="onboarding_sync_title">Aquí sincronizas</string>
+    <string name="onboarding_sync_desc">Baja la planilla más reciente, detecta cambios, avisa si hay promociones por vencer y verifica si hay actualización disponible.</string>
+    <string name="onboarding_ajustes_title">Aquí están tus ajustes</string>
+    <string name="onboarding_ajustes_desc">Cambia tamaño de texto, modo de transporte y borra caché o historial.</string>
+    <string name="onboarding_next">Siguiente</string>
+    <string name="onboarding_got_it">¡Entendido!</string>
+    <string name="onboarding_skip">Omitir</string>
 </resources>

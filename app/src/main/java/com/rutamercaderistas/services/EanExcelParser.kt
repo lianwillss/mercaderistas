@@ -14,7 +14,7 @@ import java.io.InputStream
 import java.text.Normalizer
 import javax.inject.Inject
 
-const val EAN_DATA_VERSION = 11
+const val EAN_DATA_VERSION = 12
 
 // Prefijo/sufijo de los archivos Excel de catálogo EAN en assets.
 // Para agregar más productos basta con soltar otro archivo "ean*.xlsx"
@@ -30,6 +30,7 @@ private val EAN_FILE_BRANDS = mapOf(
     "loveco" to "Love Co",
     "caso_cia" to "CASO Y CIA",
     "nat" to "NAT NATURAL",
+    "up_wine" to "UP WINE",
 )
 
 // Alias de marca: la empresa ve algunas marcas con un nombre distinto al del
@@ -176,6 +177,7 @@ class EanExcelParser @Inject constructor(
                     }
                 }
                 "barra" in h -> codigoBarra = col
+                "sku" in h -> codCencosud = col
                 "cencosud" in h -> codCencosud = col
                 "proveedor" in h -> codProveedor = col
                 "marca" in h -> marca = col

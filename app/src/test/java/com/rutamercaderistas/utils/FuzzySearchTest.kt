@@ -44,4 +44,21 @@ class FuzzySearchTest {
         assertTrue(levenshtein("kit", "cit") <= 1)
         assertTrue(levenshtein("casa", "calle") >= 2)
     }
+
+    @Test
+    fun compactMatchIgnoresSpaces() {
+        assertTrue(fuzzyMatches("supermercado", "super mercado"))
+        assertTrue(fuzzyMatches("bymaria", "by maria"))
+    }
+
+    @Test
+    fun numericCodesTolerant() {
+        assertTrue(fuzzyMatches("13710", "13710"))
+        assertFalse(fuzzyMatches("99999", "13710"))
+    }
+
+    @Test
+    fun singleTokenDoesNotMatchUnrelatedMultiToken() {
+        assertFalse(fuzzyMatches("zzz", "panaderia del barrio supermercado"))
+    }
 }
