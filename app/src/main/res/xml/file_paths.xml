@@ -5,4 +5,5 @@
     <files-path name="manual" path="manual.pdf"/>
     <cache-path name="apk" path="apk/"/>
     <cache-path name="exports" path="route_exports/"/>
+    <cache-path name="share_images" path="share_images/"/>
 </paths>

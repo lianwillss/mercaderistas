@@ -243,7 +243,7 @@ fun HeaderSection(
                                 text = if (isOnline) stringResource(R.string.header_en_linea, lastSyncRelative)
                                        else stringResource(R.string.header_sin_conexion),
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White.copy(alpha = 0.75f),
+                                color = Color.White.copy(alpha = 0.90f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier
@@ -304,15 +304,19 @@ fun HeaderSection(
                         .onGloballyPositioned { coordinates ->
                             onRefreshPositioned(coordinates.boundsInWindow().center)
                         }
-                        .clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onRefresh()
-                        },
+                        .clickable(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onRefresh()
+                            },
+                            role = androidx.compose.ui.semantics.Role.Button,
+                        )
+                        .semantics { contentDescription = "Sincronizar ruta" },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Refresh,
-                        contentDescription = stringResource(R.string.header_actualizar_cd),
+                        contentDescription = null,
                         tint = Color.White,
                         modifier = Modifier.size(22.dp),
                     )
@@ -325,12 +329,16 @@ fun HeaderSection(
                         .size(dimens.touchMin)
                         .clip(CircleShape)
                         .background(Color.White.copy(alpha = 0.2f))
-                        .clickable { onGlobalSearch() },
+                        .clickable(
+                            onClick = { onGlobalSearch() },
+                            role = androidx.compose.ui.semantics.Role.Button,
+                        )
+                        .semantics { contentDescription = "Buscar locales y promociones" },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Search,
-                        contentDescription = stringResource(R.string.busqueda_titulo),
+                        contentDescription = null,
                         tint = Color.White,
                         modifier = Modifier.size(22.dp),
                     )
@@ -343,12 +351,16 @@ fun HeaderSection(
                         .size(dimens.touchMin)
                         .clip(CircleShape)
                         .background(Color.White.copy(alpha = 0.2f))
-                        .clickable { expanded = true },
+                        .clickable(
+                            onClick = { expanded = true },
+                            role = androidx.compose.ui.semantics.Role.Button,
+                        )
+                        .semantics { contentDescription = "Abrir menú" },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.MoreVert,
-                        contentDescription = stringResource(R.string.header_menu_cd),
+                        contentDescription = null,
                         tint = Color.White,
                         modifier = Modifier.size(22.dp),
                     )

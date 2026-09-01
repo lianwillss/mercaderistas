@@ -51,6 +51,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -91,8 +95,15 @@ fun OnboardingOverlay(
     var index by remember { mutableIntStateOf(0) }
     val step = steps[index]
     val isLast = index == steps.lastIndex
+    val titleForCd = stringResource(step.titleRes)
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .semantics {
+                contentDescription = "Guía de inicio, paso ${index + 1} de ${steps.size}: $titleForCd"
+            }
+    ) {
         val density = LocalDensity.current
         val maxWpx = constraints.maxWidth.toFloat()
         val maxHpx = constraints.maxHeight.toFloat()
@@ -115,7 +126,11 @@ fun OnboardingOverlay(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer(alpha = 0.99f)
-                .clickable { onDismiss() }
+                .clickable(
+                    onClick = { onDismiss() },
+                    role = Role.Button,
+                )
+                .semantics { contentDescription = "Cerrar guía" }
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 drawRect(Color.Black.copy(alpha = 0.62f))
@@ -172,7 +187,13 @@ fun OnboardingOverlay(
                         contentAlignment = Alignment.Center
                     ) { step.icon(MaterialTheme.colorScheme.primary) }
                     androidx.compose.foundation.layout.Spacer(Modifier.height(12.dp))
-                    Text(stringResource(step.titleRes), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                    Text(
+                        stringResource(step.titleRes),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.semantics { heading() }
+                    )
                     androidx.compose.foundation.layout.Spacer(Modifier.height(6.dp))
                     Text(stringResource(step.descRes), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
                     androidx.compose.foundation.layout.Spacer(Modifier.height(16.dp))

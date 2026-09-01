@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -69,6 +70,8 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.rutamercaderistas.ui.theme.AppDimens
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.LocalAppDimens
@@ -255,6 +258,7 @@ private fun SearchBarContent(
     TextField(
         value = searchQuery,
         onValueChange = onSearchChange,
+        label = { Text(stringResource(R.string.buscar_local_placeholder)) },
         placeholder = { Text(stringResource(R.string.buscar_local_placeholder)) },
         leadingIcon = {
             Icon(Icons.Outlined.Search, contentDescription = stringResource(R.string.buscar_cd), modifier = Modifier.size(18.dp))
@@ -270,6 +274,7 @@ private fun SearchBarContent(
         shape = ComponentShapes.textField,
         modifier = Modifier
             .fillMaxWidth()
+            .semantics { contentDescription = "Buscar local por nombre, código o dirección. Escribe para filtrar la lista." }
             .padding(horizontal = dimens.spacingMd, vertical = dimens.spacingXs)
     )
 }
@@ -421,10 +426,29 @@ private fun LocaleCardContent(
             }
             if (local.direccion.isNotBlank() || local.comuna.isNotBlank()) {
                 Spacer(modifier = Modifier.height(2.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .heightIn(min = 24.dp)
+                        .clickable(
+                            onClick = { onAddressClick(local.direccion) },
+                            role = Role.Button,
+                        )
+                        .semantics {
+                            val addr = buildString {
+                                if (local.direccion.isNotBlank()) append(local.direccion)
+                                if (local.comuna.isNotBlank()) {
+                                    if (isNotEmpty()) append(", ")
+                                    append(local.comuna)
+                                }
+                            }
+                            contentDescription = "Abrir $addr en Maps"
+                        }
+                        .padding(vertical = 2.dp),
+                ) {
                     Icon(
                         imageVector = Icons.Outlined.LocationOn,
-                        contentDescription = stringResource(R.string.direccion_cd),
+                        contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(12.dp)
                     )
@@ -441,10 +465,6 @@ private fun LocaleCardContent(
                         color = MaterialTheme.colorScheme.primary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.clickable(
-                            onClick = { onAddressClick(local.direccion) },
-                            role = Role.Button,
-                        )
                     )
                 }
             }
@@ -474,10 +494,29 @@ private fun LocaleDetailPane(
             Text(local.codigo, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (local.direccion.isNotBlank() || local.comuna.isNotBlank()) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .clickable(
+                        onClick = { onAddressClick(local.direccion) },
+                        role = Role.Button,
+                    )
+                    .semantics {
+                        val addr = buildString {
+                            if (local.direccion.isNotBlank()) append(local.direccion)
+                            if (local.comuna.isNotBlank()) {
+                                if (isNotEmpty()) append(", ")
+                                append(local.comuna)
+                            }
+                        }
+                        contentDescription = "Abrir $addr en Maps"
+                    }
+                    .padding(vertical = 4.dp),
+            ) {
                 Icon(
                     imageVector = Icons.Outlined.LocationOn,
-                    contentDescription = stringResource(R.string.direccion_cd),
+                    contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(16.dp)
                 )
@@ -492,7 +531,6 @@ private fun LocaleDetailPane(
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable(onClick = { onAddressClick(local.direccion) }, role = Role.Button),
                 )
             }
         }

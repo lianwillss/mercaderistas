@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -138,34 +139,36 @@ fun StoreCard(
                 Spacer(modifier = Modifier.width(dimens.spacingMd))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = local.local.ifBlank { stringResource(R.string.sin_numero) },
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.semantics { heading() },
-                        )
-                        if (hasPromos) {
-                            val promosCd = stringResource(R.string.promociones_cd)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Icon(
-                                imageVector = Icons.Outlined.LocalFireDepartment,
-                                contentDescription = promosCd,
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(dimens.iconSm),
+                    Column(modifier = Modifier.semantics(mergeDescendants = true) {}) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = local.local.ifBlank { stringResource(R.string.sin_numero) },
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.semantics { heading() },
+                            )
+                            if (hasPromos) {
+                                val promosCd = stringResource(R.string.promociones_cd)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.Outlined.LocalFireDepartment,
+                                    contentDescription = promosCd,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(dimens.iconSm),
+                                )
+                            }
+                        }
+
+                        if (local.codigo.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = local.codigo,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                    }
-
-                    if (local.codigo.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = local.codigo,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
                     }
 
                     if (local.direccion.isNotBlank() || local.comuna.isNotBlank()) {
@@ -174,16 +177,20 @@ fun StoreCard(
                         Row(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(12.dp))
+                                .heightIn(min = 48.dp)
                                 .clickable(
                                     onClick = { onAddressClick(local.direccion) },
                                     role = androidx.compose.ui.semantics.Role.Button,
                                 )
+                                .semantics {
+                                    contentDescription = "Abrir ${local.direccion} en Maps"
+                                }
                                 .padding(vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.LocationOn,
-                                contentDescription = stringResource(R.string.direccion_cd),
+                                contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(13.dp)
                             )
@@ -219,21 +226,13 @@ fun StoreCard(
                 val sharePromosPlural: (Int) -> String = { count ->
                     shareContext.resources.getQuantityString(R.plurals.promos_count_plural, count, count)
                 }
+                var showShareSheet by remember { mutableStateOf(false) }
                 Box(
                     modifier = Modifier
                         .size(dimens.touchMin)
                         .clip(CircleShape)
                         .clickable(
-                            onClick = {
-                                val shareText = buildStoreShareText(
-                                    local = local,
-                                    promotionsByBrand = promotionsByBrand,
-                                    brandCleanCache = brandCleanCache,
-                                    marcasLabel = shareMarcasLabel,
-                                    promosPlural = sharePromosPlural,
-                                )
-                                onShareLocal(shareText)
-                            },
+                            onClick = { showShareSheet = true },
                             role = androidx.compose.ui.semantics.Role.Button,
                         )
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)),
@@ -244,6 +243,75 @@ fun StoreCard(
                         contentDescription = stringResource(R.string.compartir),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(dimens.iconSm),
+                    )
+                }
+                if (showShareSheet) {
+                    ShareSelectorSheet(
+                        visible = true,
+                        onDismiss = { showShareSheet = false },
+                        onShare = { mode, includeMaps ->
+                            when (mode) {
+                                ShareMode.SOLO_MARCAS -> {
+                                    val text = buildStoreShareText(
+                                        local = local,
+                                        promotionsByBrand = promotionsByBrand,
+                                        brandCleanCache = brandCleanCache,
+                                        marcasLabel = shareMarcasLabel,
+                                        promosPlural = sharePromosPlural,
+                                        includePromos = false,
+                                        includeMapsLink = includeMaps,
+                                    )
+                                    onShareLocal(text)
+                                }
+                                ShareMode.CON_PROMOS -> {
+                                    val text = buildStoreShareText(
+                                        local = local,
+                                        promotionsByBrand = promotionsByBrand,
+                                        brandCleanCache = brandCleanCache,
+                                        marcasLabel = shareMarcasLabel,
+                                        promosPlural = sharePromosPlural,
+                                        includePromos = true,
+                                        includeMapsLink = includeMaps,
+                                    )
+                                    onShareLocal(text)
+                                }
+                                ShareMode.CON_MAPA -> {
+                                    val promosMap = if (includeMaps) promotionsByBrand else emptyMap()
+                                    val file = com.rutamercaderistas.util.ShareImageGenerator.generateForLocal(
+                                        context = shareContext,
+                                        localName = local.local,
+                                        address = local.direccion,
+                                        comuna = local.comuna,
+                                        marcas = local.clientes.map { it.nombre },
+                                        promosByBrand = local.clientes.associate { c ->
+                                            val clean = brandCleanCache[c.nombre] ?: c.nombre.cleanBrand()
+                                            val count = promotionsByBrand[clean].orEmpty()
+                                                .filter { matchesChain(it.chain, local.local, local.cadena, local.formato) }.size
+                                            c.nombre to count
+                                        },
+                                    )
+                                    val uri = androidx.core.content.FileProvider.getUriForFile(
+                                        shareContext, "${shareContext.packageName}.fileprovider", file
+                                    )
+                                    val shareText = buildStoreShareText(
+                                        local = local,
+                                        promotionsByBrand = promotionsByBrand,
+                                        brandCleanCache = brandCleanCache,
+                                        marcasLabel = shareMarcasLabel,
+                                        promosPlural = sharePromosPlural,
+                                        includePromos = true,
+                                        includeMapsLink = includeMaps,
+                                    )
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                        type = "image/png"
+                                        putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                        putExtra(android.content.Intent.EXTRA_TEXT, shareText)
+                                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    shareContext.startActivity(android.content.Intent.createChooser(intent, shareContext.getString(R.string.compartir)))
+                                }
+                            }
+                        }
                     )
                 }
 
@@ -324,25 +392,41 @@ private fun buildStoreShareText(
     brandCleanCache: Map<String, String>,
     marcasLabel: String,
     promosPlural: (Int) -> String,
+    includePromos: Boolean = true,
+    includeMapsLink: Boolean = true,
 ): String {
     return buildString {
-        appendLine("\uD83C\uDFEA ${local.local.ifBlank { "S/N" }}")
+        appendLine("*\uD83C\uDFEA ${local.local.ifBlank { "S/N" }}*")
         if (local.direccion.isNotBlank()) appendLine("\uD83D\uDCCD ${local.direccion}")
         if (local.comuna.isNotBlank()) appendLine("\uD83C\uDFD9\uFE0F ${local.comuna}")
+        if (includeMapsLink && local.direccion.isNotBlank()) {
+            val mapsLink = "https://www.google.com/maps/search/?api=1&query=${local.direccion.replace(" ", "+")},${local.comuna.replace(" ", "+")}"
+            appendLine(mapsLink)
+        }
         appendLine()
         if (local.clientes.isNotEmpty()) {
-            appendLine(marcasLabel)
+            appendLine("*${marcasLabel}*")
             local.clientes.forEach { c ->
-                val clean = brandCleanCache[c.nombre] ?: c.nombre.cleanBrand()
-                val promos = promotionsByBrand[clean].orEmpty()
-                    .filter { matchesChain(it.chain, local.local, local.cadena, local.formato) }
-                append("  \u2022 ${c.nombre}")
-                if (promos.isNotEmpty()) append(" \uD83D\uDD25 ${promosPlural(promos.size)}")
-                appendLine()
-                promos.forEach { p ->
-                    append("    - ${p.productName}")
-                    if (p.price.isNotBlank()) append(" \uD83D\uDCB0 ${p.price}")
+                appendLine("  \u2022 ${c.nombre}")
+            }
+            if (includePromos) {
+                val promosByBrand = local.clientes.mapNotNull { c ->
+                    val clean = brandCleanCache[c.nombre] ?: c.nombre.cleanBrand()
+                    val promos = promotionsByBrand[clean].orEmpty()
+                        .filter { matchesChain(it.chain, local.local, local.cadena, local.formato) }
+                    if (promos.isNotEmpty()) c.nombre to promos else null
+                }
+                if (promosByBrand.isNotEmpty()) {
                     appendLine()
+                    appendLine("*\uD83D\uDD25 Promociones:*")
+                    promosByBrand.forEach { (brand, promos) ->
+                        appendLine("  *$brand* \u2014 ${promosPlural(promos.size)}")
+                        promos.forEach { p ->
+                            append("    \u2022 ${p.productName}")
+                            if (p.price.isNotBlank()) append(" \uD83D\uDCB0 ${p.price}")
+                            appendLine()
+                        }
+                    }
                 }
             }
         }

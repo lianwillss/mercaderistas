@@ -65,6 +65,12 @@
     <string name="header_compartir_ruta">Compartir ruta</string>
     <string name="header_buscar_actualizacion">Buscar actualización</string>
     <string name="header_actualizar_cd">Actualizar</string>
+    <string name="header_sincronizar_cd">Sincronizar ruta</string>
+    <string name="header_buscar_cd">Buscar locales y promociones</string>
+    <string name="abrir_maps_cd">Abrir %s en Maps</string>
+    <string name="bottom_tab_cd">%s, pestaña %d de 5</string>
+    <string name="bottom_tab_seleccionada_cd">Seleccionada</string>
+    <string name="bottom_tab_no_seleccionada_cd">No seleccionada</string>
     <string name="header_menu_cd">Menú</string>
 
     <!-- Stats -->
@@ -352,4 +358,12 @@
     <string name="onboarding_next">Siguiente</string>
     <string name="onboarding_got_it">¡Entendido!</string>
     <string name="onboarding_skip">Omitir</string>
+
+    <!-- Compartir selector -->
+    <string name="compartir_titulo">Compartir</string>
+    <string name="compartir_solo_marcas">Solo marcas</string>
+    <string name="compartir_con_promos">Con promociones</string>
+    <string name="compartir_con_mapa">Con mapa (imagen)</string>
+    <string name="compartir_incluir_maps">Incluir link de Maps</string>
+    <string name="compartir_cancelar">Cancelar</string>
 </resources>
