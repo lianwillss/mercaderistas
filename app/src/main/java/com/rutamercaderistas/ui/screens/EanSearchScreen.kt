@@ -539,7 +539,15 @@ private fun EanProductCard(
                             color = MaterialTheme.colorScheme.secondary,
                         )
                     }
-                    if (product.codProveedor.isNotBlank()) {
+                    if (product.conversion.isNotBlank()) {
+                        EanCodeChip(
+                            label = "CAJA",
+                            value = product.conversion,
+                            query = query,
+                            color = MaterialTheme.colorScheme.tertiary,
+                        )
+                    }
+                    if (product.codProveedor.isNotBlank() && product.codProveedor.trim() != "19") {
                         EanCodeChip(
                             label = "Prov",
                             value = product.codProveedor,

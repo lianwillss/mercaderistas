@@ -65,7 +65,8 @@ class PromotionRepository @Inject constructor(
                     val mapper = ColumnMapper()
                     mapper.map(headers)
                     val idxBrand = mapper.getIndex("MARCA", "BRAND", "PRODUCTO")
-                    val idxChain = mapper.getIndex("CADENA", "CHAIN", "TIENDA", "SUBCADENA")
+                    val idxChain = mapper.getIndex("CADENA", "CHAIN", "TIENDA")
+                    val idxSubChain = mapper.getIndex("SUBCADENA", "SUBTIENDA")
                     val idxStart = mapper.getIndex("INICIO", "DESDE", "INICIAL")
                     val idxEnd = mapper.getIndex("FINAL", "HASTA", "FINALIZACION")
                     val idxProduct = mapper.getIndex("SKU", "NOMBRE", "PRODUCTO")
@@ -74,7 +75,7 @@ class PromotionRepository @Inject constructor(
                         Timber.w("Promociones: header no reconocido (%d cols): %s", headers.size, headers.joinToString(","))
                         return@withContext true
                     }
-                    val maxIdx = maxOf(idxBrand, idxChain, idxStart, idxEnd, idxProduct, idxPrice)
+                    val maxIdx = maxOf(idxBrand, idxChain, idxSubChain, idxStart, idxEnd, idxProduct, idxPrice)
 
                     Timber.d("Promociones: %d líneas en CSV (sin header)", lines.size)
 
@@ -91,7 +92,9 @@ class PromotionRepository @Inject constructor(
                         }
 
                         val brand = cols[idxBrand].trim()
-                        val chain = cols[idxChain].trim()
+                        val chainRaw = cols[idxChain].trim()
+                        val subChainRaw = if (idxSubChain != -1 && idxSubChain < cols.size) cols[idxSubChain].trim() else ""
+                        val chain = subChainRaw.takeIf { it.isNotBlank() } ?: chainRaw
                         val start = cols[idxStart].trim()
                         val end = cols[idxEnd].trim()
                         val product = if (idxProduct in cols.indices) cols[idxProduct].trim() else ""

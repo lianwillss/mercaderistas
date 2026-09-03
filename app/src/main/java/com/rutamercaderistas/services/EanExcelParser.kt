@@ -14,7 +14,7 @@ import java.io.InputStream
 import java.text.Normalizer
 import javax.inject.Inject
 
-const val EAN_DATA_VERSION = 17
+const val EAN_DATA_VERSION = 19
 
 // Prefijo/sufijo de los archivos Excel de catálogo EAN en assets.
 // Para agregar más productos basta con soltar otro archivo "ean*.xlsx"
@@ -118,13 +118,24 @@ class EanExcelParser @Inject constructor(
     // Evita productos duplicados al combinar varios archivos "ean*.xlsx" (o
     // dentro de uno solo). La clave es el EAN; si el EAN está vacío se usa el
     // SKU Cencosud. Los productos sin ninguno de los dos no se deduplican.
+    // Si un duplicado trae `conversion` (CAJA) y el original no, se fusiona.
     private fun dedupe(products: List<EanProductEntity>): List<EanProductEntity> {
-        val seen = mutableSetOf<String>()
-        return products.filter { p ->
+        val map = mutableMapOf<String, EanProductEntity>()
+        val blanks = mutableListOf<EanProductEntity>()
+        for (p in products) {
             val key = p.eanPrincipal.ifBlank { p.codCencosud }
-            if (key.isBlank()) return@filter true
-            seen.add(key)
+            if (key.isBlank()) {
+                blanks.add(p)
+                continue
+            }
+            val existing = map[key]
+            if (existing == null) {
+                map[key] = p
+            } else if (existing.conversion.isBlank() && p.conversion.isNotBlank()) {
+                map[key] = existing.copy(conversion = p.conversion)
+            }
         }
+        return map.values + blanks
     }
 
     private fun parse(inputStream: InputStream, defaultBrand: String? = null): List<EanProductEntity> {
@@ -231,7 +242,14 @@ class EanExcelParser @Inject constructor(
         if (normalizeSearch(marcaClean) in EXCLUDED_BRANDS) return null
         val unBase = map.unBase?.let { getStringCellValue(row.getCell(it)) } ?: ""
         val unPedido = map.unPedido?.let { getStringCellValue(row.getCell(it)) } ?: ""
-        val conversion = map.conversion?.let { getStringCellValue(row.getCell(it)) } ?: ""
+        val conversionRaw = map.conversion?.let { getStringCellValue(row.getCell(it)) } ?: ""
+        // Hardcoded CAJA para NAT NATURAL (su Excel no trae columna Conversión)
+        val conversion = when {
+            conversionRaw.isNotBlank() -> conversionRaw
+            codCencosud == "1846223" -> "16"
+            normalizeSearch(marcaClean) == "nat natural" -> "24"
+            else -> conversionRaw
+        }
         val estado = map.estado?.let { getStringCellValue(row.getCell(it)) } ?: ""
         val catN1Cencosud = map.catCencosud[0]?.let { getStringCellValue(row.getCell(it)) } ?: ""
         val catN2Cencosud = map.catCencosud[1]?.let { getStringCellValue(row.getCell(it)) } ?: ""
