@@ -103,6 +103,7 @@ fun MainScreen(
     onShareLocal: (String) -> Unit,
     onSharePromo: (PromotionEntity) -> Unit,
     onDismissSyncChanges: () -> Unit = {},
+    onClearValidationErrors: () -> Unit = {},
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -213,6 +214,7 @@ fun MainScreen(
                         onDismissSyncChanges = onDismissSyncChanges,
                         onOpenSettings = { navController.navigate(SettingsRoute) },
                         onRefreshPositioned = { refreshCenter = it },
+                        onClearValidationErrors = onClearValidationErrors,
                     )
                 }
                 composable<AllLocalesRoute>(

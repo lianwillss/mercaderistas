@@ -55,6 +55,7 @@ data class SyncUiState(
     val snackbarMessage: String? = null,
     val syncError: String? = null,
     val syncChanges: PlanillaChanges? = null,
+    val validationErrors: List<com.rutamercaderistas.domain.validation.ValidationError> = emptyList(),
 ) {
     val isSyncing: Boolean get() = state is SyncState.Syncing
     val syncPhase: String? get() = (state as? SyncState.Syncing)?.phase
@@ -67,6 +68,7 @@ class SyncViewModel @Inject constructor(
     private val repository: RuteroRepository,
     private val promotionRepository: PromotionRepository,
     private val brandReference: BrandReference,
+    private val preferencesRepository: com.rutamercaderistas.data.preferences.PreferencesRepository,
 ) : AndroidViewModel(application) {
 
     private val _state = MutableStateFlow(SyncUiState())
@@ -131,7 +133,7 @@ class SyncViewModel @Inject constructor(
 
     fun syncFromDrive() {
         syncJob?.cancel()
-        _state.value = _state.value.copy(state = SyncState.Syncing(), syncError = null, syncChanges = null)
+        _state.value = _state.value.copy(state = SyncState.Syncing(), syncError = null, syncChanges = null, validationErrors = emptyList())
         syncJob = viewModelScope.launch {
             val result = performDriveSync()
             _state.value = _state.value.copy(state = SyncState.Idle)
@@ -145,6 +147,15 @@ class SyncViewModel @Inject constructor(
         return withContext(Dispatchers.IO) {
             try {
                 val oldEntries = ruteroManager.loadAllEntries()
+                // Incremental: si el ETag no cambió, no hay nada que hacer
+                val lastETag = try { preferencesRepository.getLastSyncETag() } catch (_: Exception) { null }
+                if (lastETag != null) {
+                    val currentETag = try { com.rutamercaderistas.data.network.headForETag(Constants.DRIVE_EXPORT_URL) } catch (_: Exception) { null }
+                    if (currentETag != null && currentETag == lastETag) {
+                        _state.value = _state.value.copy(state = SyncState.Idle)
+                        return@withContext SyncResult.NoChange
+                    }
+                }
                 _state.value = _state.value.copy(state = SyncState.Syncing(phase = getApplication<Application>().getString(R.string.sync_descargando)))
                 val cacheBustedUrl = "${Constants.DRIVE_EXPORT_URL}&ts=${System.currentTimeMillis()}"
                 val bytes = downloadWithRetries(cacheBustedUrl)
@@ -156,7 +167,25 @@ class SyncViewModel @Inject constructor(
                     }
 
                 _state.value = _state.value.copy(state = SyncState.Syncing(phase = getApplication<Application>().getString(R.string.sync_procesando)))
+                // Hash incremental: si el contenido no cambió, no re-procesar
+                val lastHash = try { preferencesRepository.getLastSyncHash() } catch (_: Exception) { null }
+                val currentHash = try {
+                    val md = java.security.MessageDigest.getInstance("SHA-256")
+                    md.update(bytes)
+                    md.digest().joinToString("") { "%02x".format(it) }
+                } catch (_: Exception) { null }
+                if (lastHash != null && currentHash != null && lastHash == currentHash) {
+                    _state.value = _state.value.copy(state = SyncState.Idle)
+                    return@withContext SyncResult.NoChange
+                }
                 val changed = ruteroManager.saveMasterExcel(bytes)
+                if (currentHash != null) {
+                    try { preferencesRepository.setLastSyncHash(currentHash) } catch (_: Exception) {}
+                    try {
+                        val etag = com.rutamercaderistas.data.network.headForETag(Constants.DRIVE_EXPORT_URL)
+                        if (etag != null) preferencesRepository.setLastSyncETag(etag)
+                    } catch (_: Exception) {}
+                }
                 if (changed) {
                     _state.value = _state.value.copy(state = SyncState.Syncing(phase = getApplication<Application>().getString(R.string.sync_indexando)))
                     val indexOk = ruteroManager.createIndex()
@@ -165,7 +194,8 @@ class SyncViewModel @Inject constructor(
                         promotionRepository.refresh()
                         val newEntries = ruteroManager.loadAllEntries()
                         val changes = if (oldEntries.isEmpty()) PlanillaChanges() else computePlanillaChanges(oldEntries, newEntries)
-                        _state.value = _state.value.copy(state = SyncState.Idle, syncChanges = changes)
+                        val validationErrors = com.rutamercaderistas.domain.validation.PlanillaValidator.validateRutero(newEntries)
+                        _state.value = _state.value.copy(state = SyncState.Idle, syncChanges = changes, validationErrors = validationErrors)
                         SyncResult.Success(true)
                     } else {
                         _state.value = _state.value.copy(state = SyncState.Idle)
@@ -186,7 +216,7 @@ class SyncViewModel @Inject constructor(
 
     fun syncFromDriveWithRouteReload(currentRoute: String?) {
         syncJob?.cancel()
-        _state.value = _state.value.copy(state = SyncState.Syncing(), syncError = null, syncChanges = null)
+        _state.value = _state.value.copy(state = SyncState.Syncing(), syncError = null, syncChanges = null, validationErrors = emptyList())
         syncJob = viewModelScope.launch {
             val result = performDriveSync()
             when (result) {
@@ -234,6 +264,10 @@ class SyncViewModel @Inject constructor(
 
     fun clearChanges() {
         _state.value = _state.value.copy(syncChanges = null)
+    }
+
+    fun clearValidationErrors() {
+        _state.value = _state.value.copy(validationErrors = emptyList())
     }
 
     private fun computePlanillaChanges(old: List<EntradaRuta>, new: List<EntradaRuta>): PlanillaChanges {

@@ -37,6 +37,7 @@ class SyncViewModelTest {
     private lateinit var repository: RuteroRepository
     private lateinit var promotionRepository: PromotionRepository
     private lateinit var brandReference: BrandReference
+    private lateinit var preferencesRepository: com.rutamercaderistas.data.preferences.PreferencesRepository
     private lateinit var connectivityManager: ConnectivityManager
     private lateinit var clipboardManager: ClipboardManager
     private lateinit var viewModel: SyncViewModel
@@ -63,6 +64,7 @@ class SyncViewModelTest {
             coEvery { refresh() } returns true
         }
         brandReference = mockk(relaxed = true)
+        preferencesRepository = mockk(relaxed = true)
 
         viewModel = SyncViewModel(
             application = application,
@@ -70,6 +72,7 @@ class SyncViewModelTest {
             repository = repository,
             promotionRepository = promotionRepository,
             brandReference = brandReference,
+            preferencesRepository = preferencesRepository,
         )
     }
 

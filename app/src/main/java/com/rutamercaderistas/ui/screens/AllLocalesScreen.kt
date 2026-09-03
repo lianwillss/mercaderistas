@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -77,8 +78,16 @@ import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.ui.theme.rs
 import com.rutamercaderistas.ui.theme.storeColor
+import androidx.compose.ui.platform.LocalContext
+import androidx.datastore.preferences.core.edit
+import com.rutamercaderistas.data.preferences.PreferencesRepository
+import com.rutamercaderistas.data.preferences.prefsDataStore
 import com.rutamercaderistas.ui.theme.storeSoftColor
 import com.rutamercaderistas.utils.fuzzyMatches
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.collectAsState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -92,6 +101,39 @@ fun AllLocalesScreen(
     var searchQuery by rememberSaveable { mutableStateOf(initialSearch) }
     val dimens = LocalAppDimens.current
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(rememberTopAppBarState())
+    val context = LocalContext.current
+    var searchHistory by remember { mutableStateOf(emptyList<String>()) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        context.prefsDataStore.data.map { prefs ->
+            prefs[PreferencesRepository.KEY_LOCALES_SEARCH_HISTORY]?.let { raw ->
+                runCatching { org.json.JSONArray(raw) }
+                    .getOrElse { org.json.JSONArray() }
+                    .let { arr -> List(arr.length()) { i -> arr.getString(i) } }
+            } ?: emptyList()
+        }.collect { searchHistory = it }
+    }
+
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.isNotBlank() && searchQuery.length >= 2) {
+            kotlinx.coroutines.delay(800)
+            if (searchQuery.isNotBlank()) {
+                scope.launch {
+                    val prefs = context.prefsDataStore.data.first()
+                    val existing = prefs[PreferencesRepository.KEY_LOCALES_SEARCH_HISTORY]
+                        ?.let { runCatching { org.json.JSONArray(it) }.getOrNull() } ?: org.json.JSONArray()
+                    val list = (0 until existing.length()).map { existing.getString(it) }.toMutableList()
+                    list.remove(searchQuery.trim())
+                    list.add(0, searchQuery.trim())
+                    val trimmed = list.take(8)
+                    val next = org.json.JSONArray()
+                    trimmed.forEach { next.put(it) }
+                    context.prefsDataStore.edit { it[PreferencesRepository.KEY_LOCALES_SEARCH_HISTORY] = next.toString() }
+                }
+            }
+        }
+    }
 
     LaunchedEffect(initialSearch) {
         if (initialSearch.isNotBlank()) searchQuery = initialSearch
@@ -130,6 +172,8 @@ fun AllLocalesScreen(
             onClose = onClose,
             onAddressClick = onAddressClick,
             onGlobalSearch = onGlobalSearch,
+            searchHistory = searchHistory,
+            onHistoryClick = { searchQuery = it },
         )
     } else {
         AllLocalesSinglePane(
@@ -140,6 +184,8 @@ fun AllLocalesScreen(
             onAddressClick = onAddressClick,
             onGlobalSearch = onGlobalSearch,
             scrollBehavior = scrollBehavior,
+            searchHistory = searchHistory,
+            onHistoryClick = { searchQuery = it },
         )
     }
 }
@@ -154,6 +200,8 @@ private fun AllLocalesSinglePane(
     onAddressClick: (String) -> Unit,
     onGlobalSearch: () -> Unit,
     scrollBehavior: androidx.compose.material3.TopAppBarScrollBehavior,
+    searchHistory: List<String> = emptyList(),
+    onHistoryClick: (String) -> Unit = {},
 ) {
     val dimens = LocalAppDimens.current
     Column(
@@ -173,6 +221,8 @@ private fun AllLocalesSinglePane(
             searchQuery = searchQuery,
             onSearchChange = onSearchChange,
             dimens = dimens,
+            searchHistory = searchHistory,
+            onHistoryClick = onHistoryClick,
         )
         CountAndGrid(
             locales = locales,
@@ -192,6 +242,8 @@ private fun AllLocalesTwoPane(
     onClose: () -> Unit,
     onAddressClick: (String) -> Unit,
     onGlobalSearch: () -> Unit,
+    searchHistory: List<String> = emptyList(),
+    onHistoryClick: (String) -> Unit = {},
 ) {
     val dimens = LocalAppDimens.current
     var selected by remember { mutableStateOf<LocalDelDia?>(null) }
@@ -206,6 +258,8 @@ private fun AllLocalesTwoPane(
                 searchQuery = searchQuery,
                 onSearchChange = onSearchChange,
                 dimens = dimens,
+                searchHistory = searchHistory,
+                onHistoryClick = onHistoryClick,
             )
             Text(
                 text = stringResource(R.string.locales_count, locales.size),
@@ -254,29 +308,52 @@ private fun SearchBarContent(
     searchQuery: String,
     onSearchChange: (String) -> Unit,
     dimens: AppDimens,
+    searchHistory: List<String> = emptyList(),
+    onHistoryClick: (String) -> Unit = {},
 ) {
-    TextField(
-        value = searchQuery,
-        onValueChange = onSearchChange,
-        label = { Text(stringResource(R.string.buscar_local_placeholder)) },
-        placeholder = { Text(stringResource(R.string.buscar_local_placeholder)) },
-        leadingIcon = {
-            Icon(Icons.Outlined.Search, contentDescription = stringResource(R.string.buscar_cd), modifier = Modifier.size(18.dp))
-        },
-        trailingIcon = {
-            if (searchQuery.isNotEmpty()) {
-                IconButton(onClick = { onSearchChange("") }) {
-                    Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.limpiar_cd), modifier = Modifier.size(18.dp))
+    Column(modifier = Modifier.fillMaxWidth()) {
+        TextField(
+            value = searchQuery,
+            onValueChange = onSearchChange,
+            label = { Text(stringResource(R.string.buscar_local_placeholder)) },
+            placeholder = { Text(stringResource(R.string.buscar_local_placeholder)) },
+            leadingIcon = {
+                Icon(Icons.Outlined.Search, contentDescription = stringResource(R.string.buscar_cd), modifier = Modifier.size(18.dp))
+            },
+            trailingIcon = {
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { onSearchChange("") }) {
+                        Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.limpiar_cd), modifier = Modifier.size(18.dp))
+                    }
+                }
+            },
+            singleLine = true,
+            shape = ComponentShapes.textField,
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics { contentDescription = "Buscar local por nombre, código o dirección. Escribe para filtrar la lista." }
+                .padding(horizontal = dimens.spacingMd, vertical = dimens.spacingXs)
+        )
+        if (searchQuery.isBlank() && searchHistory.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = dimens.spacingMd, vertical = 4.dp)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                searchHistory.take(5).forEach { query ->
+                    androidx.compose.material3.AssistChip(
+                        onClick = { onHistoryClick(query) },
+                        label = { Text(query, maxLines = 1) },
+                        leadingIcon = {
+                            Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(14.dp))
+                        },
+                    )
                 }
             }
-        },
-        singleLine = true,
-        shape = ComponentShapes.textField,
-        modifier = Modifier
-            .fillMaxWidth()
-            .semantics { contentDescription = "Buscar local por nombre, código o dirección. Escribe para filtrar la lista." }
-            .padding(horizontal = dimens.spacingMd, vertical = dimens.spacingXs)
-    )
+        }
+    }
 }
 
 @Composable

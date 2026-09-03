@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,11 +29,12 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.CloudDownload
+import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,7 +57,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
@@ -72,6 +74,8 @@ import com.rutamercaderistas.ui.components.StoreCard
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.ui.theme.rs
+import com.rutamercaderistas.domain.validation.ValidationError
+import androidx.compose.ui.geometry.Offset
 import com.rutamercaderistas.viewmodel.RouteUiState
 import com.rutamercaderistas.viewmodel.SyncUiState
 import com.rutamercaderistas.viewmodel.PlanillaChanges
@@ -99,6 +103,7 @@ fun MainRouteContent(
     onDismissSyncChanges: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onRefreshPositioned: (Offset) -> Unit = {},
+    onClearValidationErrors: () -> Unit = {},
 ) {
     val entries = routeState.entries
     val selectedRoute = routeState.selectedRoute
@@ -195,6 +200,13 @@ fun MainRouteContent(
                 SyncChangesBanner(
                     changes = syncState.syncChanges!!,
                     onDismiss = onDismissSyncChanges,
+                )
+            }
+
+            if (syncState.validationErrors.isNotEmpty() && !isSyncing) {
+                ValidationErrorsBanner(
+                    errors = syncState.validationErrors,
+                    onDismiss = onClearValidationErrors,
                 )
             }
 
@@ -393,6 +405,115 @@ private fun SyncChangesBanner(changes: PlanillaChanges, onDismiss: () -> Unit) {
                 contentDescription = stringResource(R.string.cerrar),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+@Composable
+private fun ValidationErrorsBanner(errors: List<ValidationError>, onDismiss: () -> Unit) {
+    val dimens = LocalAppDimens.current
+    var showDetail by remember { mutableStateOf(false) }
+    val summary = "${errors.size} ${if (errors.size == 1) "error" else "errores"} de validación"
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = dimens.spacingLg, vertical = dimens.spacingXs)
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.errorContainer)
+            .semantics { contentDescription = "Validación: $summary" }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.WarningAmber,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onErrorContainer,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Validación de planilla",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = summary,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+        }
+        TextButton(onClick = { showDetail = true }) {
+            Text(text = "Ver detalle", color = MaterialTheme.colorScheme.onErrorContainer, fontWeight = FontWeight.Bold)
+        }
+        IconButton(onClick = onDismiss) {
+            Icon(
+                imageVector = Icons.Outlined.Close,
+                contentDescription = stringResource(R.string.cerrar),
+                tint = MaterialTheme.colorScheme.onErrorContainer,
+            )
+        }
+    }
+    if (showDetail) {
+        var visible by remember { mutableStateOf(true) }
+        LaunchedEffect(Unit) { visible = true }
+        // Simple modal using Box
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f))
+                .clickable { showDetail = false },
+            contentAlignment = Alignment.Center,
+        ) {
+            // Use Card for details
+            androidx.compose.material3.Card(
+                modifier = Modifier
+                    .fillMaxWidth(0.92f)
+                    .heightIn(max = 420.dp)
+                    .clickable(enabled = false, onClick = {}),
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Errores de validación (${errors.size})",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    androidx.compose.foundation.lazy.LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.weight(1f, fill = false),
+                    ) {
+                        items(errors.size) { idx ->
+                            val e = errors[idx]
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(MaterialTheme.shapes.small)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .padding(8.dp),
+                            ) {
+                                Text(
+                                    text = "Fila ${e.row} · ${e.field}: ${e.message}",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                if (e.value.isNotBlank()) {
+                                    Text(
+                                        text = e.value,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    TextButton(onClick = { showDetail = false }, modifier = Modifier.align(Alignment.End)) {
+                        Text(stringResource(R.string.cerrar))
+                    }
+                }
+            }
         }
     }
 }

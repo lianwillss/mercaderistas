@@ -9,6 +9,31 @@ import java.net.URI
 import java.net.URL
 import java.net.UnknownHostException
 
+suspend fun headForETag(
+    url: String,
+    connectTimeout: Int = 10_000,
+    readTimeout: Int = 10_000,
+): String? = withContext(Dispatchers.IO) {
+    var conn: HttpURLConnection? = null
+    try {
+        conn = URL(url).openConnection() as HttpURLConnection
+        conn.requestMethod = "HEAD"
+        conn.connectTimeout = connectTimeout
+        conn.readTimeout = readTimeout
+        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
+        conn.connect()
+        if (conn.responseCode in 200..299) {
+            return@withContext conn.getHeaderField("ETag") ?: conn.getHeaderField("etag")
+                ?: conn.getHeaderField("Last-Modified")
+        }
+        null
+    } catch (_: Exception) {
+        null
+    } finally {
+        conn?.disconnect()
+    }
+}
+
 suspend fun downloadBytes(
     url: String,
     connectTimeout: Int = 30_000,

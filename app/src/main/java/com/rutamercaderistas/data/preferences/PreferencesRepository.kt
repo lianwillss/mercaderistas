@@ -32,8 +32,12 @@ class PreferencesRepository @Inject constructor(
         private val KEY_LAST_VERSION_CODE = intPreferencesKey("last_version_code")
         internal val KEY_FONT_SCALE = floatPreferencesKey("font_scale")
         private val KEY_SEARCH_HISTORY = stringPreferencesKey("ean_search_history")
+        val KEY_LOCALES_SEARCH_HISTORY = stringPreferencesKey("locales_search_history")
         val KEY_ONBOARDING_DONE = stringPreferencesKey("onboarding_done")
+        private val KEY_LAST_SYNC_ETAG = stringPreferencesKey("last_sync_etag")
+        private val KEY_LAST_SYNC_HASH = stringPreferencesKey("last_sync_hash")
         private const val SEARCH_HISTORY_MAX = 8
+        private const val LOCALES_SEARCH_HISTORY_MAX = 8
     }
 
     suspend fun getSelectedRoute(): String? =
@@ -126,10 +130,59 @@ class PreferencesRepository @Inject constructor(
         context.prefsDataStore.edit { it.remove(KEY_SEARCH_HISTORY) }
     }
 
+    fun getLocalesSearchHistoryFlow(): Flow<List<String>> =
+        context.prefsDataStore.data.map { prefs ->
+            prefs[KEY_LOCALES_SEARCH_HISTORY]?.let { raw ->
+                runCatching { JSONArray(raw) }
+                    .getOrElse { JSONArray() }
+                    .let { arr -> List(arr.length()) { i -> arr.getString(i) } }
+            } ?: emptyList()
+        }
+
+    suspend fun addLocalesSearchQuery(query: String) {
+        val q = query.trim()
+        if (q.isBlank()) return
+        context.prefsDataStore.edit { prefs ->
+            val existing = prefs[KEY_LOCALES_SEARCH_HISTORY]
+                ?.let { runCatching { JSONArray(it) }.getOrNull() } ?: JSONArray()
+            val list = (0 until existing.length()).map { existing.getString(it) }.toMutableList()
+            list.remove(q)
+            list.add(0, q)
+            val trimmed = list.take(LOCALES_SEARCH_HISTORY_MAX)
+            val next = JSONArray()
+            trimmed.forEach { next.put(it) }
+            prefs[KEY_LOCALES_SEARCH_HISTORY] = next.toString()
+        }
+    }
+
+    suspend fun clearLocalesSearchHistory() {
+        context.prefsDataStore.edit { it.remove(KEY_LOCALES_SEARCH_HISTORY) }
+    }
+
     suspend fun isOnboardingDone(): Boolean =
         context.prefsDataStore.data.first()[KEY_ONBOARDING_DONE] != null
 
     suspend fun setOnboardingDone() {
         context.prefsDataStore.edit { it[KEY_ONBOARDING_DONE] = "true" }
+    }
+
+    suspend fun getLastSyncETag(): String? =
+        context.prefsDataStore.data.first()[KEY_LAST_SYNC_ETAG]
+
+    suspend fun setLastSyncETag(value: String?) {
+        context.prefsDataStore.edit { prefs ->
+            if (value == null) prefs.remove(KEY_LAST_SYNC_ETAG)
+            else prefs[KEY_LAST_SYNC_ETAG] = value
+        }
+    }
+
+    suspend fun getLastSyncHash(): String? =
+        context.prefsDataStore.data.first()[KEY_LAST_SYNC_HASH]
+
+    suspend fun setLastSyncHash(value: String?) {
+        context.prefsDataStore.edit { prefs ->
+            if (value == null) prefs.remove(KEY_LAST_SYNC_HASH)
+            else prefs[KEY_LAST_SYNC_HASH] = value
+        }
     }
 }

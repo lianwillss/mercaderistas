@@ -3,6 +3,7 @@ package com.rutamercaderistas.ui.components
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -38,6 +39,7 @@ import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SystemUpdate
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -65,9 +67,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
@@ -262,29 +266,72 @@ fun HeaderSection(
                         }
                         if (promosExpiringSoon.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(6.dp))
+                            val infinitePorVencer = rememberInfiniteTransition(label = "porVencer")
+                            val bgPulse by infinitePorVencer.animateFloat(
+                                initialValue = 0.90f, targetValue = 0.62f,
+                                animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
+                                label = "bgPulse"
+                            )
+                            val iconScale by infinitePorVencer.animateFloat(
+                                initialValue = 1f, targetValue = 1.18f,
+                                animationSpec = infiniteRepeatable(tween(650), RepeatMode.Reverse),
+                                label = "iconScale"
+                            )
+                            var countPopTarget by remember { mutableStateOf(1f) }
+                            val countScale by animateFloatAsState(
+                                targetValue = countPopTarget,
+                                animationSpec = tween(220, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+                                label = "countPop"
+                            )
+                            androidx.compose.runtime.LaunchedEffect(promosExpiringSoon.size) {
+                                countPopTarget = 1.22f
+                                kotlinx.coroutines.delay(180)
+                                countPopTarget = 1f
+                            }
                             Box(
                                 modifier = Modifier
+                                    .graphicsLayer { alpha = bgPulse }
+                                    .shadow(8.dp, shape = MaterialTheme.shapes.extraSmall)
                                     .clip(MaterialTheme.shapes.extraSmall)
-                                    .background(UrgencyOrangeSoft.copy(alpha = 0.9f))
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            colors = listOf(UrgencyOrange, Color(0xFFEF4444))
+                                        )
+                                    )
                                     .clickable(
                                         onClick = { onExpiringSoonClick() },
                                         role = androidx.compose.ui.semantics.Role.Button,
                                     )
-                                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.WarningAmber,
-                                        contentDescription = null,
-                                        tint = UrgencyOrange,
-                                        modifier = Modifier.size(16.dp),
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .size(22.dp)
+                                            .clip(CircleShape)
+                                            .background(Color.White),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.LocalFireDepartment,
+                                            contentDescription = null,
+                                            tint = Color(0xFFEF4444),
+                                            modifier = Modifier
+                                                .size(14.dp)
+                                                .graphicsLayer { scaleX = iconScale; scaleY = iconScale },
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = stringResource(R.string.header_por_vencer, promosExpiringSoon.size),
+                                        modifier = Modifier.graphicsLayer {
+                                            scaleX = countScale
+                                            scaleY = countScale
+                                        },
                                         style = MaterialTheme.typography.labelLarge,
-                                        color = UrgencyOrange,
+                                        color = Color.White,
+                                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
