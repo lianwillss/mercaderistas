@@ -312,28 +312,38 @@ private fun SearchBarContent(
     onHistoryClick: (String) -> Unit = {},
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        TextField(
-            value = searchQuery,
-            onValueChange = onSearchChange,
-            label = { Text(stringResource(R.string.buscar_local_placeholder)) },
-            placeholder = { Text(stringResource(R.string.buscar_local_placeholder)) },
-            leadingIcon = {
-                Icon(Icons.Outlined.Search, contentDescription = stringResource(R.string.buscar_cd), modifier = Modifier.size(18.dp))
-            },
-            trailingIcon = {
-                if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { onSearchChange("") }) {
-                        Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.limpiar_cd), modifier = Modifier.size(18.dp))
-                    }
+    TextField(
+        value = searchQuery,
+        onValueChange = onSearchChange,
+        label = { Text(stringResource(R.string.buscar_local_placeholder)) },
+        placeholder = { Text(stringResource(R.string.buscar_local_placeholder)) },
+        supportingText = {
+            if (searchQuery.isNotEmpty() && searchQuery.length < 2) {
+                Text(
+                    text = "Escribe al menos 2 caracteres",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        isError = searchQuery.length == 1,
+        leadingIcon = {
+            Icon(Icons.Outlined.Search, contentDescription = stringResource(R.string.buscar_cd), modifier = Modifier.size(18.dp))
+        },
+        trailingIcon = {
+            if (searchQuery.isNotEmpty()) {
+                IconButton(onClick = { onSearchChange("") }) {
+                    Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.limpiar_cd), modifier = Modifier.size(18.dp))
                 }
-            },
-            singleLine = true,
-            shape = ComponentShapes.textField,
-            modifier = Modifier
-                .fillMaxWidth()
-                .semantics { contentDescription = "Buscar local por nombre, código o dirección. Escribe para filtrar la lista." }
-                .padding(horizontal = dimens.spacingMd, vertical = dimens.spacingXs)
-        )
+            }
+        },
+        singleLine = true,
+        shape = ComponentShapes.textField,
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = "Buscar local por nombre, código o dirección. Escribe para filtrar la lista." }
+            .padding(horizontal = dimens.spacingMd, vertical = dimens.spacingXs)
+    )
         if (searchQuery.isBlank() && searchHistory.isNotEmpty()) {
             Row(
                 modifier = Modifier
@@ -419,17 +429,34 @@ private fun EmptyLocales(query: String) {
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                imageVector = Icons.Outlined.Store,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                modifier = Modifier.size(48.dp),
-            )
-            Spacer(modifier = Modifier.height(12.dp))
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Store,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(36.dp),
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = stringResource(R.string.sin_resultados_para, query),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 24.dp),
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.ean_no_results_hint),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
         }
     }

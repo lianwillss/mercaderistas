@@ -316,7 +316,7 @@ fun MainScreen(
                     popExitTransition = { slideDownExit },
                 ) {
                     GlobalSearchScreen(
-                        locales = routeUiState.allLocales,
+                        locales = routeUiState.allRuteroLocales.ifEmpty { routeUiState.allLocales },
                         promotions = routeUiState.promotionsByBrand.values.flatten(),
                         onAddressClick = onAddressClick,
                         onBrandClick = onBrandClick,

@@ -530,17 +530,26 @@ private fun FirstLaunchEmptyState(isOffline: Boolean, onSync: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(
-            imageVector = if (isOffline) Icons.Outlined.CloudOff else Icons.Outlined.CloudDownload,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(56.dp),
-        )
-        Spacer(modifier = Modifier.height(dimens.spacingMd))
+        Box(
+            modifier = Modifier
+                .size(96.dp)
+                .clip(androidx.compose.foundation.shape.CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = if (isOffline) Icons.Outlined.CloudOff else Icons.Outlined.CloudDownload,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(48.dp),
+            )
+        }
+        Spacer(modifier = Modifier.height(dimens.spacingLg))
         Text(
             text = stringResource(R.string.empty_state_titulo),
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
         )
         Spacer(modifier = Modifier.height(dimens.spacingXs))
         Text(
@@ -548,9 +557,13 @@ private fun FirstLaunchEmptyState(isOffline: Boolean, onSync: () -> Unit) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 16.dp),
         )
         Spacer(modifier = Modifier.height(dimens.spacingLg))
-        Button(onClick = onSync) {
+        Button(
+            onClick = onSync,
+            modifier = Modifier.fillMaxWidth(0.7f),
+        ) {
             Icon(Icons.Outlined.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
             Text(stringResource(R.string.empty_state_accion))

@@ -1,5 +1,6 @@
 package com.rutamercaderistas.ui.screens
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -26,6 +27,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Search
@@ -269,23 +276,28 @@ fun PromotionsOverviewScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
+                    .horizontalScroll(rememberScrollState())
+                    .animateContentSize(animationSpec = tween(300)),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (routeBrands.isNotEmpty()) {
-                    FilterChip(
-                        selected = soloMisMarcas,
-                        onClick = { soloMisMarcas = !soloMisMarcas },
-                        label = { Text(stringResource(R.string.solo_mis_marcas), style = MaterialTheme.typography.labelLarge) },
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
+                AnimatedVisibility(
+                    visible = routeBrands.isNotEmpty(),
+                    enter = expandHorizontally(animationSpec = tween(300)) + fadeIn(tween(200)),
+                    exit = shrinkHorizontally(animationSpec = tween(300)) + fadeOut(tween(200)),
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = soloMisMarcas,
+                            onClick = { soloMisMarcas = !soloMisMarcas },
+                            label = { Text(stringResource(R.string.solo_mis_marcas), style = MaterialTheme.typography.labelLarge) },
+                        )
+                    }
                 }
                 FilterChip(
                     selected = soloHoy,
                     onClick = { soloHoy = !soloHoy },
                     label = { Text(stringResource(R.string.solo_hoy), style = MaterialTheme.typography.labelLarge) },
                 )
-                Spacer(modifier = Modifier.width(4.dp))
                 allChains.forEach { chain ->
                     FilterChip(
                         selected = selectedChain == chain,

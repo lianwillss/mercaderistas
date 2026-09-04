@@ -11,8 +11,10 @@ import com.rutamercaderistas.domain.usecase.ComputeChainToLocalesUseCase
 import com.rutamercaderistas.domain.usecase.ComputeRouteBrandsUseCase
 import com.rutamercaderistas.domain.usecase.GroupPromotionsUseCase
 import com.rutamercaderistas.domain.usecase.GroupedPromotions
+import com.rutamercaderistas.models.ClienteInfo
 import com.rutamercaderistas.models.DiaSemana
 import com.rutamercaderistas.models.EntradaRuta
+import com.rutamercaderistas.models.toNaturalCase
 import com.rutamercaderistas.models.LocalDelDia
 import com.rutamercaderistas.R
 import com.rutamercaderistas.services.PromotionRepository
@@ -76,6 +78,7 @@ data class RouteUiState(
     val lastSyncRelative: String = "",
     val snackbarMessage: String? = null,
     val needsInitialLoad: Boolean = false,
+    val allRuteroLocales: List<LocalDelDia> = emptyList(),
 ) {
     val isDataLoaded: Boolean get() = route is RouteDataState.Loaded
     val selectedRoute: String? get() = (route as? RouteDataState.Loaded)?.selectedRoute
@@ -119,6 +122,7 @@ class RouteViewModel @Inject constructor(
         observeRoutes()
         observeRecentRoutes()
         observeEntries()
+        observeAllRuteroLocales()
     }
 
     private fun observeRoutes() {
@@ -133,6 +137,35 @@ class RouteViewModel @Inject constructor(
         viewModelScope.launch {
             recentRoutesStore.recentRoutesFlow.collect { recent ->
                 _uiState.update { it.copy(recentRoutes = recent) }
+            }
+        }
+    }
+
+    private fun toLocales(entries: List<EntradaRuta>): List<LocalDelDia> {
+        if (entries.isEmpty()) return emptyList()
+        return entries.groupBy { it.codigo.uppercase() + it.local.uppercase() }
+            .map { (_, ents) ->
+                val first = ents.first()
+                LocalDelDia(
+                    codigo = first.codigo,
+                    local = first.local.toNaturalCase(),
+                    direccion = first.direccion.toNaturalCase(),
+                    cadena = first.cadena,
+                    formato = first.formato,
+                    region = first.region,
+                    comuna = first.comuna,
+                    clientes = ents.map { e -> ClienteInfo(e.cliente, e.esPrioritaria, e.frecuencia) }.sortedByDescending { it.esPrioritaria }
+                )
+            }
+    }
+
+    private fun observeAllRuteroLocales() {
+        viewModelScope.launch {
+            val initial = withContext(defaultDispatcher) { toLocales(ruteroManager.loadAllEntries()) }
+            _uiState.update { it.copy(allRuteroLocales = initial) }
+            ruteroManager.ruterosFlow.collect {
+                val updated = withContext(defaultDispatcher) { toLocales(ruteroManager.loadAllEntries()) }
+                _uiState.update { it.copy(allRuteroLocales = updated) }
             }
         }
     }

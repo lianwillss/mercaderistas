@@ -5,9 +5,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,11 +41,22 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.datastore.preferences.core.edit
 import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.PromotionEntity
+import com.rutamercaderistas.data.preferences.PreferencesRepository
+import com.rutamercaderistas.data.preferences.prefsDataStore
 import com.rutamercaderistas.models.LocalDelDia
 import com.rutamercaderistas.ui.components.ScreenHeader
 import com.rutamercaderistas.ui.theme.LocalAppDimens
+import com.rutamercaderistas.utils.fuzzyMatches
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.collectAsState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,24 +71,78 @@ fun GlobalSearchScreen(
     val dimens = LocalAppDimens.current
     val focusManager = LocalFocusManager.current
     var searchQuery by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var searchHistory by remember { mutableStateOf(emptyList<String>()) }
 
-    val q = searchQuery.lowercase().trim()
-    val filteredLocales = remember(locales, q) {
-        if (q.isBlank()) emptyList()
-        else locales.filter {
-            it.local.lowercase().contains(q) ||
-                it.direccion.lowercase().contains(q) ||
-                it.codigo.lowercase().contains(q) ||
-                it.comuna.lowercase().contains(q) ||
-                it.cadena.lowercase().contains(q)
+    // Historial global (reusa locales history para coherencia)
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        context.prefsDataStore.data.map { prefs ->
+            prefs[PreferencesRepository.KEY_LOCALES_SEARCH_HISTORY]?.let { raw ->
+                runCatching { org.json.JSONArray(raw) }.getOrElse { org.json.JSONArray() }
+                    .let { arr -> List(arr.length()) { i -> arr.getString(i) } }
+            } ?: emptyList()
+        }.collect { searchHistory = it }
+    }
+    // Guardar en historial tras debounce
+    androidx.compose.runtime.LaunchedEffect(searchQuery) {
+        if (searchQuery.isNotBlank() && searchQuery.length >= 2) {
+            kotlinx.coroutines.delay(900)
+            if (searchQuery.isNotBlank()) {
+                scope.launch {
+                    val prefs = context.prefsDataStore.data.first()
+                    val existing = prefs[PreferencesRepository.KEY_LOCALES_SEARCH_HISTORY]
+                        ?.let { runCatching { org.json.JSONArray(it) }.getOrNull() } ?: org.json.JSONArray()
+                    val list = (0 until existing.length()).map { existing.getString(it) }.toMutableList()
+                    list.remove(searchQuery.trim())
+                    list.add(0, searchQuery.trim())
+                    val trimmed = list.take(8)
+                    val next = org.json.JSONArray()
+                    trimmed.forEach { next.put(it) }
+                    context.prefsDataStore.edit { it[PreferencesRepository.KEY_LOCALES_SEARCH_HISTORY] = next.toString() }
+                }
+            }
         }
     }
-    val filteredPromotions = remember(promotions, q) {
-        if (q.isBlank()) emptyList()
+
+    val q = searchQuery.trim()
+    val filteredLocales = remember(locales, searchQuery) {
+        if (searchQuery.isBlank()) emptyList()
+        else {
+            // Prioriza locales: búsqueda difusa por nombre y código (tolerante a tildes, typos y ceros)
+            val ranked = locales.mapNotNull { local ->
+                val haystack = buildString {
+                    append(local.local).append(' ')
+                    append(local.codigo).append(' ')
+                    append(local.direccion).append(' ')
+                    append(local.comuna).append(' ')
+                    append(local.cadena)
+                    if (local.clientes.isNotEmpty()) {
+                        append(' ')
+                        append(local.clientes.joinToString(" ") { it.nombre })
+                    }
+                }
+                if (!fuzzyMatches(searchQuery, haystack)) return@mapNotNull null
+                // score: código exacto > nombre exacto > difuso
+                val codeHit = local.codigo.lowercase().trimStart('0').contains(searchQuery.lowercase().trimStart('0')) ||
+                    local.codigo.lowercase().contains(searchQuery.lowercase())
+                val nameHit = local.local.lowercase().contains(searchQuery.lowercase())
+                val score = when {
+                    codeHit && searchQuery.any { it.isDigit() } -> 0
+                    nameHit -> 1
+                    else -> 2
+                }
+                score to local
+            }.sortedBy { it.first }.map { it.second }
+            ranked
+        }
+    }
+    val filteredPromotions = remember(promotions, searchQuery) {
+        if (searchQuery.isBlank()) emptyList()
         else promotions.filter {
-            it.productName.lowercase().contains(q) ||
-                it.brand.lowercase().contains(q) ||
-                it.chain.lowercase().contains(q)
+            fuzzyMatches(searchQuery, "${it.productName} ${it.brand} ${it.chain}") ||
+                it.productName.lowercase().contains(searchQuery.lowercase().trim()) ||
+                it.brand.lowercase().contains(searchQuery.lowercase().trim())
         }
     }
 
@@ -106,15 +176,61 @@ fun GlobalSearchScreen(
         )
 
         if (q.isBlank()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = stringResource(R.string.busqueda_instruccion),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            if (searchHistory.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = dimens.spacingXl, vertical = dimens.spacingMd),
+                ) {
+                    Text(
+                        text = "Búsquedas recientes",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        searchHistory.take(5).forEach { query ->
+                            androidx.compose.material3.AssistChip(
+                                onClick = { searchQuery = query },
+                                label = { Text(query, maxLines = 1) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Filled.Search,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp),
+                                    )
+                                },
+                            )
+                        }
+                    }
+                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(24.dp))
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.busqueda_instruccion),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            } else {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(R.string.busqueda_instruccion),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         } else {
             LazyColumn(
