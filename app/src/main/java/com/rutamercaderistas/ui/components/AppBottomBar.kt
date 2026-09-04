@@ -317,8 +317,8 @@ private fun BottomBarItem(
             }
             if (badge != null) {
                 androidx.compose.material3.Badge(
-                    containerColor = accent,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
                     modifier = Modifier.padding(top = 0.dp, end = 2.dp),
                 ) {
                     Text(badge, style = MaterialTheme.typography.labelSmall)

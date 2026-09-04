@@ -159,10 +159,10 @@ fun EanSearchScreen(
     }
 
     val tfColors = TextFieldDefaults.colors(
-        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         unfocusedIndicatorColor = Color.Transparent,
-        focusedIndicatorColor = Color.Transparent,
+        focusedIndicatorColor = MaterialTheme.colorScheme.primary,
         cursorColor = MaterialTheme.colorScheme.primary,
     )
 
