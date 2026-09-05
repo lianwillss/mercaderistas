@@ -14,7 +14,7 @@ import java.io.InputStream
 import java.text.Normalizer
 import javax.inject.Inject
 
-const val EAN_DATA_VERSION = 19
+const val EAN_DATA_VERSION = 20
 
 // Prefijo/sufijo de los archivos Excel de catálogo EAN en assets.
 // Para agregar más productos basta con soltar otro archivo "ean*.xlsx"
@@ -33,6 +33,7 @@ private val EAN_FILE_BRANDS = mapOf(
     "up_wine" to "UP WINE",
     "cuk" to "CUK",
     "tnogal" to "TNOGAL",
+    "olimpia_franui" to "OLIMPIA-FRANUI",
     "casoy" to "CASO Y CIA",
     "suk" to "SUK",
 )
@@ -203,6 +204,7 @@ class EanExcelParser @Inject constructor(
                 "marca" in h -> marca = col
                 "estado" in h -> estado = col
                 "conversion" in h || "convers" in h -> conversion = col
+                "caja" in h -> conversion = col
                 "pedido" in h -> unPedido = col
                 "base" in h -> unBase = col
                 "descrip" in h -> descripcion = col
@@ -302,7 +304,7 @@ class EanExcelParser @Inject constructor(
 
     private fun getStringCellValue(cell: Cell?): String {
         if (cell == null) return ""
-        return when (cell.cellType) {
+        val raw = when (cell.cellType) {
             CellType.STRING -> cell.stringCellValue.trim()
             CellType.NUMERIC -> {
                 // Handle numeric cells (codes that might be stored as numbers)
@@ -316,7 +318,10 @@ class EanExcelParser @Inject constructor(
             CellType.BOOLEAN -> cell.booleanCellValue.toString()
             CellType.FORMULA -> cell.stringCellValue.trim()
             else -> ""
-        }.also { it.trim() }
+        }
+        // Quita el apóstrofe inicial que Excel usa como marcador de texto
+        // (p. ej. "'7798147784442" → "7798147784442").
+        return raw.trim().removePrefix("'")
     }
 
     // Cargar desde assets (todos los archivos "ean_*.xlsx" se combinan)
