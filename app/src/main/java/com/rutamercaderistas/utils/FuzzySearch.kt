@@ -1,5 +1,8 @@
 package com.rutamercaderistas.utils
 
+import com.rutamercaderistas.domain.model.effectiveChain
+import com.rutamercaderistas.domain.model.normalizeChain
+import com.rutamercaderistas.models.LocalDelDia
 import com.rutamercaderistas.services.compactNorm
 import com.rutamercaderistas.services.normalizeSearch
 
@@ -35,6 +38,62 @@ private fun tokenFuzzy(qt: String, tt: String): Boolean {
     // Errores de tipeo: distancia de edición pequeña respecto al largo del token.
     val maxDist = if (qt.length <= 3) 0 else if (qt.length <= 6) 1 else 2
     return levenshtein(qt, tt) <= maxDist
+}
+
+/**
+ * Alias de cadena del lado query: lo que el usuario escribe vs el nombre
+ * canónico (sisa → santa isabel, walmart → lider).
+ */
+private val CHAIN_QUERY_ALIASES = mapOf(
+    "sisa" to "santa isabel",
+    "sta" to "santa isabel",
+    "walmart" to "lider",
+)
+
+private fun expandChainAliases(query: String): String {
+    var q = normalizeSearch(query)
+    for ((alias, canonical) in CHAIN_QUERY_ALIASES) {
+        q = q.replace(Regex("\\b$alias\\b"), canonical)
+    }
+    return q
+}
+
+/**
+ * Ranking de locales para la búsqueda global: código exacto (con ceros
+ * tolerados) > nombre exacto > difuso. También matchea por cadena
+ * (jumbo, sisa/santa isabel, lider/walmart, unimarc, alvi, etc.)
+ * usando la cadena normalizada. Función pura, testeable.
+ */
+fun rankLocales(query: String, locales: List<LocalDelDia>): List<LocalDelDia> {
+    if (query.isBlank()) return emptyList()
+    val expandedQuery = expandChainAliases(query)
+    return locales.mapNotNull { local ->
+        val chainNorm = normalizeChain(effectiveChain(local.cadena, local.formato))
+        val haystack = buildString {
+            append(local.local).append(' ')
+            append(local.codigo).append(' ')
+            append(local.direccion).append(' ')
+            append(local.comuna).append(' ')
+            append(local.cadena).append(' ')
+            append(local.formato).append(' ')
+            append(chainNorm)
+            if (local.clientes.isNotEmpty()) {
+                append(' ')
+                append(local.clientes.joinToString(" ") { it.nombre })
+            }
+        }
+        if (!fuzzyMatches(query, haystack) && !fuzzyMatches(expandedQuery, haystack)) return@mapNotNull null
+        val qLower = query.lowercase()
+        val codeHit = local.codigo.lowercase().trimStart('0').contains(qLower.trimStart('0')) ||
+            local.codigo.lowercase().contains(qLower)
+        val nameHit = local.local.lowercase().contains(qLower)
+        val score = when {
+            codeHit && query.any { it.isDigit() } -> 0
+            nameHit -> 1
+            else -> 2
+        }
+        score to local
+    }.sortedBy { it.first }.map { it.second }
 }
 
 fun levenshtein(lhs: CharSequence, rhs: CharSequence): Int {

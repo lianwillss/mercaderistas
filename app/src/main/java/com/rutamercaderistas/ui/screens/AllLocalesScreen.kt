@@ -79,15 +79,11 @@ import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.ui.theme.rs
 import com.rutamercaderistas.ui.theme.storeColor
 import androidx.compose.ui.platform.LocalContext
-import androidx.datastore.preferences.core.edit
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rutamercaderistas.data.preferences.PreferencesRepository
-import com.rutamercaderistas.data.preferences.prefsDataStore
 import com.rutamercaderistas.ui.theme.storeSoftColor
 import com.rutamercaderistas.utils.fuzzyMatches
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import androidx.compose.runtime.collectAsState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -102,35 +98,15 @@ fun AllLocalesScreen(
     val dimens = LocalAppDimens.current
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(rememberTopAppBarState())
     val context = LocalContext.current
-    var searchHistory by remember { mutableStateOf(emptyList<String>()) }
+    val prefsRepo = remember(context) { PreferencesRepository(context.applicationContext) }
+    val searchHistory by prefsRepo.getLocalesSearchHistoryFlow().collectAsStateWithLifecycle(initialValue = emptyList())
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-
-    LaunchedEffect(Unit) {
-        context.prefsDataStore.data.map { prefs ->
-            prefs[PreferencesRepository.KEY_LOCALES_SEARCH_HISTORY]?.let { raw ->
-                runCatching { org.json.JSONArray(raw) }
-                    .getOrElse { org.json.JSONArray() }
-                    .let { arr -> List(arr.length()) { i -> arr.getString(i) } }
-            } ?: emptyList()
-        }.collect { searchHistory = it }
-    }
 
     LaunchedEffect(searchQuery) {
         if (searchQuery.isNotBlank() && searchQuery.length >= 2) {
             kotlinx.coroutines.delay(800)
             if (searchQuery.isNotBlank()) {
-                scope.launch {
-                    val prefs = context.prefsDataStore.data.first()
-                    val existing = prefs[PreferencesRepository.KEY_LOCALES_SEARCH_HISTORY]
-                        ?.let { runCatching { org.json.JSONArray(it) }.getOrNull() } ?: org.json.JSONArray()
-                    val list = (0 until existing.length()).map { existing.getString(it) }.toMutableList()
-                    list.remove(searchQuery.trim())
-                    list.add(0, searchQuery.trim())
-                    val trimmed = list.take(8)
-                    val next = org.json.JSONArray()
-                    trimmed.forEach { next.put(it) }
-                    context.prefsDataStore.edit { it[PreferencesRepository.KEY_LOCALES_SEARCH_HISTORY] = next.toString() }
-                }
+                scope.launch { prefsRepo.addLocalesSearchQuery(searchQuery) }
             }
         }
     }

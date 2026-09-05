@@ -150,6 +150,7 @@ class RouteViewModel @Inject constructor(
                     codigo = first.codigo,
                     local = first.local.toNaturalCase(),
                     direccion = first.direccion.toNaturalCase(),
+                    rutero = ents.map { it.rutero }.filter { it.isNotBlank() }.distinct().sorted().joinToString(" · "),
                     cadena = first.cadena,
                     formato = first.formato,
                     region = first.region,

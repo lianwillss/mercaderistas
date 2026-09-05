@@ -140,6 +140,7 @@
     <string name="busqueda_locales">Locales</string>
     <string name="busqueda_promociones">Promociones</string>
     <string name="busqueda_sin_resultados">Sin resultados</string>
+    <string name="busqueda_codigo_label">Cód: %1$s</string>
 
     <!-- Manual -->
     <string name="manual_usuario_title">Manual de usuario</string>

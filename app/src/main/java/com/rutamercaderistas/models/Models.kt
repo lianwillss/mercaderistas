@@ -61,6 +61,7 @@ data class LocalDelDia(
     val codigo: String,
     val local: String,
     val direccion: String,
+    val rutero: String = "",
     val comuna: String = "",
     val region: String = "",
     val cadena: String = "",
