@@ -20,6 +20,10 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -44,6 +48,7 @@ import kotlinx.coroutines.flow.debounce
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusManager
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -130,18 +135,29 @@ fun GlobalSearchScreen(
         }
     }
 
+    var historyExpanded by remember { mutableStateOf(false) }
+    val matchingHistory = remember(searchHistory, searchQuery) {
+        if (searchQuery.isBlank()) searchHistory
+        else searchHistory.filter { it.contains(searchQuery, ignoreCase = true) }
+    }
+
     Column(modifier = modifier.fillMaxSize()) {
         ScreenHeader(
             title = stringResource(R.string.busqueda_titulo),
             onBack = onBack,
         )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = dimens.spacingXl, vertical = dimens.spacingMd),
+        ) {
         TextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = dimens.spacingXl, vertical = dimens.spacingMd)
-                .semantics { contentDescription = "Buscar local por nombre o código en todo el rutero" },
+                .semantics { contentDescription = "Buscar local por nombre o código en todo el rutero" }
+                .onFocusChanged { historyExpanded = it.isFocused },
             label = { Text(stringResource(R.string.buscar_local_placeholder)) },
             placeholder = { Text(stringResource(R.string.busqueda_hint)) },
             supportingText = {
@@ -170,6 +186,47 @@ fun GlobalSearchScreen(
             ),
             shape = RoundedCornerShape(16.dp),
         )
+        DropdownMenu(
+            expanded = historyExpanded && matchingHistory.isNotEmpty(),
+            onDismissRequest = { historyExpanded = false },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            matchingHistory.take(5).forEach { h ->
+                DropdownMenuItem(
+                    text = { Text(h, maxLines = 1) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.History,
+                            contentDescription = null,
+                        )
+                    },
+                    onClick = {
+                        searchQuery = h
+                        historyExpanded = false
+                    },
+                )
+            }
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        text = stringResource(R.string.limpiar_historial),
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.Delete,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                },
+                onClick = {
+                    scope.launch { prefsRepo.clearLocalesSearchHistory() }
+                    historyExpanded = false
+                },
+            )
+        }
+        }
 
         if (q.isNotBlank() && (typing || isSearching)) {
             LinearProgressIndicator(
@@ -181,61 +238,15 @@ fun GlobalSearchScreen(
         }
 
         if (q.isBlank()) {
-            if (searchHistory.isNotEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = dimens.spacingXl, vertical = dimens.spacingMd),
-                ) {
-                    Text(
-                        text = "Búsquedas recientes",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        searchHistory.take(5).forEach { query ->
-                            androidx.compose.material3.AssistChip(
-                                onClick = { searchQuery = query },
-                                label = { Text(query, maxLines = 1) },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Filled.Search,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(14.dp),
-                                    )
-                                },
-                            )
-                        }
-                    }
-                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(24.dp))
-                    Box(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = stringResource(R.string.busqueda_instruccion),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            } else {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = stringResource(R.string.busqueda_instruccion),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = stringResource(R.string.busqueda_instruccion),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         } else {
             LazyColumn(

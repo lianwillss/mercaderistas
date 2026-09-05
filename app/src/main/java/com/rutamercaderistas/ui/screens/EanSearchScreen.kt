@@ -7,8 +7,14 @@ import android.util.LruCache
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,12 +26,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -33,6 +42,8 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -52,6 +63,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -72,8 +87,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.SuggestionChip
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -115,6 +131,7 @@ private val barcodeCache = LruCache<String, Bitmap>(64)
 private sealed interface EanResultRow
 private data class EanBrandRow(val brand: String) : EanResultRow
 private data class EanProductRow(val product: EanProductEntity) : EanResultRow
+private const val NO_BRAND_KEY = "\u0000"
 
 // Paleta de acentos por marca: color estable derivado del nombre para que cada
 // marca sea reconocible por color en la interfaz (punto en el encabezado y chip).
@@ -158,11 +175,25 @@ fun EanSearchScreen(
         }
     }
 
+    val launchScanner = {
+        Toast.makeText(
+            context,
+            R.string.ean_scanning_cd,
+            Toast.LENGTH_SHORT,
+        ).show()
+        val activity = context as? Activity
+        if (activity != null) {
+            scannerLauncher.launch(
+                IntentIntegrator(activity).createScanIntent()
+            )
+        }
+    }
+
     val tfColors = TextFieldDefaults.colors(
         unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         unfocusedIndicatorColor = Color.Transparent,
-        focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+        focusedIndicatorColor = Color.Transparent,
         cursorColor = MaterialTheme.colorScheme.primary,
     )
 
@@ -264,10 +295,30 @@ fun EanSearchScreen(
                             .fillMaxSize()
                             .padding(horizontal = dimens.spacingMd, vertical = dimens.spacingSm),
                     ) {
+                        var searchFocused by remember { mutableStateOf(false) }
+                        val searchPill = RoundedCornerShape(28.dp)
+                        val searchBorder by animateColorAsState(
+                            targetValue = if (searchFocused) MaterialTheme.colorScheme.primary
+                            else Color.Transparent,
+                            label = "eanSearchBorder",
+                        )
+                        val searchElevation by animateDpAsState(
+                            targetValue = if (searchFocused) 8.dp else 2.dp,
+                            label = "eanSearchElevation",
+                        )
+                        val scanCd = stringResource(R.string.escanear_codigo_barras)
+                        var historyExpanded by remember { mutableStateOf(false) }
+                        val matchingHistory = remember(searchHistory, value.query) {
+                            if (value.query.isBlank()) searchHistory
+                            else searchHistory.filter { it.contains(value.query, ignoreCase = true) }
+                        }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
+                            Box(
+                                modifier = Modifier.weight(1f),
+                            ) {
                             TextField(
                                 value = value.query,
                                 onValueChange = { viewModel.onQueryChange(it) },
@@ -288,7 +339,8 @@ fun EanSearchScreen(
                                     Icon(
                                         imageVector = Icons.Filled.Search,
                                         contentDescription = stringResource(R.string.buscar_cd),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        tint = if (searchFocused) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 },
                                 trailingIcon = {
@@ -300,36 +352,91 @@ fun EanSearchScreen(
                                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
                                         }
-                                    } else {
-                                        IconButton(
-                                            onClick = {
-                                                Toast.makeText(
-                                                    context,
-                                                    R.string.ean_scanning_cd,
-                                                    Toast.LENGTH_SHORT,
-                                                ).show()
-                                                val activity = context as? Activity
-                                                if (activity != null) {
-                                                    scannerLauncher.launch(
-                                                        IntentIntegrator(activity).createScanIntent()
-                                                    )
-                                                }
-                                            },
-                                        ) {
-                                            Icon(
-                                                painter = painterResource(R.drawable.ic_barcode),
-                                                contentDescription = stringResource(R.string.escanear_codigo_barras),
-                                                tint = MaterialTheme.colorScheme.primary,
-                                            )
-                                        }
                                     }
                                 },
                                 singleLine = true,
                                 colors = tfColors,
+                                shape = searchPill,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .heightIn(min = dimens.touchMin),
+                                    .heightIn(min = dimens.touchMin)
+                                    .onFocusChanged {
+                                        searchFocused = it.isFocused
+                                        historyExpanded = it.isFocused
+                                    }
+                                    .shadow(searchElevation, searchPill)
+                                    .border(1.5.dp, searchBorder, searchPill),
                             )
+                            DropdownMenu(
+                                expanded = historyExpanded && matchingHistory.isNotEmpty(),
+                                onDismissRequest = { historyExpanded = false },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                matchingHistory.take(5).forEach { h ->
+                                    DropdownMenuItem(
+                                        text = { Text(h, maxLines = 1) },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Outlined.History,
+                                                contentDescription = null,
+                                            )
+                                        },
+                                        onClick = {
+                                            viewModel.onHistoryClick(h)
+                                            historyExpanded = false
+                                        },
+                                    )
+                                }
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = stringResource(R.string.ean_clear_history),
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Delete,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                        )
+                                    },
+                                    onClick = {
+                                        viewModel.clearSearchHistory()
+                                        historyExpanded = false
+                                    },
+                                )
+                            }
+                            }
+                            Spacer(modifier = Modifier.width(dimens.spacingSm))
+                            Box(
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .shadow(8.dp, CircleShape)
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            colors = listOf(
+                                                MaterialTheme.colorScheme.primary,
+                                                MaterialTheme.colorScheme.tertiary,
+                                            )
+                                        )
+                                    )
+                                    .clickable(
+                                        onClick = launchScanner,
+                                        role = Role.Button,
+                                        onClickLabel = scanCd,
+                                    )
+                                    .semantics { contentDescription = scanCd },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_barcode),
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            }
                             }
 
                         if (value.query.isNotEmpty() || value.results.isNotEmpty()) {
@@ -343,24 +450,48 @@ fun EanSearchScreen(
                             )
                         }
 
-                        if (value.query.isBlank() && searchHistory.isNotEmpty()) {
-                            EanHistoryChips(
-                                history = searchHistory,
-                                onChip = { viewModel.onHistoryClick(it) },
-                                onClear = { viewModel.clearSearchHistory() },
-                            )
-                        }
-
                     if (value.query.isNotBlank() && value.results.isEmpty()) {
                         Box(modifier = Modifier.weight(1f)) {
                             EanEmptyState(query = value.query, onClear = { viewModel.clearQuery() })
                         }
                     } else {
-                        val rows = remember(value.results) {
+                        val brandsInResults = remember(value.results) {
+                            value.results.map { it.marca.ifBlank { NO_BRAND_KEY } }.distinct()
+                        }
+                        var brandFilter by remember(value.query) { mutableStateOf<String?>(null) }
+                        if (brandsInResults.size > 1) {
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentPadding = PaddingValues(vertical = dimens.spacingXs),
+                                horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+                            ) {
+                                item(key = "ean_brand_all") {
+                                    FilterChip(
+                                        selected = brandFilter == null,
+                                        onClick = { brandFilter = null },
+                                        label = { Text(stringResource(R.string.todas)) },
+                                    )
+                                }
+                                items(brandsInResults, key = { "ean_brand_$it" }) { brandKey ->
+                                    FilterChip(
+                                        selected = brandFilter == brandKey,
+                                        onClick = { brandFilter = if (brandFilter == brandKey) null else brandKey },
+                                        label = {
+                                            Text(
+                                                if (brandKey == NO_BRAND_KEY) stringResource(R.string.ean_sin_marca)
+                                                else brandKey
+                                            )
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                        val rows = remember(value.results, brandFilter) {
                             buildList<EanResultRow> {
                                 value.results
                                     .groupBy { it.marca.ifBlank { "\u0000" } }
                                     .forEach { (brandKey, products) ->
+                                        if (brandFilter != null && brandKey != brandFilter) return@forEach
                                         add(EanBrandRow(brandKey))
                                         products.forEach { add(EanProductRow(it)) }
                                     }
@@ -376,12 +507,30 @@ fun EanSearchScreen(
                             ),
                             verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
                         ) {
-                            items(rows, key = {
+                            itemsIndexed(rows, key = { _, it ->
                                 when (it) {
                                     is EanBrandRow -> "brand_${it.brand}"
                                     is EanProductRow -> it.product.id
                                 }
-                            }) { row ->
+                            }) { index, row ->
+                                var visible by remember { mutableStateOf(false) }
+                                val animAlpha by animateFloatAsState(
+                                    targetValue = if (visible) 1f else 0f,
+                                    animationSpec = tween(250, delayMillis = minOf(index, 8) * 40),
+                                    label = "eanRowAlpha",
+                                )
+                                val animOffsetY by animateDpAsState(
+                                    targetValue = if (visible) 0.dp else 12.dp,
+                                    animationSpec = tween(250, delayMillis = minOf(index, 8) * 40),
+                                    label = "eanRowOffset",
+                                )
+                                LaunchedEffect(Unit) { visible = true }
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .graphicsLayer(alpha = animAlpha)
+                                        .offset(y = animOffsetY),
+                                ) {
                                 when (row) {
                                     is EanBrandRow -> EanBrandHeader(
                                         title = if (row.brand == "\u0000")
@@ -393,6 +542,7 @@ fun EanSearchScreen(
                                         query = value.query,
                                         onBarcodeClick = { zoomProduct = row.product },
                                     )
+                                }
                                 }
                             }
                     }
@@ -423,6 +573,20 @@ fun EanSearchScreen(
     }
 
     zoomProduct?.let { product ->
+        // Entrada tipo container-transform (el Dialog es otra ventana:
+        // sharedElement real no es posible, se emula con spring + fade)
+        var zoomVisible by remember(product.eanPrincipal) { mutableStateOf(false) }
+        val zoomScale by animateFloatAsState(
+            targetValue = if (zoomVisible) 1f else 0.88f,
+            animationSpec = spring(dampingRatio = 0.75f, stiffness = 350f),
+            label = "eanZoomScale",
+        )
+        val zoomAlpha by animateFloatAsState(
+            targetValue = if (zoomVisible) 1f else 0f,
+            animationSpec = tween(200),
+            label = "eanZoomAlpha",
+        )
+        LaunchedEffect(product.eanPrincipal) { zoomVisible = true }
         IosModal(
             visible = true,
             onDismiss = { zoomProduct = null },
@@ -430,7 +594,13 @@ fun EanSearchScreen(
             subtitle = product.eanPrincipal,
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        scaleX = zoomScale
+                        scaleY = zoomScale
+                        alpha = zoomAlpha
+                    },
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 BarcodeImage(
@@ -859,47 +1029,6 @@ private fun computeHighlightRanges(text: String, tokens: List<String>): List<Int
         }
     }
     return merged
-}
-
-@Composable
-private fun EanHistoryChips(
-    history: List<String>,
-    onChip: (String) -> Unit,
-    onClear: () -> Unit,
-) {
-    val dimens = LocalAppDimens.current
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = stringResource(R.string.ean_recent_searches),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            TextButton(onClick = onClear, contentPadding = PaddingValues(0.dp)) {
-                Text(
-                    text = stringResource(R.string.ean_clear_history),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
-        LazyRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
-            contentPadding = PaddingValues(vertical = dimens.spacingXs),
-        ) {
-            items(history) { q ->
-                SuggestionChip(
-                    onClick = { onChip(q) },
-                    label = { Text(q) },
-                )
-            }
-        }
-    }
 }
 
 @Preview(showBackground = true)

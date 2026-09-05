@@ -2,6 +2,7 @@ package com.rutamercaderistas.ui.screens
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -27,17 +28,22 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Store
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DividerDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,12 +54,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextOverflow
@@ -250,13 +259,30 @@ private fun AllLocalesTwoPane(
                     contentPadding = PaddingValues(horizontal = dimens.spacingMd, vertical = dimens.spacingXs),
                     verticalArrangement = Arrangement.spacedBy(10.dp * rs()),
                 ) {
-                    items(locales, key = { it.codigo }) { local ->
-                        LocaleCard(
-                            local = local,
-                            selected = selected == local,
-                            onClick = { selected = local },
-                            onAddressClick = onAddressClick,
+                    itemsIndexed(locales, key = { _, local -> local.codigo }) { index, local ->
+                        var visible by remember { mutableStateOf(false) }
+                        val animAlpha by animateFloatAsState(
+                            targetValue = if (visible) 1f else 0f,
+                            animationSpec = tween(250, delayMillis = minOf(index, 8) * 40),
                         )
+                        val animOffsetY by animateDpAsState(
+                            targetValue = if (visible) 0.dp else 12.dp,
+                            animationSpec = tween(250, delayMillis = minOf(index, 8) * 40),
+                        )
+                        LaunchedEffect(Unit) { visible = true }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .graphicsLayer(alpha = animAlpha)
+                                .offset(y = animOffsetY),
+                        ) {
+                            LocaleCard(
+                                local = local,
+                                selected = selected == local,
+                                onClick = { selected = local },
+                                onAddressClick = onAddressClick,
+                            )
+                        }
                     }
                 }
             }
@@ -266,14 +292,38 @@ private fun AllLocalesTwoPane(
             color = DividerDefaults.color,
         )
         Box(modifier = Modifier.fillMaxHeight().fillMaxWidth(0.5f)) {
-            selected?.let { local ->
-                LocaleDetailPane(local = local, onAddressClick = onAddressClick)
-            } ?: Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    text = stringResource(R.string.locale_detail_placeholder),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            key(selected?.codigo) {
+                var detailVisible by remember { mutableStateOf(false) }
+                val detailAlpha by animateFloatAsState(
+                    targetValue = if (detailVisible) 1f else 0f,
+                    animationSpec = spring(dampingRatio = 0.8f, stiffness = 400f),
+                    label = "detailAlpha",
                 )
+                val detailOffsetX by animateDpAsState(
+                    targetValue = if (detailVisible) 0.dp else 24.dp,
+                    animationSpec = spring(dampingRatio = 0.8f, stiffness = 400f),
+                    label = "detailOffset",
+                )
+                LaunchedEffect(Unit) { detailVisible = true }
+                selected?.let { local ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer(alpha = detailAlpha)
+                            .offset(x = detailOffsetX),
+                    ) {
+                        LocaleDetailPane(local = local, onAddressClick = onAddressClick)
+                    }
+                }
+            }
+            if (selected == null) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = stringResource(R.string.locale_detail_placeholder),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    )
+                }
             }
         }
     }
@@ -287,7 +337,18 @@ private fun SearchBarContent(
     searchHistory: List<String> = emptyList(),
     onHistoryClick: (String) -> Unit = {},
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
+    val context = LocalContext.current
+    val clearScope = rememberCoroutineScope()
+    var historyExpanded by remember { mutableStateOf(false) }
+    val matchingHistory = remember(searchHistory, searchQuery) {
+        if (searchQuery.isBlank()) searchHistory
+        else searchHistory.filter { it.contains(searchQuery, ignoreCase = true) }
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = dimens.spacingMd, vertical = dimens.spacingXs),
+    ) {
     TextField(
         value = searchQuery,
         onValueChange = onSearchChange,
@@ -318,27 +379,47 @@ private fun SearchBarContent(
         modifier = Modifier
             .fillMaxWidth()
             .semantics { contentDescription = "Buscar local por nombre, código o dirección. Escribe para filtrar la lista." }
-            .padding(horizontal = dimens.spacingMd, vertical = dimens.spacingXs)
+            .onFocusChanged { historyExpanded = it.isFocused },
     )
-        if (searchQuery.isBlank() && searchHistory.isNotEmpty()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = dimens.spacingMd, vertical = 4.dp)
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                searchHistory.take(5).forEach { query ->
-                    androidx.compose.material3.AssistChip(
-                        onClick = { onHistoryClick(query) },
-                        label = { Text(query, maxLines = 1) },
-                        leadingIcon = {
-                            Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(14.dp))
-                        },
-                    )
-                }
-            }
+    DropdownMenu(
+        expanded = historyExpanded && matchingHistory.isNotEmpty(),
+        onDismissRequest = { historyExpanded = false },
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        matchingHistory.take(5).forEach { query ->
+            DropdownMenuItem(
+                text = { Text(query, maxLines = 1) },
+                leadingIcon = {
+                    Icon(Icons.Outlined.History, contentDescription = null)
+                },
+                onClick = {
+                    onHistoryClick(query)
+                    historyExpanded = false
+                },
+            )
         }
+        DropdownMenuItem(
+            text = {
+                Text(
+                    text = stringResource(R.string.limpiar_historial),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Outlined.Delete,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            },
+            onClick = {
+                clearScope.launch {
+                    PreferencesRepository(context.applicationContext).clearLocalesSearchHistory()
+                }
+                historyExpanded = false
+            },
+        )
+    }
     }
 }
 

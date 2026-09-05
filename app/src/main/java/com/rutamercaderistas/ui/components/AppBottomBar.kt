@@ -3,6 +3,7 @@ package com.rutamercaderistas.ui.components
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -105,6 +106,7 @@ fun AppBottomBar(
 
             val slideOffsetDp by animateDpAsState(
                 targetValue = slotDp * selectedIndex,
+                animationSpec = spring(dampingRatio = 0.8f, stiffness = 400f),
                 label = "bottomBarSlide",
             )
             val pillColor by animateColorAsState(

@@ -322,6 +322,7 @@
     <string name="ean_clear_search">Limpiar búsqueda</string>
     <string name="ean_recent_searches">Búsquedas recientes</string>
     <string name="ean_clear_history">Limpiar historial</string>
+    <string name="limpiar_historial">Limpiar historial</string>
     <string name="ean_recent_chip_cd">Buscar %s</string>
     <string name="header_ajustes">Ajustes</string>
     <string name="settings_title">Ajustes</string>
