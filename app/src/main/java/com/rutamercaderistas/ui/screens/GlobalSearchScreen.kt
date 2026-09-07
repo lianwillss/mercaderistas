@@ -1,5 +1,11 @@
 package com.rutamercaderistas.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +25,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.History
@@ -26,6 +34,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -311,6 +320,8 @@ private fun SectionTitle(text: String) {
 private fun LocaleSearchRow(local: LocalDelDia, onAddressClick: (String) -> Unit) {
     val dimens = LocalAppDimens.current
     val address = local.direccion.ifBlank { stringResource(R.string.sin_direccion) }
+    val navigateCd = stringResource(R.string.como_llegar_a, local.local)
+    var expanded by remember { mutableStateOf(false) }
     Surface(
         tonalElevation = 1.dp,
         shape = RoundedCornerShape(12.dp),
@@ -319,37 +330,93 @@ private fun LocaleSearchRow(local: LocalDelDia, onAddressClick: (String) -> Unit
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .animateContentSize()
                 .padding(dimens.spacingMd),
         ) {
-            Text(
-                text = local.local,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            if (local.codigo.isNotBlank()) {
-                Text(
-                    text = stringResource(R.string.busqueda_codigo_label, local.codigo),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Text(
-                text = address,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (local.rutero.isNotBlank()) {
-                Text(
-                    text = local.rutero,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-            TextButton(
-                onClick = { onAddressClick(address) },
-                modifier = Modifier.semantics { contentDescription = "Cómo llegar a ${local.local}" },
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(text = "Cómo llegar")
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = local.local,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    if (local.codigo.isNotBlank()) {
+                        Text(
+                            text = stringResource(R.string.busqueda_codigo_label, local.codigo),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        text = address,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (local.rutero.isNotBlank()) {
+                        Text(
+                            text = local.rutero,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+                val expandCd = if (expanded) stringResource(R.string.busqueda_ocultar_detalle, local.local)
+                else stringResource(R.string.busqueda_ver_detalle, local.local)
+                IconButton(
+                    onClick = { expanded = !expanded },
+                    modifier = Modifier.semantics { contentDescription = expandCd },
+                ) {
+                    Icon(
+                        imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                        contentDescription = null,
+                    )
+                }
+            }
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut(),
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Spacer(modifier = Modifier.height(dimens.spacingSm))
+                    Text(
+                        text = stringResource(R.string.share_marcas_count, local.totalClientes),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    local.clientes.forEach { cliente ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = cliente.nombre,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (cliente.frecuenciaTexto.isNotBlank()) {
+                                Text(
+                                    text = cliente.frecuenciaTexto,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                    TextButton(
+                        onClick = { onAddressClick(address) },
+                        modifier = Modifier.semantics { contentDescription = navigateCd },
+                    ) {
+                        Text(text = stringResource(R.string.como_llegar))
+                    }
+                }
             }
         }
     }

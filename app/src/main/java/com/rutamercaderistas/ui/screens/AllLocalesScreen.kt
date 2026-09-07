@@ -590,7 +590,7 @@ private fun LocaleCardContent(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
-                        .heightIn(min = 24.dp)
+                        .heightIn(min = 48.dp)
                         .clickable(
                             onClick = { onAddressClick(local.direccion) },
                             role = Role.Button,

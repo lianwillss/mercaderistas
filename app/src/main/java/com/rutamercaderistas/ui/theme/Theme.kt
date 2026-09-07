@@ -53,6 +53,9 @@ private val LightColorScheme = lightColorScheme(
     scrim = Scrim
 )
 
+/** Tope de escala de fuente efectiva (sistema x usuario). Ver [MercaderistasTheme]. */
+const val MAX_FONT_SCALE = 1.3f
+
 private val AppShapes = Shapes(
     extraSmall = RoundedCornerShape(12.dp),
     small = RoundedCornerShape(16.dp),
@@ -75,7 +78,11 @@ fun MercaderistasTheme(content: @Composable () -> Unit) {
         .collectAsState(initial = 1f)
     val systemFontScale = context.resources.configuration.fontScale
     val baseDensity = LocalDensity.current
-    val density = Density(baseDensity.density, systemFontScale * userScale)
+    // Tope de escala: con zoom alto del sistema la app explotaba en tamaño y
+    // obligaba a scrollear de más. Se respeta el zoom hasta 1.3x y ahí se frena
+    // para conservar la densidad de información. Solo afecta sp, no dp.
+    val effectiveFontScale = (systemFontScale * userScale).coerceAtMost(MAX_FONT_SCALE)
+    val density = Density(baseDensity.density, effectiveFontScale)
     CompositionLocalProvider(
         LocalAppDimens provides dimens,
         LocalDensity provides density,
