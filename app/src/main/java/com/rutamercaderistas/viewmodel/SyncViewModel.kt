@@ -17,6 +17,7 @@ import timber.log.Timber
 import com.rutamercaderistas.data.result.SyncResult
 import com.rutamercaderistas.data.result.messageOrNull
 import com.rutamercaderistas.models.BrandReference
+import com.rutamercaderistas.models.DiaSemana
 import com.rutamercaderistas.models.EntradaRuta
 import com.rutamercaderistas.services.RuteroManager
 import com.rutamercaderistas.services.RuteroRepository
@@ -38,15 +39,153 @@ data class PlanillaChanges(
     val added: List<String> = emptyList(),
     val removed: List<String> = emptyList(),
     val moved: List<MovedLocales> = emptyList(),
+    val changedAddress: List<AddressChange> = emptyList(),
+    val changedBrands: List<BrandChange> = emptyList(),
+    val affectsToday: List<String> = emptyList(),
 ) {
-    val isEmpty: Boolean get() = added.isEmpty() && removed.isEmpty() && moved.isEmpty()
+    val isEmpty: Boolean get() = added.isEmpty() && removed.isEmpty() && moved.isEmpty() &&
+        changedAddress.isEmpty() && changedBrands.isEmpty() && affectsToday.isEmpty()
 }
 
 data class MovedLocales(
     val local: String,
     val fromDays: String,
     val toDays: String,
+    val fromRoute: String = "",
+    val toRoute: String = "",
 )
+
+data class AddressChange(
+    val local: String,
+    val oldAddress: String,
+    val newAddress: String,
+)
+
+data class BrandChange(
+    val local: String,
+    val added: List<String> = emptyList(),
+    val removed: List<String> = emptyList(),
+)
+
+/**
+ * Diff puro y testeable entre planilla vieja y nueva.
+ *
+ * - added/removed: locales por clave código|local.
+ * - moved: cambió el conjunto de días de visita (de los booleanos
+ *   lunes..domingo, no del nombre de ruta) y/o la ruta.
+ * - changedAddress/changedBrands: mismo local, cambió dirección o marcas.
+ * - affectsToday: quitados o movidos-fuera que se visitaban hoy en la
+ *   ruta activa.
+ */
+internal fun diffPlanilla(
+    old: List<EntradaRuta>,
+    new: List<EntradaRuta>,
+    activeRoute: String? = null,
+    today: DiaSemana? = null,
+): PlanillaChanges {
+    fun key(e: EntradaRuta) = e.codigo.uppercase() + "|" + e.local.uppercase()
+    fun visitDays(entries: List<EntradaRuta>): Set<DiaSemana> = buildSet {
+        if (entries.any { it.lunes }) add(DiaSemana.LUNES)
+        if (entries.any { it.martes }) add(DiaSemana.MARTES)
+        if (entries.any { it.miercoles }) add(DiaSemana.MIERCOLES)
+        if (entries.any { it.jueves }) add(DiaSemana.JUEVES)
+        if (entries.any { it.viernes }) add(DiaSemana.VIERNES)
+        if (entries.any { it.sabado }) add(DiaSemana.SABADO)
+        if (entries.any { it.domingo }) add(DiaSemana.DOMINGO)
+    }
+    fun routesOf(entries: List<EntradaRuta>): Set<String> =
+        entries.map { it.rutero.trim() }.filter { it.isNotBlank() }.toSet()
+    fun daysLabel(days: Set<DiaSemana>): String =
+        DiaSemana.todos().filter { it in days }.joinToString(", ") { it.abreviacion }
+    fun visitsToday(entries: List<EntradaRuta>): Boolean {
+        if (today == null) return false
+        val inRoute = activeRoute == null || entries.any { it.rutero.trim().equals(activeRoute.trim(), ignoreCase = true) }
+        if (!inRoute) return false
+        return entries.any { it.visitaEl(today) }
+    }
+
+    val oldMap = old.groupBy(::key)
+    val newMap = new.groupBy(::key)
+
+    val added = newMap.keys.subtract(oldMap.keys)
+        .mapNotNull { newMap[it]?.firstOrNull()?.local }.filter { it.isNotBlank() }
+    val removedKeys = oldMap.keys.subtract(newMap.keys)
+    val removed = removedKeys
+        .mapNotNull { oldMap[it]?.firstOrNull()?.local }.filter { it.isNotBlank() }
+
+    val moved = mutableListOf<MovedLocales>()
+    val changedAddress = mutableListOf<AddressChange>()
+    val changedBrands = mutableListOf<BrandChange>()
+    for (k in newMap.keys.intersect(oldMap.keys)) {
+        val oldEntries = oldMap[k].orEmpty()
+        val newEntries = newMap[k].orEmpty()
+        val oldDays = visitDays(oldEntries)
+        val newDays = visitDays(newEntries)
+        val oldRoutes = routesOf(oldEntries)
+        val newRoutes = routesOf(newEntries)
+        val name = newEntries.firstOrNull()?.local ?: oldEntries.firstOrNull()?.local ?: ""
+        if (oldDays != newDays || oldRoutes != newRoutes) {
+            moved.add(
+                MovedLocales(
+                    local = name,
+                    fromDays = daysLabel(oldDays),
+                    toDays = daysLabel(newDays),
+                    fromRoute = oldRoutes.sorted().joinToString(", "),
+                    toRoute = newRoutes.sorted().joinToString(", "),
+                )
+            )
+        }
+        val oldAddr = oldEntries.firstOrNull()?.direccion?.trim().orEmpty()
+        val newAddr = newEntries.firstOrNull()?.direccion?.trim().orEmpty()
+        if (oldAddr.isNotBlank() && newAddr.isNotBlank() && !oldAddr.equals(newAddr, ignoreCase = true)) {
+            changedAddress.add(AddressChange(local = name, oldAddress = oldAddr, newAddress = newAddr))
+        }
+        val oldBrands = oldEntries.map { it.cliente.trim() }.filter { it.isNotBlank() }.toSet()
+        val newBrands = newEntries.map { it.cliente.trim() }.filter { it.isNotBlank() }.toSet()
+        val addedBrands = (newBrands - oldBrands).sorted()
+        val removedBrands = (oldBrands - newBrands).sorted()
+        if (addedBrands.isNotEmpty() || removedBrands.isNotEmpty()) {
+            changedBrands.add(BrandChange(local = name, added = addedBrands, removed = removedBrands))
+        }
+    }
+
+    val affectsToday = mutableListOf<String>()
+    if (today != null) {
+        for (k in removedKeys) {
+            val entries = oldMap[k].orEmpty()
+            if (visitsToday(entries)) {
+                entries.firstOrNull()?.local?.takeIf { it.isNotBlank() }?.let { affectsToday.add(it) }
+            }
+        }
+        for (k in newMap.keys.intersect(oldMap.keys)) {
+            val oldEntries = oldMap[k].orEmpty()
+            val newEntries = newMap[k].orEmpty()
+            if (visitsToday(oldEntries) && !visitsToday(newEntries)) {
+                (newEntries.firstOrNull() ?: oldEntries.firstOrNull())?.local
+                    ?.takeIf { it.isNotBlank() }?.let { affectsToday.add(it) }
+            }
+        }
+    }
+
+    return PlanillaChanges(
+        added = added,
+        removed = removed,
+        moved = moved,
+        changedAddress = changedAddress,
+        changedBrands = changedBrands,
+        affectsToday = affectsToday.distinct(),
+    )
+}
+
+private fun EntradaRuta.visitaEl(dia: DiaSemana): Boolean = when (dia) {
+    DiaSemana.LUNES -> lunes
+    DiaSemana.MARTES -> martes
+    DiaSemana.MIERCOLES -> miercoles
+    DiaSemana.JUEVES -> jueves
+    DiaSemana.VIERNES -> viernes
+    DiaSemana.SABADO -> sabado
+    DiaSemana.DOMINGO -> domingo
+}
 
 @Stable
 data class SyncUiState(
@@ -193,7 +332,27 @@ class SyncViewModel @Inject constructor(
                         _state.value = _state.value.copy(state = SyncState.Syncing(phase = getApplication<Application>().getString(R.string.sync_actualizando_promos)))
                         promotionRepository.refresh()
                         val newEntries = ruteroManager.loadAllEntries()
-                        val changes = if (oldEntries.isEmpty()) PlanillaChanges() else computePlanillaChanges(oldEntries, newEntries)
+                        val changes = if (oldEntries.isEmpty()) {
+                            PlanillaChanges()
+                        } else {
+                            computePlanillaChanges(
+                                oldEntries,
+                                newEntries,
+                                repository.getActiveRuteroName(),
+                                todayDia(),
+                            )
+                        }
+                        if (!changes.isEmpty) {
+                            preferencesRepository.addSyncHistoryEntry(
+                                com.rutamercaderistas.data.preferences.SyncHistoryEntry(
+                                    timestamp = System.currentTimeMillis(),
+                                    summary = changesSummary(changes),
+                                )
+                            )
+                            if (changes.affectsToday.isNotEmpty()) {
+                                postTodayNotification(changes.affectsToday)
+                            }
+                        }
                         val validationErrors = com.rutamercaderistas.domain.validation.PlanillaValidator.validateRutero(newEntries)
                         _state.value = _state.value.copy(state = SyncState.Idle, syncChanges = changes, validationErrors = validationErrors)
                         SyncResult.Success(true)
@@ -270,25 +429,66 @@ class SyncViewModel @Inject constructor(
         _state.value = _state.value.copy(validationErrors = emptyList())
     }
 
-    private fun computePlanillaChanges(old: List<EntradaRuta>, new: List<EntradaRuta>): PlanillaChanges {
-        fun key(e: EntradaRuta) = e.codigo.uppercase() + "|" + e.local.uppercase()
-        fun days(entries: List<EntradaRuta>): Set<String> = entries.map { it.rutero }.toSet()
-        val oldMap = old.groupBy(::key).mapValues { (_, v) -> days(v) to v.first().local }
-        val newMap = new.groupBy(::key).mapValues { (_, v) -> days(v) to v.first().local }
-        val added = newMap.keys.subtract(oldMap.keys).mapNotNull { newMap[it]?.second }.filter { it.isNotBlank() }
-        val removed = oldMap.keys.subtract(newMap.keys).mapNotNull { oldMap[it]?.second }.filter { it.isNotBlank() }
-        val moved = newMap.keys.intersect(oldMap.keys).mapNotNull { k ->
-            val oldVal = oldMap[k] ?: return@mapNotNull null
-            val newVal = newMap[k] ?: return@mapNotNull null
-            if (oldVal.first != newVal.first) {
-                MovedLocales(
-                    local = oldVal.second,
-                    fromDays = oldVal.first.sorted().joinToString(", "),
-                    toDays = newVal.first.sorted().joinToString(", "),
-                )
-            } else null
+    private fun changesSummary(changes: PlanillaChanges): String {
+        val app = getApplication<Application>()
+        return buildList {
+            if (changes.added.isNotEmpty()) add(app.getString(R.string.sync_cambios_agregados, changes.added.size))
+            if (changes.removed.isNotEmpty()) add(app.getString(R.string.sync_cambios_eliminados, changes.removed.size))
+            if (changes.moved.isNotEmpty()) add(app.getString(R.string.sync_cambios_movidos, changes.moved.size))
+        }.joinToString(" · ")
+    }
+
+    private fun postTodayNotification(locales: List<String>) {
+        val app = getApplication<Application>()
+        if (androidx.core.app.ActivityCompat.checkSelfPermission(
+                app, android.Manifest.permission.POST_NOTIFICATIONS
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            return
         }
-        return PlanillaChanges(added = added, removed = removed, moved = moved)
+        val intent = android.content.Intent(app, com.rutamercaderistas.MainActivity::class.java).apply {
+            flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        val pendingIntent = android.app.PendingIntent.getActivity(
+            app, 0, intent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
+        )
+        val names = locales.take(3).joinToString(", ") +
+            if (locales.size > 3) " " + app.getString(R.string.notif_y_mas, locales.size - 3) else ""
+        val notification = androidx.core.app.NotificationCompat.Builder(app, SYNC_CHANNEL_ID)
+            .setSmallIcon(R.mipmap.ic_launcher_foreground)
+            .setContentTitle(app.getString(R.string.sync_ruta_hoy_titulo))
+            .setContentText(names)
+            .setStyle(
+                androidx.core.app.NotificationCompat.BigTextStyle()
+                    .bigText(app.getString(R.string.sync_ruta_hoy_texto, locales.joinToString("\n• ", prefix = "• ")))
+            )
+            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .build()
+        androidx.core.app.NotificationManagerCompat.from(app).notify(1002, notification)
+    }
+
+    companion object {
+        const val SYNC_CHANNEL_ID = "sincronizacion"
+    }
+
+    internal fun computePlanillaChanges(
+        old: List<EntradaRuta>,
+        new: List<EntradaRuta>,
+        activeRoute: String? = null,
+        today: DiaSemana? = null,
+    ): PlanillaChanges = diffPlanilla(old, new, activeRoute, today)
+
+    private fun todayDia(): DiaSemana = when (java.time.LocalDate.now().dayOfWeek) {
+        java.time.DayOfWeek.MONDAY -> DiaSemana.LUNES
+        java.time.DayOfWeek.TUESDAY -> DiaSemana.MARTES
+        java.time.DayOfWeek.WEDNESDAY -> DiaSemana.MIERCOLES
+        java.time.DayOfWeek.THURSDAY -> DiaSemana.JUEVES
+        java.time.DayOfWeek.FRIDAY -> DiaSemana.VIERNES
+        java.time.DayOfWeek.SATURDAY -> DiaSemana.SABADO
+        else -> DiaSemana.DOMINGO
     }
 
     private suspend fun downloadWithRetries(url: String, retries: Int = Constants.MAX_RETRIES): ByteArray? {

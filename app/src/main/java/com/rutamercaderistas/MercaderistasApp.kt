@@ -8,6 +8,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.rutamercaderistas.data.preferences.BrandPagesRepository
 import com.rutamercaderistas.data.preferences.PreferencesRepository
+import com.rutamercaderistas.viewmodel.SyncViewModel
 import com.rutamercaderistas.viewmodel.UpdateViewModel
 import dagger.hilt.android.HiltAndroidApp
 import io.sentry.android.core.SentryAndroid
@@ -101,9 +102,17 @@ class MercaderistasApp : Application(), Configuration.Provider {
             ).apply {
                 description = "Notificaciones de nuevas versiones disponibles"
             }
+            val sincronizacion = NotificationChannel(
+                SyncViewModel.SYNC_CHANNEL_ID,
+                getString(R.string.notif_canal_sync_nombre),
+                NotificationManager.IMPORTANCE_DEFAULT,
+            ).apply {
+                description = getString(R.string.notif_canal_sync_desc)
+            }
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(promociones)
             manager.createNotificationChannel(actualizaciones)
+            manager.createNotificationChannel(sincronizacion)
         }
     }
 

@@ -14,8 +14,14 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.json.JSONArray
+import org.json.JSONObject
 import javax.inject.Inject
 import javax.inject.Singleton
+
+data class SyncHistoryEntry(
+    val timestamp: Long,
+    val summary: String,
+)
 
 val Context.prefsDataStore: DataStore<Preferences> by preferencesDataStore(name = "mercaderistas_prefs")
 
@@ -36,8 +42,10 @@ class PreferencesRepository @Inject constructor(
         val KEY_ONBOARDING_DONE = stringPreferencesKey("onboarding_done")
         private val KEY_LAST_SYNC_ETAG = stringPreferencesKey("last_sync_etag")
         private val KEY_LAST_SYNC_HASH = stringPreferencesKey("last_sync_hash")
+        private val KEY_SYNC_HISTORY = stringPreferencesKey("sync_history")
         private const val SEARCH_HISTORY_MAX = 8
         private const val LOCALES_SEARCH_HISTORY_MAX = 8
+        private const val SYNC_HISTORY_MAX = 20
     }
 
     suspend fun getSelectedRoute(): String? =
@@ -184,5 +192,38 @@ class PreferencesRepository @Inject constructor(
             if (value == null) prefs.remove(KEY_LAST_SYNC_HASH)
             else prefs[KEY_LAST_SYNC_HASH] = value
         }
+    }
+
+    fun getSyncHistoryFlow(): Flow<List<SyncHistoryEntry>> =
+        context.prefsDataStore.data.map { prefs ->
+            prefs[KEY_SYNC_HISTORY]?.let { raw ->
+                runCatching {
+                    val arr = JSONArray(raw)
+                    List(arr.length()) { i ->
+                        val obj = arr.getJSONObject(i)
+                        SyncHistoryEntry(
+                            timestamp = obj.optLong("ts"),
+                            summary = obj.optString("summary"),
+                        )
+                    }
+                }.getOrElse { emptyList() }
+            } ?: emptyList()
+        }
+
+    suspend fun addSyncHistoryEntry(entry: SyncHistoryEntry) {
+        context.prefsDataStore.edit { prefs ->
+            val existing = prefs[KEY_SYNC_HISTORY]
+                ?.let { runCatching { JSONArray(it) }.getOrNull() } ?: JSONArray()
+            val next = JSONArray()
+            next.put(JSONObject().put("ts", entry.timestamp).put("summary", entry.summary))
+            for (i in 0 until minOf(existing.length(), SYNC_HISTORY_MAX - 1)) {
+                next.put(existing.get(i))
+            }
+            prefs[KEY_SYNC_HISTORY] = next.toString()
+        }
+    }
+
+    suspend fun clearSyncHistory() {
+        context.prefsDataStore.edit { it.remove(KEY_SYNC_HISTORY) }
     }
 }

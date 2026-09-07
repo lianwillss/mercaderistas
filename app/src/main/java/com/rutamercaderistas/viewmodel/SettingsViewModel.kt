@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.data.preferences.PreferencesRepository
+import com.rutamercaderistas.data.preferences.SyncHistoryEntry
 import com.rutamercaderistas.services.EanExcelParser
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -46,5 +47,12 @@ class SettingsViewModel @Inject constructor(
 
     fun clearSearchHistory() {
         viewModelScope.launch { preferencesRepository.clearSearchHistory() }
+    }
+
+    val syncHistory: StateFlow<List<SyncHistoryEntry>> = preferencesRepository.getSyncHistoryFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun clearSyncHistory() {
+        viewModelScope.launch { preferencesRepository.clearSyncHistory() }
     }
 }

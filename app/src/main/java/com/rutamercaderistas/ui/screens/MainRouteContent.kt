@@ -60,6 +60,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.rutamercaderistas.R
@@ -433,7 +434,7 @@ private fun ValidationErrorsBanner(errors: List<ValidationError>, onDismiss: () 
         Spacer(modifier = Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "Validación de planilla",
+                text = stringResource(R.string.validacion_titulo),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onErrorContainer,
                 fontWeight = FontWeight.Bold,
@@ -445,7 +446,7 @@ private fun ValidationErrorsBanner(errors: List<ValidationError>, onDismiss: () 
             )
         }
         TextButton(onClick = { showDetail = true }) {
-            Text(text = "Ver detalle", color = MaterialTheme.colorScheme.onErrorContainer, fontWeight = FontWeight.Bold)
+            Text(text = stringResource(R.string.ver_detalle), color = MaterialTheme.colorScheme.onErrorContainer, fontWeight = FontWeight.Bold)
         }
         IconButton(onClick = onDismiss) {
             Icon(
@@ -475,7 +476,7 @@ private fun ValidationErrorsBanner(errors: List<ValidationError>, onDismiss: () 
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Errores de validación (${errors.size})",
+                        text = pluralStringResource(R.plurals.validacion_errores_titulo, errors.size, errors.size),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                     )

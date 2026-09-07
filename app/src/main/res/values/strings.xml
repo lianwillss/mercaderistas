@@ -8,6 +8,26 @@
     <string name="sync_cambios_eliminados">%1$d quitados</string>
     <string name="sync_cambios_movidos">%1$d movidos de día</string>
     <string name="sync_cambios_cd">Cambios detectados en la planilla</string>
+    <string name="ver_detalle">Ver detalle</string>
+    <string name="sync_sec_agregados">Agregados</string>
+    <string name="sync_sec_quitados">Quitados</string>
+    <string name="sync_sec_movidos">Movidos de día</string>
+    <string name="sync_sec_direcciones">Direcciones actualizadas</string>
+    <string name="sync_sec_marcas">Marcas actualizadas</string>
+    <string name="sync_sec_hoy">Afecta tu ruta de hoy</string>
+    <string name="sync_movido_ruta">%1$s → %2$s</string>
+    <string name="sync_historial_titulo">Historial de sincronizaciones</string>
+    <string name="sync_historial_vacio">Aún no hay sincronizaciones con cambios.</string>
+    <string name="sync_historial_borrar">Borrar historial</string>
+    <string name="sync_ruta_hoy_titulo">Cambios en tu ruta de hoy</string>
+    <string name="sync_ruta_hoy_texto">%1$s</string>
+    <string name="notif_canal_sync_nombre">Sincronización</string>
+    <string name="notif_canal_sync_desc">Avisos de cambios en tu ruta del día</string>
+    <string name="validacion_titulo">Revisión de planilla</string>
+    <plurals name="validacion_errores_titulo">
+        <item quantity="one">%1$d error de validación</item>
+        <item quantity="other">%1$d errores de validación</item>
+    </plurals>
     <string name="empty_state_titulo">Aún no hay datos</string>
     <string name="empty_state_subtitulo">Sincronizá con la planilla para cargar tu ruta del día.</string>
     <string name="empty_state_offline">No hay conexión. Conectate a internet para sincronizar la planilla.</string>
