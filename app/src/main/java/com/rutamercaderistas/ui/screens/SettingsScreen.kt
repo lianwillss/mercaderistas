@@ -25,6 +25,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
@@ -152,13 +153,10 @@ fun SettingsScreen(
                                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                                 modifier = Modifier.weight(1f),
                             )
-                            if (selected) {
-                                Icon(
-                                    Icons.Outlined.Settings,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                            }
+                            RadioButton(
+                                selected = selected,
+                                onClick = null,
+                            )
                         }
                     }
                     if (hasPendingChange) {

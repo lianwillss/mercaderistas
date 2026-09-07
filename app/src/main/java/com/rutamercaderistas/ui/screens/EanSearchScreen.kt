@@ -649,7 +649,7 @@ private fun EanProductCard(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
     ) {
         Column(modifier = Modifier.padding(dimens.spacingMd)) {
             HighlightedText(
@@ -668,7 +668,7 @@ private fun EanProductCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 96.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(MaterialTheme.shapes.small)
                         .clickable(
                             role = Role.Button,
                             onClickLabel = stringResource(R.string.ean_zoom_cd),
