@@ -205,6 +205,38 @@ fun SettingsScreen(
                 }
             }
 
+            SettingsCard(title = stringResource(R.string.sync_historial_titulo)) {
+                val syncHistory by viewModel.syncHistory.collectAsStateWithLifecycle()
+                if (syncHistory.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.sync_historial_vacio),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    syncHistory.forEach { entry ->
+                        Text(
+                            text = formatSyncHistoryDate(entry.timestamp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(
+                            text = entry.summary,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    androidx.compose.material3.OutlinedButton(onClick = {
+                        viewModel.clearSyncHistory()
+                    }) {
+                        Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.width(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(stringResource(R.string.sync_historial_borrar))
+                    }
+                }
+            }
+
             SettingsCard(title = stringResource(R.string.settings_about)) {
                 Text(
                     text = stringResource(R.string.settings_version, viewModel.versionName),
@@ -213,6 +245,17 @@ fun SettingsScreen(
                 )
             }
         }
+    }
+}
+
+private fun formatSyncHistoryDate(timestamp: Long): String {
+    return try {
+        val dt = java.time.Instant.ofEpochMilli(timestamp)
+            .atZone(java.time.ZoneId.systemDefault())
+            .toLocalDateTime()
+        dt.format(java.time.format.DateTimeFormatter.ofPattern("d MMM, HH:mm", java.util.Locale("es")))
+    } catch (_: Exception) {
+        ""
     }
 }
 

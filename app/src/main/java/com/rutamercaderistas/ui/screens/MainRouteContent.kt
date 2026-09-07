@@ -67,6 +67,7 @@ import com.rutamercaderistas.R
 import com.rutamercaderistas.models.DiaSemana
 import com.rutamercaderistas.ui.components.DaySelector
 import com.rutamercaderistas.ui.components.HeaderSection
+import com.rutamercaderistas.ui.components.IosModal
 import com.rutamercaderistas.ui.components.PromoExpiringSoonModal
 import com.rutamercaderistas.ui.components.RouteSearchBar
 import com.rutamercaderistas.ui.components.ShimmerDaySelector
@@ -362,6 +363,7 @@ private fun SyncErrorBanner(message: String, onRetry: () -> Unit) {
 @Composable
 private fun SyncChangesBanner(changes: PlanillaChanges, onDismiss: () -> Unit) {
     val dimens = LocalAppDimens.current
+    var showDetail by remember { mutableStateOf(false) }
     val cd = stringResource(R.string.sync_cambios_cd)
     val summary = buildList {
         if (changes.added.isNotEmpty()) add(stringResource(R.string.sync_cambios_agregados, changes.added.size))
@@ -400,11 +402,126 @@ private fun SyncChangesBanner(changes: PlanillaChanges, onDismiss: () -> Unit) {
                 )
             }
         }
+        TextButton(onClick = { showDetail = true }) {
+            Text(
+                text = stringResource(R.string.ver_detalle),
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+            )
+        }
         IconButton(onClick = onDismiss) {
             Icon(
                 imageVector = Icons.Outlined.Close,
                 contentDescription = stringResource(R.string.cerrar),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+    if (showDetail) {
+        IosModal(
+            visible = true,
+            onDismiss = { showDetail = false },
+            title = stringResource(R.string.sync_cambios_titulo),
+            subtitle = summary.ifBlank { null },
+        ) {
+            androidx.compose.foundation.lazy.LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp),
+            ) {
+                if (changes.affectsToday.isNotEmpty()) {
+                    item {
+                        ChangesSection(
+                            title = stringResource(R.string.sync_sec_hoy),
+                            lines = changes.affectsToday,
+                            highlight = true,
+                        )
+                    }
+                }
+                if (changes.added.isNotEmpty()) {
+                    item {
+                        ChangesSection(
+                            title = stringResource(R.string.sync_sec_agregados),
+                            lines = changes.added.sorted(),
+                        )
+                    }
+                }
+                if (changes.removed.isNotEmpty()) {
+                    item {
+                        ChangesSection(
+                            title = stringResource(R.string.sync_sec_quitados),
+                            lines = changes.removed.sorted(),
+                        )
+                    }
+                }
+                if (changes.moved.isNotEmpty()) {
+                    item {
+                        ChangesSection(
+                            title = stringResource(R.string.sync_sec_movidos),
+                            lines = changes.moved.map { m ->
+                                buildString {
+                                    append(m.local)
+                                    append(": ")
+                                    append(if (m.fromDays.isNotBlank()) m.fromDays else "—")
+                                    append(" → ")
+                                    append(if (m.toDays.isNotBlank()) m.toDays else "—")
+                                    if (m.fromRoute.isNotBlank() || m.toRoute.isNotBlank()) {
+                                        append(" (")
+                                        append(stringResource(R.string.sync_movido_ruta, m.fromRoute.ifBlank { "—" }, m.toRoute.ifBlank { "—" }))
+                                        append(")")
+                                    }
+                                }
+                            },
+                        )
+                    }
+                }
+                if (changes.changedAddress.isNotEmpty()) {
+                    item {
+                        ChangesSection(
+                            title = stringResource(R.string.sync_sec_direcciones),
+                            lines = changes.changedAddress.map { "${it.local}: ${it.oldAddress} → ${it.newAddress}" },
+                        )
+                    }
+                }
+                if (changes.changedBrands.isNotEmpty()) {
+                    item {
+                        ChangesSection(
+                            title = stringResource(R.string.sync_sec_marcas),
+                            lines = changes.changedBrands.map { b ->
+                                buildString {
+                                    append(b.local)
+                                    if (b.added.isNotEmpty()) append(" (+${b.added.joinToString(", ")})")
+                                    if (b.removed.isNotEmpty()) append(" (−${b.removed.joinToString(", ")})")
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChangesSection(
+    title: String,
+    lines: List<String>,
+    highlight: Boolean = false,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = if (highlight) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        lines.forEach { line ->
+            Text(
+                text = "• $line",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }
