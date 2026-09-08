@@ -21,7 +21,7 @@ class CodProvScreenTest {
 
     @Test
     fun codProvItems_sizeMatchesExpected() {
-        // 11 proveedores definidos
-        assertTrue(CodProvItems.size == 11)
+        // 12 proveedores definidos
+        assertTrue(CodProvItems.size == 12)
     }
 }

@@ -117,6 +117,7 @@
     <string name="cod_prov_ecocultiva">ECOCULTIVA</string>
     <string name="cod_prov_dusoleil">DUSOLEIL</string>
     <string name="cod_prov_olimpia">OLIMPIA</string>
+    <string name="cod_prov_beshos">BESHOS</string>
 
     <!-- Search -->
     <string name="buscar_ruta">Buscar ruta…</string>
