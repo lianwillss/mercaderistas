@@ -14,7 +14,7 @@ import java.io.InputStream
 import java.text.Normalizer
 import javax.inject.Inject
 
-const val EAN_DATA_VERSION = 22
+const val EAN_DATA_VERSION = 23
 
 // Prefijo/sufijo de los archivos Excel de catálogo EAN en assets.
 // Para agregar más productos basta con soltar otro archivo "ean*.xlsx"
@@ -247,11 +247,12 @@ class EanExcelParser @Inject constructor(
         val unBase = map.unBase?.let { getStringCellValue(row.getCell(it)) } ?: ""
         val unPedido = map.unPedido?.let { getStringCellValue(row.getCell(it)) } ?: ""
         val conversionRaw = map.conversion?.let { getStringCellValue(row.getCell(it)) } ?: ""
-        // Hardcoded CAJA para NAT NATURAL (su Excel no trae columna Conversión)
+        // Hardcoded CAJA para marcas cuyo Excel no trae columna Conversión/Caja
         val conversion = when {
             conversionRaw.isNotBlank() -> conversionRaw
             codCencosud == "1846223" -> "16"
             normalizeSearch(marcaClean) == "nat natural" -> "24"
+            normalizeSearch(marcaClean) == "japi jane" -> "6"
             else -> conversionRaw
         }
         val estado = map.estado?.let { getStringCellValue(row.getCell(it)) } ?: ""
