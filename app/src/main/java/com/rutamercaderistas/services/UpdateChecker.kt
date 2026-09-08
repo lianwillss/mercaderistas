@@ -46,25 +46,22 @@ object UpdateChecker {
                 return@withContext noUpdate()
             }
 
-            val remoteVersion = parseVersion(versionName)
-            val localVersion = parseVersionFromCode(currentVersionCode)
-            if (remoteVersion == null) {
+            val remoteCode = tagToVersionCode(tagName)
+            if (remoteCode == null) {
                 Timber.w("Tag inválido: %s", tagName)
                 return@withContext noUpdate()
             }
 
-            if (remoteVersion.first > localVersion.first ||
-                (remoteVersion.first == localVersion.first && remoteVersion.second > localVersion.second)
-            ) {
-                Timber.i("Actualización disponible: %s > %s", versionName, formatVersion(localVersion))
+            if (remoteCode > currentVersionCode) {
+                Timber.i("Actualización disponible: %d > %d", remoteCode, currentVersionCode)
                 UpdateInfo(
                     available = true,
-                    versionCode = currentVersionCode + 1,
+                    versionCode = remoteCode,
                     versionName = versionName,
                     apkUrl = apkUrl
                 )
             } else {
-                Timber.i("Sin actualizaciones: remote=%s, local=%s", versionName, formatVersion(localVersion))
+                Timber.i("Sin actualizaciones: remote=%d, local=%d", remoteCode, currentVersionCode)
                 noUpdate()
             }
         } catch (e: Exception) {
@@ -104,14 +101,16 @@ object UpdateChecker {
         return major to minor
     }
 
-    /** Decode versionCode 11045 → Pair(11, 45) */
-    private fun parseVersionFromCode(versionCode: Int): Pair<Int, Int> {
-        val major = versionCode / 1000
-        val minor = versionCode % 1000
-        return major to minor
+    /**
+     * Convierte un tag "v12.01" al mismo esquema de versionCode
+     * (major * 1000 + minor) para comparar con enteros directo.
+     * Visible para tests.
+     */
+    internal fun tagToVersionCode(tagName: String): Int? {
+        val versionName = tagName.removePrefix("v")
+        val parsed = parseVersion(versionName) ?: return null
+        return parsed.first * 1000 + parsed.second
     }
-
-    private fun formatVersion(v: Pair<Int, Int>): String = "${v.first}.${v.second}"
 
     private fun noUpdate() = UpdateInfo(
         available = false,
