@@ -190,6 +190,7 @@
     <string name="update_no_disponible">Sin actualizaciones disponibles</string>
     <string name="update_error_buscar">Error al buscar actualización</string>
     <string name="update_version_no_reciente">La versión descargada no es más reciente que la instalada</string>
+    <string name="update_banner_title">Nueva versión %s disponible</string>
     <string name="update_notif_disponible">Actualización disponible</string>
     <string name="update_notif_nueva">Nueva versión %s disponible</string>
     <string name="update_notif_lista">Actualización lista para instalar</string>

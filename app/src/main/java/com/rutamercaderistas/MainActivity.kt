@@ -90,6 +90,8 @@ class MainActivity : ComponentActivity() {
         setContent {
 
             val updateState by updateViewModel.state.collectAsStateWithLifecycle()
+            val showUpdateBanner by updateViewModel.showUpdateBanner.collectAsStateWithLifecycle()
+            val pendingUpdate by updateViewModel.pendingUpdate.collectAsStateWithLifecycle()
             val routeUiState by routeViewModel.uiState.collectAsStateWithLifecycle()
             val syncUiState by syncViewModel.state.collectAsStateWithLifecycle()
 
@@ -140,6 +142,10 @@ class MainActivity : ComponentActivity() {
                     MainScreen(
                         routeUiState = routeUiState,
                         syncUiState = syncUiState,
+                        showUpdateBanner = showUpdateBanner,
+                        pendingVersionName = pendingUpdate?.versionName.orEmpty(),
+                        onUpdateNow = { updateViewModel.showPendingDialog() },
+                        onUpdateLater = { updateViewModel.suppressUntilTomorrow() },
                         onCheckUpdate = { updateViewModel.checkForUpdate(force = true) },
                         onSetCurrentDay = { routeViewModel.setCurrentDay(it) },
                         onSelectRoute = { routeViewModel.selectRoute(it) },

@@ -10,6 +10,8 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.MainActivity
+import com.rutamercaderistas.R
+import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.services.UpdateChecker
 import com.rutamercaderistas.viewmodel.UpdateViewModel
 import dagger.assisted.Assisted
@@ -20,12 +22,18 @@ import timber.log.Timber
 class UpdateCheckWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
+    private val preferencesRepository: PreferencesRepository,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
         return try {
             val info = UpdateChecker.check(BuildConfig.VERSION_CODE)
             if (info.available) {
+                if (preferencesRepository.getLastNotifiedUpdateCode() == info.versionCode) {
+                    Timber.i("Update %s ya notificado, se omite", info.versionName)
+                    return Result.success()
+                }
+                preferencesRepository.setLastNotifiedUpdateCode(info.versionCode)
                 Timber.i("Update disponible en segundo plano: %s", info.versionName)
 
                 val intent = Intent(applicationContext, MainActivity::class.java).apply {
@@ -39,11 +47,11 @@ class UpdateCheckWorker @AssistedInject constructor(
 
                 val notification = NotificationCompat.Builder(applicationContext, UpdateViewModel.UPDATE_CHANNEL_ID)
                     .setSmallIcon(android.R.drawable.ic_dialog_info)
-                    .setContentTitle("Nueva actualización disponible")
-                    .setContentText("Versión ${info.versionName}")
+                    .setContentTitle(applicationContext.getString(R.string.update_notif_disponible))
+                    .setContentText(applicationContext.getString(R.string.update_notif_nueva, info.versionName))
                     .setStyle(
                         NotificationCompat.BigTextStyle()
-                            .bigText("Versión ${info.versionName} disponible para instalar")
+                            .bigText(applicationContext.getString(R.string.update_notif_nueva, info.versionName))
                     )
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
                     .setContentIntent(pendingIntent)

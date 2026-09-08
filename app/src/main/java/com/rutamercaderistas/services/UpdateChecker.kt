@@ -46,24 +46,18 @@ object UpdateChecker {
                 return@withContext noUpdate()
             }
 
-            val remoteCode = tagToVersionCode(tagName)
-            if (remoteCode == null) {
-                Timber.w("Tag inválido: %s", tagName)
+            if (!isRemoteNewer(tagName, currentVersionCode)) {
+                Timber.i("Sin actualizaciones: remote=%s, local=%d", tagName, currentVersionCode)
                 return@withContext noUpdate()
             }
 
-            if (remoteCode > currentVersionCode) {
-                Timber.i("Actualización disponible: %d > %d", remoteCode, currentVersionCode)
-                UpdateInfo(
-                    available = true,
-                    versionCode = remoteCode,
-                    versionName = versionName,
-                    apkUrl = apkUrl
-                )
-            } else {
-                Timber.i("Sin actualizaciones: remote=%d, local=%d", remoteCode, currentVersionCode)
-                noUpdate()
-            }
+            Timber.i("Actualización disponible: %s > %d", tagName, currentVersionCode)
+            UpdateInfo(
+                available = true,
+                versionCode = tagToVersionCode(tagName) ?: 0,
+                versionName = versionName,
+                apkUrl = apkUrl
+            )
         } catch (e: Exception) {
             Timber.e(e, "Error checking update")
             noUpdate()
@@ -93,23 +87,44 @@ object UpdateChecker {
         } finally { conn?.disconnect() }
     }
 
-    /** Parse "11.45" → Pair(11, 45) */
-    private fun parseVersion(versionName: String): Pair<Int, Int>? {
-        val parts = versionName.split(".")
-        val major = parts.getOrNull(0)?.toIntOrNull() ?: return null
-        val minor = parts.getOrNull(1)?.toIntOrNull() ?: 0
-        return major to minor
+    /** Parse "12.02.1" → [12, 2, 1]. Null si alguna parte no es número. */
+    internal fun parseTagParts(tagName: String): List<Int>? {
+        val versionName = tagName.removePrefix("v")
+        if (versionName.isBlank()) return null
+        return versionName.split(".").map { it.toIntOrNull() ?: return null }
+    }
+
+    /** Decodifica versionCode con esquema major*1000+minor → [major, minor]. */
+    internal fun decodeVersionCode(versionCode: Int): List<Int> =
+        listOf(versionCode / 1000, versionCode % 1000)
+
+    /**
+     * true si el tag remoto es más nuevo que el código instalado.
+     * Compara parte por parte (12.02.1 > 12.02.0), sin límite de
+     * dígitos por parte. Visible para tests.
+     */
+    internal fun isRemoteNewer(remoteTag: String, localVersionCode: Int): Boolean {
+        val remote = parseTagParts(remoteTag) ?: return false
+        val local = decodeVersionCode(localVersionCode)
+        val size = maxOf(remote.size, local.size)
+        for (i in 0 until size) {
+            val r = remote.getOrElse(i) { 0 }
+            val l = local.getOrElse(i) { 0 }
+            if (r != l) return r > l
+        }
+        return false
     }
 
     /**
-     * Convierte un tag "v12.01" al mismo esquema de versionCode
-     * (major * 1000 + minor) para comparar con enteros directo.
-     * Visible para tests.
+     * Convierte un tag "v12.01" al esquema de versionCode
+     * (major * 1000 + minor) solo para informar. La decisión de
+     * actualizar la toma [isRemoteNewer]. Visible para tests.
      */
     internal fun tagToVersionCode(tagName: String): Int? {
-        val versionName = tagName.removePrefix("v")
-        val parsed = parseVersion(versionName) ?: return null
-        return parsed.first * 1000 + parsed.second
+        val parsed = parseTagParts(tagName) ?: return null
+        val major = parsed.getOrElse(0) { 0 }
+        val minor = parsed.getOrElse(1) { 0 }
+        return major * 1000 + minor
     }
 
     private fun noUpdate() = UpdateInfo(

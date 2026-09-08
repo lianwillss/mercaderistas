@@ -66,4 +66,32 @@ class PreferencesRepositoryTest {
         repository.setTransportMode(null)
         assertNull(repository.getTransportMode())
     }
+
+    @Test
+    fun `default pendingUpdate is null`() = runTest {
+        assertNull(repository.getPendingUpdate())
+    }
+
+    @Test
+    fun `set and get pendingUpdate`() = runTest {
+        repository.setPendingUpdate(PendingUpdate("12.02", 12002, "http://x.apk"))
+        assertEquals(
+            PendingUpdate("12.02", 12002, "http://x.apk"),
+            repository.getPendingUpdate()
+        )
+    }
+
+    @Test
+    fun `clearPendingUpdate removes it`() = runTest {
+        repository.setPendingUpdate(PendingUpdate("12.02", 12002, "http://x.apk"))
+        repository.clearPendingUpdate()
+        assertNull(repository.getPendingUpdate())
+    }
+
+    @Test
+    fun `lastNotifiedUpdateCode roundtrip`() = runTest {
+        assertEquals(0, repository.getLastNotifiedUpdateCode())
+        repository.setLastNotifiedUpdateCode(12002)
+        assertEquals(12002, repository.getLastNotifiedUpdateCode())
+    }
 }

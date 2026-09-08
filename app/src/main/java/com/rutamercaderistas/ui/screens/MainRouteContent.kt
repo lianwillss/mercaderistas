@@ -34,6 +34,7 @@ import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -106,6 +107,10 @@ fun MainRouteContent(
     onOpenSettings: () -> Unit = {},
     onRefreshPositioned: (Offset) -> Unit = {},
     onClearValidationErrors: () -> Unit = {},
+    showUpdateBanner: Boolean = false,
+    pendingVersionName: String = "",
+    onUpdateNow: () -> Unit = {},
+    onUpdateLater: () -> Unit = {},
 ) {
     val entries = routeState.entries
     val selectedRoute = routeState.selectedRoute
@@ -189,6 +194,14 @@ fun MainRouteContent(
                             .padding(horizontal = dimens.spacingLg, vertical = dimens.spacingXs),
                     )
                 }
+            }
+
+            if (showUpdateBanner) {
+                UpdateBanner(
+                    versionName = pendingVersionName,
+                    onUpdateNow = onUpdateNow,
+                    onUpdateLater = onUpdateLater,
+                )
             }
 
             if (syncState.syncError != null && !isSyncing) {
@@ -354,6 +367,54 @@ private fun SyncErrorBanner(message: String, onRetry: () -> Unit) {
             Text(
                 text = stringResource(R.string.reintentar),
                 color = MaterialTheme.colorScheme.onErrorContainer,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+    }
+}
+
+@Composable
+private fun UpdateBanner(
+    versionName: String,
+    onUpdateNow: () -> Unit,
+    onUpdateLater: () -> Unit,
+) {
+    val dimens = LocalAppDimens.current
+    val cd = stringResource(R.string.update_notif_disponible)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = dimens.spacingLg, vertical = dimens.spacingXs)
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            .semantics { contentDescription = "$cd: $versionName" }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.SystemUpdate,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = stringResource(R.string.update_banner_title, versionName),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = onUpdateLater) {
+            Text(
+                text = stringResource(R.string.mas_tarde),
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        }
+        TextButton(onClick = onUpdateNow) {
+            Text(
+                text = stringResource(R.string.actualizar_btn),
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
                 fontWeight = FontWeight.Bold,
             )
         }

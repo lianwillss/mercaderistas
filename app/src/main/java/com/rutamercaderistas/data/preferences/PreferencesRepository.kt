@@ -23,6 +23,12 @@ data class SyncHistoryEntry(
     val summary: String,
 )
 
+data class PendingUpdate(
+    val versionName: String,
+    val versionCode: Int,
+    val apkUrl: String,
+)
+
 val Context.prefsDataStore: DataStore<Preferences> by preferencesDataStore(name = "mercaderistas_prefs")
 
 @Singleton
@@ -42,6 +48,10 @@ class PreferencesRepository @Inject constructor(
         val KEY_ONBOARDING_DONE = stringPreferencesKey("onboarding_done")
         private val KEY_LAST_SYNC_ETAG = stringPreferencesKey("last_sync_etag")
         private val KEY_LAST_SYNC_HASH = stringPreferencesKey("last_sync_hash")
+        private val KEY_PENDING_UPDATE_NAME = stringPreferencesKey("pending_update_name")
+        private val KEY_PENDING_UPDATE_CODE = intPreferencesKey("pending_update_code")
+        private val KEY_PENDING_UPDATE_URL = stringPreferencesKey("pending_update_url")
+        private val KEY_LAST_NOTIFIED_UPDATE = intPreferencesKey("last_notified_update_code")
         private val KEY_SYNC_HISTORY = stringPreferencesKey("sync_history")
         private const val SEARCH_HISTORY_MAX = 8
         private const val LOCALES_SEARCH_HISTORY_MAX = 8
@@ -225,5 +235,39 @@ class PreferencesRepository @Inject constructor(
 
     suspend fun clearSyncHistory() {
         context.prefsDataStore.edit { it.remove(KEY_SYNC_HISTORY) }
+    }
+
+    suspend fun setPendingUpdate(entry: PendingUpdate) {
+        context.prefsDataStore.edit { prefs ->
+            prefs[KEY_PENDING_UPDATE_NAME] = entry.versionName
+            prefs[KEY_PENDING_UPDATE_CODE] = entry.versionCode
+            prefs[KEY_PENDING_UPDATE_URL] = entry.apkUrl
+        }
+    }
+
+    suspend fun getPendingUpdate(): PendingUpdate? {
+        val prefs = context.prefsDataStore.data.first()
+        val code = prefs[KEY_PENDING_UPDATE_CODE] ?: return null
+        if (code <= 0) return null
+        return PendingUpdate(
+            versionName = prefs[KEY_PENDING_UPDATE_NAME].orEmpty(),
+            versionCode = code,
+            apkUrl = prefs[KEY_PENDING_UPDATE_URL].orEmpty(),
+        )
+    }
+
+    suspend fun clearPendingUpdate() {
+        context.prefsDataStore.edit { prefs ->
+            prefs.remove(KEY_PENDING_UPDATE_NAME)
+            prefs.remove(KEY_PENDING_UPDATE_CODE)
+            prefs.remove(KEY_PENDING_UPDATE_URL)
+        }
+    }
+
+    suspend fun getLastNotifiedUpdateCode(): Int =
+        context.prefsDataStore.data.first()[KEY_LAST_NOTIFIED_UPDATE] ?: 0
+
+    suspend fun setLastNotifiedUpdateCode(code: Int) {
+        context.prefsDataStore.edit { it[KEY_LAST_NOTIFIED_UPDATE] = code }
     }
 }

@@ -16,7 +16,7 @@ App Android (Kotlin + Compose + Hilt + Room) de rutas para mercaderistas: descar
 - CI `.github/workflows/release.yml` corre solo al pushear un tag `v*`; crea la release en GitHub con `app/build/outputs/apk/release/app-universal-release.apk`.
 - Acciones fijadas por SHA — no cambiar a tags flotantes. `action-gh-release` v3 usa `overwrite_files` (ya no `overwrite`).
 - Firma: `keystore.properties` (gitignored, texto plano) para local; CI usa `KEYSTORE_BASE64`/`KEYSTORE_PASSWORD`/`KEY_ALIAS`/`KEY_PASSWORD` como secrets + `KEYSTORE_PATH` env.
-- **`version.json` en la raíz está stale (11.27) y no lo usa el código. No editarlo.** La verdad es `versionCode`/`versionName` en `app/build.gradle` (hoy 11055 / "11.55").
+- La verdad de versión es `versionCode`/`versionName` en `app/build.gradle` (`version.json` se eliminó por stale: nada lo usaba).
 
 ## Testing — races de coroutines
 

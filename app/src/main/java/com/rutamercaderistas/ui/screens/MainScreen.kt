@@ -104,6 +104,10 @@ fun MainScreen(
     onSharePromo: (PromotionEntity) -> Unit,
     onDismissSyncChanges: () -> Unit = {},
     onClearValidationErrors: () -> Unit = {},
+    showUpdateBanner: Boolean = false,
+    pendingVersionName: String = "",
+    onUpdateNow: () -> Unit = {},
+    onUpdateLater: () -> Unit = {},
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -215,6 +219,10 @@ fun MainScreen(
                         onOpenSettings = { navController.navigate(SettingsRoute) },
                         onRefreshPositioned = { refreshCenter = it },
                         onClearValidationErrors = onClearValidationErrors,
+                        showUpdateBanner = showUpdateBanner,
+                        pendingVersionName = pendingVersionName,
+                        onUpdateNow = onUpdateNow,
+                        onUpdateLater = onUpdateLater,
                     )
                 }
                 composable<AllLocalesRoute>(
