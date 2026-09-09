@@ -118,7 +118,7 @@ fun MainRouteContent(
     val stats = routeState.stats
     val activeDays = routeState.activeDays
     val recentRoutes = routeState.recentRoutes
-    val isDataLoaded = routeState.isDataLoaded
+    val isDataLoaded = routeState.isDataLoaded && !routeState.isRouteLoading
     val isSyncing = syncState.isSyncing
 
     var searchActive by remember { mutableStateOf(false) }
@@ -159,8 +159,17 @@ fun MainRouteContent(
             activeDays.getOrNull(pagerState.currentPage) ?: activeDays.firstOrNull()
         }
 
-        LaunchedEffect(currentDay) {
-            onSetCurrentDay(currentDay)
+        LaunchedEffect(routeState.isRouteLoading, selectedRoute) {
+            if (routeState.isRouteLoading) {
+                selectedDayIndex = 0
+                pagerState.scrollToPage(0)
+            }
+        }
+
+        LaunchedEffect(currentDay, routeState.isRouteLoading) {
+            if (!routeState.isRouteLoading) {
+                onSetCurrentDay(currentDay)
+            }
         }
 
         Column(modifier = Modifier.fillMaxSize()) {
@@ -303,6 +312,17 @@ fun MainRouteContent(
                         onShareLocal = onShareLocal,
                     )
                 }
+            }
+        } else if (routeState.isRouteLoading) {
+            Box(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = stringResource(R.string.cargando),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         } else if (!isDataLoaded) {
             Box(modifier = Modifier.weight(1f)) {

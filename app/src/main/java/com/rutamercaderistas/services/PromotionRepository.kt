@@ -69,7 +69,7 @@ class PromotionRepository @Inject constructor(
                     val idxSubChain = mapper.getIndex("SUBCADENA", "SUBTIENDA")
                     val idxStart = mapper.getIndex("INICIO", "DESDE", "INICIAL")
                     val idxEnd = mapper.getIndex("FINAL", "HASTA", "FINALIZACION")
-                    val idxProduct = mapper.getIndex("SKU", "NOMBRE", "PRODUCTO")
+                    val idxProduct = mapper.getIndex("PRODUCTO", "NOMBRE", "SKU")
                     val idxPrice = mapper.findFirstContaining("PRECIO", "% PROMOCION", "OFERTA")
                     if (idxBrand == -1 || idxChain == -1 || idxStart == -1 || idxEnd == -1) {
                         Timber.w("Promociones: header no reconocido (%d cols): %s", headers.size, headers.joinToString(","))

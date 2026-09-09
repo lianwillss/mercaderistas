@@ -142,12 +142,10 @@ class UpdateViewModelTest {
 
     @Test
     fun `restore shows banner for stored newer pending`() = runTest {
-        coEvery { preferencesRepository.getPendingUpdate() } returns
-            PendingUpdate("12.03", 12003, "http://x.apk")
+        val newer = PendingUpdate("99.99", BuildConfig.VERSION_CODE + 1, "http://x.apk")
+        coEvery { preferencesRepository.getPendingUpdate() } returns newer
         val restored = track(UpdateViewModel(application, preferencesRepository))
-        awaitOnMain {
-            restored.pendingUpdate.value == PendingUpdate("12.03", 12003, "http://x.apk")
-        }
+        awaitOnMain { restored.pendingUpdate.value == newer }
         awaitOnMain { restored.showUpdateBanner.value }
     }
 

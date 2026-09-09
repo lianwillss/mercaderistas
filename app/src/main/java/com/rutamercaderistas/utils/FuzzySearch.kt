@@ -96,6 +96,21 @@ fun rankLocales(query: String, locales: List<LocalDelDia>): List<LocalDelDia> {
     }.sortedBy { it.first }.map { it.second }
 }
 
+/** Cadena normalizada de un local para filtros (Jumbo, Lider, ...). */
+fun localeChain(local: LocalDelDia): String =
+    normalizeChain(effectiveChain(local.cadena, local.formato))
+
+/** Filtra por cadena y/o solo-con-promos. Función pura, testeable. */
+fun filterLocales(
+    locales: List<LocalDelDia>,
+    chain: String?,
+    onlyWithPromos: Boolean,
+    promoBrands: Set<String>,
+): List<LocalDelDia> = locales.filter { local ->
+    (chain == null || localeChain(local) == chain) &&
+        (!onlyWithPromos || local.clientes.any { it.nombre.cleanBrand() in promoBrands })
+}
+
 fun levenshtein(lhs: CharSequence, rhs: CharSequence): Int {
     val lp = lhs.length
     val rp = rhs.length

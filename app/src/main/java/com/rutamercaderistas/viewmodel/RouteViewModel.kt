@@ -28,11 +28,13 @@ import com.rutamercaderistas.utils.cleanBrand
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -46,6 +48,7 @@ sealed interface RouteDataState {
         val selectedRoute: String?,
         val entries: List<EntradaRuta>,
         val activeDays: List<DiaSemana>,
+        val currentDay: DiaSemana? = null,
         val currentDayLocales: List<LocalDelDia>,
         val allLocales: List<LocalDelDia>,
         val stats: RuteroRepository.Stats,
@@ -79,6 +82,7 @@ data class RouteUiState(
     val snackbarMessage: String? = null,
     val needsInitialLoad: Boolean = false,
     val allRuteroLocales: List<LocalDelDia> = emptyList(),
+    val isRouteLoading: Boolean = false,
 ) {
     val isDataLoaded: Boolean get() = route is RouteDataState.Loaded
     val selectedRoute: String? get() = (route as? RouteDataState.Loaded)?.selectedRoute
@@ -117,6 +121,8 @@ class RouteViewModel @Inject constructor(
     val uiState: StateFlow<RouteUiState> = _uiState.asStateFlow()
 
     private var routeVersion = 0
+    private var routeSelectionToken = 0L
+    private var routeSelectionJob: Job? = null
 
     init {
         observeRoutes()
@@ -189,16 +195,19 @@ class RouteViewModel @Inject constructor(
                             effectiveChain(locale.cadena, locale.formato).takeIf { it.isNotBlank() }
                         }.map { normalizeChain(it) }.toSet()
                         val chainToLocales = computeChainToLocales(allLocales)
+                        val previousDay = (_uiState.value.route as? RouteDataState.Loaded)?.currentDay
+                        val currentDay = previousDay?.takeIf { it in activeDays } ?: activeDays.firstOrNull()
+                        val currentDayLocales = currentDay?.let(repository::getLocalesForDay).orEmpty()
 
                         if (versionAtStart == routeVersion) {
                             _uiState.update { state ->
-                                val previousCurrentDayLocales = (state.route as? RouteDataState.Loaded)?.currentDayLocales ?: emptyList()
                                 state.copy(
                                     route = RouteDataState.Loaded(
                                         selectedRoute = selectedRoute,
                                         entries = entries,
                                         activeDays = activeDays,
-                                        currentDayLocales = previousCurrentDayLocales,
+                                        currentDay = currentDay,
+                                        currentDayLocales = currentDayLocales,
                                         allLocales = allLocales,
                                         stats = stats,
                                     ),
@@ -301,9 +310,14 @@ class RouteViewModel @Inject constructor(
     }
 
     fun selectRoute(rutero: String) {
-        viewModelScope.launch {
+        val token = ++routeSelectionToken
+        routeSelectionJob?.cancel()
+        routeVersion++
+        _uiState.update { it.copy(isRouteLoading = true) }
+        routeSelectionJob = viewModelScope.launch {
             try {
                 val entries = ruteroManager.loadRoute(rutero)
+                if (token != routeSelectionToken) return@launch
                 if (entries.isNotEmpty()) {
                     preferencesRepository.setSelectedRoute(rutero)
                     repository.setEntries(entries, rutero)
@@ -319,12 +333,12 @@ class RouteViewModel @Inject constructor(
                         effectiveChain(locale.cadena, locale.formato).takeIf { it.isNotBlank() }
                     }.map { normalizeChain(it) }.toSet()
                     val chainToLocales = computeChainToLocales(allLocales)
-                    routeVersion++
                     _uiState.update { it.copy(
                         route = RouteDataState.Loaded(
                             selectedRoute = rutero,
                             entries = entries,
                             activeDays = activeDays,
+                            currentDay = currentDay,
                             currentDayLocales = currentDayLocales,
                             allLocales = allLocales,
                             stats = stats,
@@ -333,10 +347,18 @@ class RouteViewModel @Inject constructor(
                         routeBrands = routeBrands,
                         routeChains = routeChains,
                         needsInitialLoad = false,
+                        isRouteLoading = false,
                     )}
+                } else {
+                    _uiState.update { it.copy(isRouteLoading = false) }
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Timber.w(e, "Error selecting route")
+                if (token == routeSelectionToken) {
+                    _uiState.update { it.copy(isRouteLoading = false) }
+                }
             }
         }
     }
@@ -348,7 +370,7 @@ class RouteViewModel @Inject constructor(
             _uiState.update { state ->
                 val currentRoute = state.route
                 if (currentRoute is RouteDataState.Loaded) {
-                    state.copy(route = currentRoute.copy(currentDayLocales = locales))
+                    state.copy(route = currentRoute.copy(currentDay = dia, currentDayLocales = locales))
                 } else state
             }
         }

@@ -8,8 +8,12 @@ import com.rutamercaderistas.data.local.toEntities
 import com.rutamercaderistas.models.EntradaRuta
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import kotlin.system.measureTimeMillis
 
 /**
@@ -29,30 +33,38 @@ class RuteroManager(
     val ruterosFlow: Flow<List<String>> = routeEntryDao.observeRuteros()
 
     private val parser = ExcelParser()
+    private val syncMutex = Mutex()
+
+    suspend fun <T> withSyncLock(block: suspend () -> T): T {
+        syncMutex.lock()
+        return try {
+            block()
+        } finally {
+            syncMutex.unlock()
+        }
+    }
 
     /**
      * Guarda el archivo Excel maestro asegurando que se reemplace el anterior.
      */
     suspend fun saveMasterExcel(bytes: ByteArray): Boolean = withContext(Dispatchers.IO) {
+        val target = File(context.filesDir, EXCEL_FILE_NAME)
+        val temp = File(context.filesDir, "$EXCEL_FILE_NAME.tmp")
         try {
-            val file = File(context.filesDir, EXCEL_FILE_NAME)
-            if (file.exists()) {
-                file.delete()
-                Timber.d("OLD_FILE_REMOVED: Archivo anterior eliminado")
+            temp.writeBytes(bytes)
+            if (temp.length() <= 0 || !isValidMasterExcel(temp)) {
+                Timber.e("NEW_FILE_REJECTED: Excel vacío o con estructura inválida")
+                return@withContext false
             }
 
-            file.writeBytes(bytes)
-
-            if (file.exists() && file.length() > 0) {
-                Timber.d("NEW_FILE_SAVED: Archivo maestro guardado (%d bytes)", file.length())
-                true
-            } else {
-                Timber.e("ONEDRIVE_DOWNLOAD_FAILED: Archivo guardado está vacío o no existe")
-                false
-            }
+            replaceFile(temp, target)
+            Timber.d("NEW_FILE_SAVED: Archivo maestro guardado (%d bytes)", target.length())
+            true
         } catch (e: Exception) {
             Timber.e(e, "Error guardando Excel maestro")
             false
+        } finally {
+            if (temp.exists()) temp.delete()
         }
     }
 
@@ -74,6 +86,10 @@ class RuteroManager(
 
                 if (result.isSuccess) {
                     val (ruteros, byRoute) = result.getOrThrow()
+                    if (!isValidMasterData(ruteros, byRoute)) {
+                        Timber.e("INDEX_FAILED: Excel sin rutas o columnas de datos válidas")
+                        return@measureTimeMillis
+                    }
 
                     val allEntities = byRoute.flatMap { (_, entries) ->
                         entries.toEntities()
@@ -91,6 +107,33 @@ class RuteroManager(
         }
         Timber.d("LOAD_TIME_MS (Indexación): %d ms", time)
         success
+    }
+
+    private suspend fun isValidMasterExcel(file: File): Boolean {
+        val (ruteros, byRoute) = parser.parseAll(file).getOrNull() ?: return false
+        return isValidMasterData(ruteros, byRoute)
+    }
+
+    private fun isValidMasterData(
+        ruteros: List<String>,
+        byRoute: Map<String, List<EntradaRuta>>,
+    ): Boolean = isValidMasterImport(ruteros, byRoute.values.flatten())
+
+    private fun replaceFile(source: File, target: File) {
+        try {
+            Files.move(
+                source.toPath(),
+                target.toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING,
+            )
+        } catch (_: AtomicMoveNotSupportedException) {
+            Files.move(
+                source.toPath(),
+                target.toPath(),
+                StandardCopyOption.REPLACE_EXISTING,
+            )
+        }
     }
 
     /**
@@ -134,3 +177,11 @@ class RuteroManager(
     }
 
 }
+
+internal fun isValidMasterImport(
+    ruteros: List<String>,
+    entries: List<EntradaRuta>,
+): Boolean = ruteros.isNotEmpty() && entries.isNotEmpty() &&
+    entries.any { it.local.isNotBlank() } &&
+    entries.any { it.codigo.isNotBlank() } &&
+    entries.any { it.cliente.isNotBlank() }

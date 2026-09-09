@@ -14,7 +14,7 @@ private val DATE_FORMATS = listOf(
     DateTimeFormatter.ofPattern("yyyy/MM/dd"),
 )
 
-fun parseCsvLine(line: String): List<String>? {
+fun parseCsvLine(line: String, delimiter: Char = ';'): List<String>? {
     if (line.isBlank()) return null
     val result = mutableListOf<String>()
     val current = StringBuilder()
@@ -31,7 +31,7 @@ fun parseCsvLine(line: String): List<String>? {
                 }
                 inQuotes = !inQuotes
             }
-            (ch == ',' || ch == ';') && !inQuotes -> {
+            ch == delimiter && !inQuotes -> {
                 result.add(current.toString())
                 current.clear()
             }

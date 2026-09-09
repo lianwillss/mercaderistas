@@ -184,6 +184,47 @@ class RouteViewModelTest {
     }
 
     @Test
+    fun `repository refresh recalculates the selected day locales`() = runTest(testDispatcher) {
+        val oldEntries = listOf(
+            EntradaRuta("", "RUTA-1", "1", "Local antiguo", "", "Cliente 1", lunes = true),
+        )
+        val newEntries = listOf(
+            EntradaRuta("", "RUTA-1", "2", "Local nuevo", "", "Cliente 2", lunes = true),
+        )
+        coEvery { ruteroManager.loadRoute("RUTA-1") } returns oldEntries
+
+        val viewModel = createViewModel()
+        viewModel.selectRoute("RUTA-1")
+        awaitOnMain { viewModel.uiState.value.entries.isNotEmpty() }
+        viewModel.setCurrentDay(DiaSemana.LUNES)
+        awaitOnMain { viewModel.uiState.value.currentDayLocales.any { it.local == "Local Antiguo" } }
+
+        repository.setEntries(newEntries, "RUTA-1")
+
+        awaitOnMain {
+            viewModel.uiState.value.currentDayLocales.singleOrNull()?.local == "Local Nuevo"
+        }
+    }
+
+    @Test
+    fun `latest route selection wins when selections happen quickly`() = runTest(testDispatcher) {
+        val oldEntries = listOf(EntradaRuta("", "RUTA-1", "1", "Ruta vieja", "", "Cliente 1"))
+        val newEntries = listOf(EntradaRuta("", "RUTA-2", "2", "Ruta nueva", "", "Cliente 2"))
+        coEvery { ruteroManager.loadRoute("RUTA-1") } returns oldEntries
+        coEvery { ruteroManager.loadRoute("RUTA-2") } returns newEntries
+
+        val viewModel = createViewModel()
+        viewModel.selectRoute("RUTA-1")
+        viewModel.selectRoute("RUTA-2")
+        awaitOnMain { viewModel.uiState.value.selectedRoute == "RUTA-2" }
+
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("RUTA-2", viewModel.uiState.value.selectedRoute)
+        assertEquals("Ruta Nueva", viewModel.uiState.value.allLocales.single().local)
+    }
+
+    @Test
     fun `loadInitialData selects first route when no saved route`() = runTest(testDispatcher) {
         coEvery { ruteroManager.loadIndex() } returns listOf("RUTA-1", "RUTA-2")
         coEvery { ruteroManager.loadRoute("RUTA-1") } returns listOf(

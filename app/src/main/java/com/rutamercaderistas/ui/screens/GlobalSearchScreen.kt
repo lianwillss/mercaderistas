@@ -33,6 +33,7 @@ import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -67,10 +68,14 @@ import androidx.compose.ui.unit.dp
 import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.data.preferences.PreferencesRepository
+import com.rutamercaderistas.domain.model.normalizeChain
 import com.rutamercaderistas.models.LocalDelDia
 import com.rutamercaderistas.ui.components.ScreenHeader
 import com.rutamercaderistas.ui.theme.LocalAppDimens
+import com.rutamercaderistas.utils.cleanBrand
+import com.rutamercaderistas.utils.filterLocales
 import com.rutamercaderistas.utils.fuzzyMatches
+import com.rutamercaderistas.utils.localeChain
 import com.rutamercaderistas.utils.rankLocales
 import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalContext
@@ -116,30 +121,51 @@ fun GlobalSearchScreen(
         }
     }
 
+    var selectedChain by remember { mutableStateOf<String?>(null) }
+    var soloConPromos by remember { mutableStateOf(false) }
+    val chains = remember(locales) {
+        locales.map { localeChain(it) }.filter { it.isNotBlank() }.distinct().sorted()
+    }
+    val promoBrands = remember(promotions) {
+        promotions.map { it.brand.cleanBrand() }.toSet()
+    }
+
     val q = searchQuery.trim()
     var isSearching by remember { mutableStateOf(false) }
     val typing = searchQuery != debouncedQuery
-    val filteredLocales by produceState(initialValue = emptyList<LocalDelDia>(), locales, debouncedQuery) {
+    val filteredLocales by produceState(
+        initialValue = emptyList<LocalDelDia>(),
+        locales, debouncedQuery, selectedChain, soloConPromos, promoBrands,
+    ) {
         if (debouncedQuery.isBlank()) {
             value = emptyList()
             return@produceState
         }
         isSearching = true
         value = withContext(Dispatchers.Default) {
-            rankLocales(debouncedQuery, locales).take(50)
+            filterLocales(
+                rankLocales(debouncedQuery, locales),
+                selectedChain,
+                soloConPromos,
+                promoBrands,
+            ).take(50)
         }
         isSearching = false
     }
-    val filteredPromotions by produceState(initialValue = emptyList<PromotionEntity>(), promotions, debouncedQuery) {
+    val filteredPromotions by produceState(
+        initialValue = emptyList<PromotionEntity>(),
+        promotions, debouncedQuery, selectedChain,
+    ) {
         if (debouncedQuery.isBlank()) {
             value = emptyList()
             return@produceState
         }
         value = withContext(Dispatchers.Default) {
             promotions.filter {
-                fuzzyMatches(debouncedQuery, "${it.productName} ${it.brand} ${it.chain}") ||
-                    it.productName.lowercase().contains(debouncedQuery.lowercase().trim()) ||
-                    it.brand.lowercase().contains(debouncedQuery.lowercase().trim())
+                (selectedChain == null || normalizeChain(it.chain) == selectedChain) &&
+                    (fuzzyMatches(debouncedQuery, "${it.productName} ${it.brand} ${it.chain}") ||
+                        it.productName.lowercase().contains(debouncedQuery.lowercase().trim()) ||
+                        it.brand.lowercase().contains(debouncedQuery.lowercase().trim()))
             }.take(50)
         }
     }
@@ -244,6 +270,31 @@ fun GlobalSearchScreen(
                     .padding(horizontal = dimens.spacingXl),
                 color = MaterialTheme.colorScheme.primary,
             )
+        }
+
+        if (q.isNotBlank() && (chains.isNotEmpty() || promoBrands.isNotEmpty())) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = dimens.spacingXl)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (promoBrands.isNotEmpty()) {
+                    FilterChip(
+                        selected = soloConPromos,
+                        onClick = { soloConPromos = !soloConPromos },
+                        label = { Text(stringResource(R.string.busqueda_solo_promos), style = MaterialTheme.typography.labelLarge) },
+                    )
+                }
+                chains.forEach { chain ->
+                    FilterChip(
+                        selected = selectedChain == chain,
+                        onClick = { selectedChain = if (selectedChain == chain) null else chain },
+                        label = { Text(chain, style = MaterialTheme.typography.labelLarge) },
+                    )
+                }
+            }
         }
 
         if (q.isBlank()) {

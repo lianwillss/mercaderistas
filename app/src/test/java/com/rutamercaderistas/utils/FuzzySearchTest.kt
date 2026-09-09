@@ -186,4 +186,55 @@ class FuzzySearchTest {
         assertEquals(1, ranked.size)
         assertEquals("J513", ranked[0].codigo)
     }
+
+    @Test
+    fun filterLocales_nullChainReturnsAll() {
+        val locales = listOf(
+            local("1", "A", cadena = "CENCOSUD", formato = "JUMBO"),
+            local("2", "B", cadena = "UNIMARC"),
+        )
+        assertEquals(2, filterLocales(locales, null, false, emptySet()).size)
+    }
+
+    @Test
+    fun filterLocales_byChainNormalizesFormato() {
+        val locales = listOf(
+            local("1", "A", cadena = "CENCOSUD", formato = "J"),
+            local("2", "B", cadena = "UNIMARC"),
+        )
+        val filtered = filterLocales(locales, "JUMBO", false, emptySet())
+        assertEquals(1, filtered.size)
+        assertEquals("1", filtered[0].codigo)
+    }
+
+    @Test
+    fun filterLocales_onlyWithPromos() {
+        val conPromo = local("1", "A").copy(clientes = listOf(ClienteInfo("CUK", false, 1)))
+        val sinPromo = local("2", "B").copy(clientes = listOf(ClienteInfo("SIN PROMO", false, 1)))
+        val filtered = filterLocales(listOf(conPromo, sinPromo), null, true, setOf("CUK"))
+        assertEquals(1, filtered.size)
+        assertEquals("1", filtered[0].codigo)
+    }
+
+    @Test
+    fun filterLocales_combined() {
+        val locales = listOf(
+            local("1", "A", cadena = "CENCOSUD", formato = "JUMBO").copy(
+                clientes = listOf(ClienteInfo("CUK", false, 1))
+            ),
+            local("2", "B", cadena = "CENCOSUD", formato = "JUMBO"),
+            local("3", "C", cadena = "UNIMARC").copy(
+                clientes = listOf(ClienteInfo("CUK", false, 1))
+            ),
+        )
+        val filtered = filterLocales(locales, "JUMBO", true, setOf("CUK"))
+        assertEquals(1, filtered.size)
+        assertEquals("1", filtered[0].codigo)
+    }
+
+    @Test
+    fun localeChain_blankIsBlank() {
+        assertEquals("", localeChain(local("1", "A")))
+        assertEquals("JUMBO", localeChain(local("1", "A", cadena = "CENCOSUD", formato = "JUMBO")))
+    }
 }

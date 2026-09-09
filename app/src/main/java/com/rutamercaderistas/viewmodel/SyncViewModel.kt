@@ -283,7 +283,8 @@ class SyncViewModel @Inject constructor(
     }
 
     private suspend fun performDriveSync(): SyncResult<Boolean> {
-        return withContext(Dispatchers.IO) {
+        return ruteroManager.withSyncLock {
+            withContext(Dispatchers.IO) {
             try {
                 val oldEntries = ruteroManager.loadAllEntries()
                 // Incremental: si el ETag no cambió, no hay nada que hacer
@@ -318,6 +319,19 @@ class SyncViewModel @Inject constructor(
                     return@withContext SyncResult.NoChange
                 }
                 val changed = ruteroManager.saveMasterExcel(bytes)
+                if (!changed) {
+                    _state.value = _state.value.copy(state = SyncState.Idle)
+                    return@withContext SyncResult.Error(getApplication<Application>().getString(R.string.sync_error_excel))
+                }
+
+                _state.value = _state.value.copy(state = SyncState.Syncing(phase = getApplication<Application>().getString(R.string.sync_indexando)))
+                val indexOk = ruteroManager.createIndex()
+                if (!indexOk) {
+                    _state.value = _state.value.copy(state = SyncState.Idle)
+                    return@withContext SyncResult.Error(getApplication<Application>().getString(R.string.sync_error_excel))
+                }
+
+                // Only mark the source as committed after the file and Room index are valid.
                 if (currentHash != null) {
                     try { preferencesRepository.setLastSyncHash(currentHash) } catch (_: Exception) {}
                     try {
@@ -325,50 +339,38 @@ class SyncViewModel @Inject constructor(
                         if (etag != null) preferencesRepository.setLastSyncETag(etag)
                     } catch (_: Exception) {}
                 }
-                if (changed) {
-                    _state.value = _state.value.copy(state = SyncState.Syncing(phase = getApplication<Application>().getString(R.string.sync_indexando)))
-                    val indexOk = ruteroManager.createIndex()
-                    if (indexOk) {
-                        _state.value = _state.value.copy(state = SyncState.Syncing(phase = getApplication<Application>().getString(R.string.sync_actualizando_promos)))
-                        promotionRepository.refresh()
-                        val newEntries = ruteroManager.loadAllEntries()
-                        val changes = if (oldEntries.isEmpty()) {
-                            PlanillaChanges()
-                        } else {
-                            computePlanillaChanges(
-                                oldEntries,
-                                newEntries,
-                                repository.getActiveRuteroName(),
-                                todayDia(),
-                            )
-                        }
-                        if (!changes.isEmpty) {
-                            preferencesRepository.addSyncHistoryEntry(
-                                com.rutamercaderistas.data.preferences.SyncHistoryEntry(
-                                    timestamp = System.currentTimeMillis(),
-                                    summary = changesSummary(changes),
-                                )
-                            )
-                            if (changes.affectsToday.isNotEmpty()) {
-                                postTodayNotification(changes.affectsToday)
-                            }
-                        }
-                        val validationErrors = com.rutamercaderistas.domain.validation.PlanillaValidator.validateRutero(newEntries)
-                        _state.value = _state.value.copy(state = SyncState.Idle, syncChanges = changes, validationErrors = validationErrors)
-                        SyncResult.Success(true)
-                    } else {
-                        _state.value = _state.value.copy(state = SyncState.Idle)
-                        SyncResult.Error(getApplication<Application>().getString(R.string.sync_error_excel))
-                    }
+
+                _state.value = _state.value.copy(state = SyncState.Syncing(phase = getApplication<Application>().getString(R.string.sync_actualizando_promos)))
+                promotionRepository.refresh()
+                val newEntries = ruteroManager.loadAllEntries()
+                val changes = if (oldEntries.isEmpty()) {
+                    PlanillaChanges()
                 } else {
-                    _state.value = _state.value.copy(state = SyncState.Syncing(phase = getApplication<Application>().getString(R.string.sync_actualizando_promos)))
-                    promotionRepository.refresh()
-                    _state.value = _state.value.copy(state = SyncState.Idle)
-                    SyncResult.NoChange
+                    computePlanillaChanges(
+                        oldEntries,
+                        newEntries,
+                        repository.getActiveRuteroName(),
+                        todayDia(),
+                    )
                 }
+                if (!changes.isEmpty) {
+                    preferencesRepository.addSyncHistoryEntry(
+                        com.rutamercaderistas.data.preferences.SyncHistoryEntry(
+                            timestamp = System.currentTimeMillis(),
+                            summary = changesSummary(changes),
+                        )
+                    )
+                    if (changes.affectsToday.isNotEmpty()) {
+                        postTodayNotification(changes.affectsToday)
+                    }
+                }
+                val validationErrors = com.rutamercaderistas.domain.validation.PlanillaValidator.validateRutero(newEntries)
+                _state.value = _state.value.copy(state = SyncState.Idle, syncChanges = changes, validationErrors = validationErrors)
+                SyncResult.Success(true)
             } catch (e: Exception) {
                 _state.value = _state.value.copy(state = SyncState.Idle)
                 SyncResult.Error(e.message ?: getApplication<Application>().getString(R.string.sync_error_general))
+            }
             }
         }
     }

@@ -16,8 +16,6 @@ import javax.xml.parsers.SAXParserFactory
 
 class ExcelParser {
 
-    private val mapper = ColumnMapper()
-
     interface ProgressListener {
         fun onProgress(message: String, percentage: Int)
     }
@@ -28,6 +26,7 @@ class ExcelParser {
             try {
                 val reader = XSSFReader(pkg)
                 val sharedStrings: SharedStrings = reader.sharedStringsTable
+                val mapper = ColumnMapper()
                 val rId = findDataSheetRId(pkg, reader, sharedStrings)
                     ?: return Result.failure(Exception("Hoja de datos no encontrada"))
 
@@ -67,6 +66,7 @@ class ExcelParser {
             try {
                 val reader = XSSFReader(pkg)
                 val sharedStrings: SharedStrings = reader.sharedStringsTable
+                val mapper = ColumnMapper()
                 val rId = findDataSheetRId(pkg, reader, sharedStrings)
                     ?: return Result.failure(Exception("Hoja de datos no encontrada"))
 
@@ -140,6 +140,7 @@ class ExcelParser {
             try {
                 val reader = XSSFReader(pkg)
                 val sharedStrings: SharedStrings = reader.sharedStringsTable
+                val mapper = ColumnMapper()
                 val rId = findDataSheetRId(pkg, reader, sharedStrings)
                     ?: return Result.failure(Exception("Hoja de datos no encontrada"))
 

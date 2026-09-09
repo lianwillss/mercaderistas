@@ -9,9 +9,9 @@ import java.time.LocalDate
 class CsvParserTest {
 
     @Test
-    fun `parseCsvLine splits comma-separated values`() {
+    fun `parseCsvLine splits comma-separated values with explicit delimiter`() {
         val line = "CUK,Jumbo,2026-07-01,2026-07-31,Chocolate 70%,\\$2.990"
-        val result = parseCsvLine(line)
+        val result = parseCsvLine(line, ',')
         assertNotNull(result)
         assertEquals(6, result!!.size)
         assertEquals("CUK", result[0])
@@ -23,9 +23,33 @@ class CsvParserTest {
     }
 
     @Test
+    fun `parseCsvLine defaults to semicolon and keeps commas inside fields`() {
+        val line = "CASO Y CIA;ALVI;;2026-04-21;2026-05-25;667745001;NECTAR JUMEX 335 CC, COCO PINA;710"
+        val result = parseCsvLine(line)
+        assertNotNull(result)
+        assertEquals(8, result!!.size)
+        assertEquals("CASO Y CIA", result[0])
+        assertEquals("ALVI", result[1])
+        assertEquals("2026-04-21", result[3])
+        assertEquals("2026-05-25", result[4])
+        assertEquals("667745001", result[5])
+        assertEquals("NECTAR JUMEX 335 CC, COCO PINA", result[6])
+        assertEquals("710", result[7])
+    }
+
+    @Test
+    fun `parseCsvLine parses promo header into 8 columns`() {
+        val line = "MARCA;CADENA;SUBCADENA;INICIO;FINAL;SKU;PRODUCTO;PRECIO - % PROMOCION"
+        val result = parseCsvLine(line)
+        assertNotNull(result)
+        assertEquals(8, result!!.size)
+        assertEquals("PRODUCTO", result[6])
+    }
+
+    @Test
     fun `parseCsvLine handles quoted fields with commas`() {
         val line = "CUK,Jumbo,2026-07-01,2026-07-31,\"Chocolate 70%, oferta\",\\$2.990"
-        val result = parseCsvLine(line)
+        val result = parseCsvLine(line, ',')
         assertNotNull(result)
         assertEquals(6, result!!.size)
         assertEquals("Chocolate 70%, oferta", result[4])
@@ -34,7 +58,7 @@ class CsvParserTest {
     @Test
     fun `parseCsvLine handles quoted fields with internal quotes`() {
         val line = "MARCA,X,2026-07-01,2026-07-31,\"Producto \"\"especial\"\"\",\\$100"
-        val result = parseCsvLine(line)
+        val result = parseCsvLine(line, ',')
         assertNotNull(result)
         assertEquals(6, result!!.size)
         assertEquals("Producto \"especial\"", result[4])
@@ -56,7 +80,7 @@ class CsvParserTest {
 
     @Test
     fun `parseCsvLine handles empty fields`() {
-        val result = parseCsvLine("a,,c")
+        val result = parseCsvLine("a,,c", ',')
         assertNotNull(result)
         assertEquals(3, result!!.size)
         assertEquals("a", result[0])
