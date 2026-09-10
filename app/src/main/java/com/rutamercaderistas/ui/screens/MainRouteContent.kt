@@ -37,7 +37,6 @@ import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.SystemUpdate
-import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -64,7 +63,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.rutamercaderistas.R
@@ -80,7 +78,6 @@ import com.rutamercaderistas.ui.components.StoreCard
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.ui.theme.rs
-import com.rutamercaderistas.domain.validation.ValidationError
 import androidx.compose.ui.geometry.Offset
 import com.rutamercaderistas.viewmodel.RouteUiState
 import com.rutamercaderistas.viewmodel.SyncUiState
@@ -118,7 +115,6 @@ fun MainRouteContent(
     onCancelSyncPreview: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onRefreshPositioned: (Offset) -> Unit = {},
-    onClearValidationErrors: () -> Unit = {},
     showUpdateBanner: Boolean = false,
     pendingVersionName: String = "",
     onUpdateNow: () -> Unit = {},
@@ -258,13 +254,6 @@ fun MainRouteContent(
                         onCancel = onCancelSyncPreview,
                     )
                 }
-            }
-
-            if (syncState.validationErrors.isNotEmpty() && !isSyncing) {
-                ValidationErrorsBanner(
-                    errors = syncState.validationErrors,
-                    onDismiss = onClearValidationErrors,
-                )
             }
 
             Spacer(modifier = Modifier.height(dimens.spacingXs))
@@ -638,9 +627,6 @@ private fun SyncPreviewBanner(
         }
     }.joinToString(" · ")
     val metadata = stringResource(R.string.sync_preview_summary, preview.routeCount, preview.entryCount)
-    val warning = preview.validationErrorCount.takeIf { it > 0 }?.let {
-        stringResource(R.string.sync_preview_invalid, it)
-    }
     val previewCd = stringResource(R.string.sync_preview_cd)
 
     Column(
@@ -666,13 +652,6 @@ private fun SyncPreviewBanner(
             Text(
                 text = summary,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-        }
-        warning?.let {
-            Text(
-                text = it,
-                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
         }
@@ -711,115 +690,6 @@ private fun ChangesSection(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-        }
-    }
-}
-
-@Composable
-private fun ValidationErrorsBanner(errors: List<ValidationError>, onDismiss: () -> Unit) {
-    val dimens = LocalAppDimens.current
-    var showDetail by remember { mutableStateOf(false) }
-    val summary = "${errors.size} ${if (errors.size == 1) "error" else "errores"} de validación"
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = dimens.spacingLg, vertical = dimens.spacingXs)
-            .clip(MaterialTheme.shapes.medium)
-            .background(MaterialTheme.colorScheme.errorContainer)
-            .semantics { contentDescription = "Validación: $summary" }
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            imageVector = Icons.Outlined.WarningAmber,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onErrorContainer,
-            modifier = Modifier.size(18.dp),
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = stringResource(R.string.validacion_titulo),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onErrorContainer,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = summary,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onErrorContainer,
-            )
-        }
-        TextButton(onClick = { showDetail = true }) {
-            Text(text = stringResource(R.string.ver_detalle), color = MaterialTheme.colorScheme.onErrorContainer, fontWeight = FontWeight.Bold)
-        }
-        IconButton(onClick = onDismiss) {
-            Icon(
-                imageVector = Icons.Outlined.Close,
-                contentDescription = stringResource(R.string.cerrar),
-                tint = MaterialTheme.colorScheme.onErrorContainer,
-            )
-        }
-    }
-    if (showDetail) {
-        var visible by remember { mutableStateOf(true) }
-        LaunchedEffect(Unit) { visible = true }
-        // Simple modal using Box
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.5f))
-                .clickable { showDetail = false },
-            contentAlignment = Alignment.Center,
-        ) {
-            // Use Card for details
-            androidx.compose.material3.Card(
-                modifier = Modifier
-                    .fillMaxWidth(0.92f)
-                    .heightIn(max = 420.dp)
-                    .clickable(enabled = false, onClick = {}),
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = pluralStringResource(R.plurals.validacion_errores_titulo, errors.size, errors.size),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    androidx.compose.foundation.lazy.LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.weight(1f, fill = false),
-                    ) {
-                        items(errors.size) { idx ->
-                            val e = errors[idx]
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(MaterialTheme.shapes.small)
-                                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                                    .padding(8.dp),
-                            ) {
-                                Text(
-                                    text = "Fila ${e.row} · ${e.field}: ${e.message}",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.Bold,
-                                )
-                                if (e.value.isNotBlank()) {
-                                    Text(
-                                        text = e.value,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    TextButton(onClick = { showDetail = false }, modifier = Modifier.align(Alignment.End)) {
-                        Text(stringResource(R.string.cerrar))
-                    }
-                }
-            }
         }
     }
 }

@@ -23,11 +23,6 @@
     <string name="sync_ruta_hoy_texto">%1$s</string>
     <string name="notif_canal_sync_nombre">Sincronización</string>
     <string name="notif_canal_sync_desc">Avisos de cambios en tu ruta del día</string>
-    <string name="validacion_titulo">Revisión de planilla</string>
-    <plurals name="validacion_errores_titulo">
-        <item quantity="one">%1$d error de validación</item>
-        <item quantity="other">%1$d errores de validación</item>
-    </plurals>
     <string name="empty_state_titulo">Aún no hay datos</string>
     <string name="empty_state_subtitulo">Sincronizá con la planilla para cargar tu ruta del día.</string>
     <string name="empty_state_offline">No hay conexión. Conectate a internet para sincronizar la planilla.</string>

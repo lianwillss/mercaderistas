@@ -184,7 +184,6 @@ class MainActivity : ComponentActivity() {
                          onDismissSyncChanges = { syncViewModel.clearChanges() },
                          onConfirmSyncPreview = { syncViewModel.confirmSyncPreview(routeUiState.selectedRoute) },
                          onCancelSyncPreview = { syncViewModel.cancelSyncPreview() },
-                         onClearValidationErrors = { syncViewModel.clearValidationErrors() },
                         onSharePromo = { promo ->
                             val text = buildString {
                                 appendLine("\uD83D\uDCE3 ${promo.productName}")

@@ -52,7 +52,6 @@ data class SyncPreview(
     val changes: PlanillaChanges,
     val routeCount: Int,
     val entryCount: Int,
-    val validationErrorCount: Int,
 )
 
 data class MovedLocales(
@@ -203,7 +202,6 @@ data class SyncUiState(
     val syncError: String? = null,
     val syncChanges: PlanillaChanges? = null,
     val syncPreview: SyncPreview? = null,
-    val validationErrors: List<com.rutamercaderistas.domain.validation.ValidationError> = emptyList(),
 ) {
     val isSyncing: Boolean get() = state is SyncState.Syncing
     val syncPhase: String? get() = (state as? SyncState.Syncing)?.phase
@@ -253,14 +251,12 @@ class SyncViewModel @Inject constructor(
             } else {
                 computePlanillaChanges(oldEntries, staged.entries, activeRoute, activeRoute?.let { todayDia() })
             }
-            val validationErrors = com.rutamercaderistas.domain.validation.PlanillaValidator.validateRutero(staged.entries)
             val preview = SyncPreview(
                 changes = changes,
                 routeCount = staged.ruteros.size,
                 entryCount = staged.entries.size,
-                validationErrorCount = validationErrors.size,
             )
-            if (changes.isEmpty && validationErrors.isEmpty()) {
+            if (changes.isEmpty) {
                 ruteroManager.withSyncLock { ruteroManager.discardStagedMasterExcel() }
                 return@launch
             }
@@ -317,7 +313,7 @@ class SyncViewModel @Inject constructor(
 
     fun syncFromDrive() {
         syncJob?.cancel()
-        _state.value = _state.value.copy(state = SyncState.Syncing(), syncError = null, syncChanges = null, syncPreview = null, validationErrors = emptyList())
+        _state.value = _state.value.copy(state = SyncState.Syncing(), syncError = null, syncChanges = null, syncPreview = null)
         syncJob = viewModelScope.launch {
             val result = performDriveSync(previewOnly = false)
             _state.value = _state.value.copy(state = SyncState.Idle)
@@ -376,14 +372,12 @@ class SyncViewModel @Inject constructor(
                     } else {
                         computePlanillaChanges(oldEntries, staged.entries, activeRoute, todayDia())
                     }
-                    val validationErrors = com.rutamercaderistas.domain.validation.PlanillaValidator.validateRutero(staged.entries)
                     val preview = SyncPreview(
                         changes = changes,
                         routeCount = staged.ruteros.size,
                         entryCount = staged.entries.size,
-                        validationErrorCount = validationErrors.size,
                     )
-                    if (!changes.isEmpty || validationErrors.isNotEmpty()) {
+                    if (!changes.isEmpty) {
                         pendingPreview = PendingSyncPreview(preview, oldEntries, activeRoute, currentHash)
                         _state.value = _state.value.copy(state = SyncState.Idle, syncPreview = preview)
                         return@withContext SyncResult.NoChange
@@ -446,14 +440,13 @@ class SyncViewModel @Inject constructor(
                 postTodayNotification(changes.affectsToday)
             }
         }
-        val validationErrors = com.rutamercaderistas.domain.validation.PlanillaValidator.validateRutero(newEntries)
-        _state.value = _state.value.copy(state = SyncState.Idle, syncChanges = changes, validationErrors = validationErrors)
+        _state.value = _state.value.copy(state = SyncState.Idle, syncChanges = changes)
         return SyncResult.Success(true)
     }
 
     fun syncFromDriveWithRouteReload(currentRoute: String?) {
         syncJob?.cancel()
-        _state.value = _state.value.copy(state = SyncState.Syncing(), syncError = null, syncChanges = null, syncPreview = null, validationErrors = emptyList())
+        _state.value = _state.value.copy(state = SyncState.Syncing(), syncError = null, syncChanges = null, syncPreview = null)
         syncJob = viewModelScope.launch {
             val result = performDriveSync(previewOnly = currentRoute != null)
             when (result) {
@@ -557,10 +550,6 @@ class SyncViewModel @Inject constructor(
 
     fun clearChanges() {
         _state.value = _state.value.copy(syncChanges = null)
-    }
-
-    fun clearValidationErrors() {
-        _state.value = _state.value.copy(validationErrors = emptyList())
     }
 
     private fun changesSummary(changes: PlanillaChanges): String {
