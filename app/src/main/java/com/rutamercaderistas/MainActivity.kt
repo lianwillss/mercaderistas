@@ -116,6 +116,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            LaunchedEffect(syncUiState.isSyncing) {
+                if (!syncUiState.isSyncing) {
+                    routeViewModel.updateSyncLabel()
+                }
+            }
+
             LaunchedEffect(updateState) {
                 val msg = (updateState as? UpdateUiState.Message)?.text ?: return@LaunchedEffect
                 snackbarHostState.showSnackbar(msg)
@@ -175,8 +181,10 @@ class MainActivity : ComponentActivity() {
                             }
                             ctx.startActivity(android.content.Intent.createChooser(intent, ctx.getString(R.string.compartir_local)))
                         },
-                        onDismissSyncChanges = { syncViewModel.clearChanges() },
-                        onClearValidationErrors = { syncViewModel.clearValidationErrors() },
+                         onDismissSyncChanges = { syncViewModel.clearChanges() },
+                         onConfirmSyncPreview = { syncViewModel.confirmSyncPreview(routeUiState.selectedRoute) },
+                         onCancelSyncPreview = { syncViewModel.cancelSyncPreview() },
+                         onClearValidationErrors = { syncViewModel.clearValidationErrors() },
                         onSharePromo = { promo ->
                             val text = buildString {
                                 appendLine("\uD83D\uDCE3 ${promo.productName}")

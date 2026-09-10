@@ -1,5 +1,6 @@
 package com.rutamercaderistas.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,6 +25,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -53,6 +55,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -82,7 +85,14 @@ import androidx.compose.ui.geometry.Offset
 import com.rutamercaderistas.viewmodel.RouteUiState
 import com.rutamercaderistas.viewmodel.SyncUiState
 import com.rutamercaderistas.viewmodel.PlanillaChanges
+import com.rutamercaderistas.viewmodel.SyncPreview
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collectLatest
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -104,6 +114,8 @@ fun MainRouteContent(
     onShareLocal: (String) -> Unit,
     onGlobalSearch: () -> Unit = {},
     onDismissSyncChanges: () -> Unit = {},
+    onConfirmSyncPreview: () -> Unit = {},
+    onCancelSyncPreview: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onRefreshPositioned: (Offset) -> Unit = {},
     onClearValidationErrors: () -> Unit = {},
@@ -123,6 +135,7 @@ fun MainRouteContent(
 
     var searchActive by remember { mutableStateOf(false) }
     var showExpiringSoon by remember { mutableStateOf(false) }
+    var headerVisible by rememberSaveable { mutableStateOf(true) }
 
     val activeDayNumbers by remember(activeDays) {
         derivedStateOf { activeDays.map { day -> diaDelMes(day) } }
@@ -166,6 +179,10 @@ fun MainRouteContent(
             }
         }
 
+        LaunchedEffect(selectedRoute) {
+            headerVisible = true
+        }
+
         LaunchedEffect(currentDay, routeState.isRouteLoading) {
             if (!routeState.isRouteLoading) {
                 onSetCurrentDay(currentDay)
@@ -174,19 +191,25 @@ fun MainRouteContent(
 
         Column(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            HeaderSection(
-                isOnline = syncState.isOnline,
-                lastSyncRelative = routeState.lastSyncRelative,
-                onRefresh = onHeaderRefresh,
-                onOpenManual = onNavigateToManual,
-                onShare = onExportRoute,
-                onCheckUpdate = onCheckUpdate,
-                promosExpiringSoon = routeState.promosExpiringSoon,
-                onExpiringSoonClick = { showExpiringSoon = true },
-                onGlobalSearch = onGlobalSearch,
-                onOpenSettings = onOpenSettings,
-                onRefreshPositioned = onRefreshPositioned,
-            )
+            AnimatedVisibility(
+                visible = headerVisible || isSyncing,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically(),
+            ) {
+                HeaderSection(
+                    isOnline = syncState.isOnline,
+                    lastSyncRelative = routeState.lastSyncRelative,
+                    onRefresh = onHeaderRefresh,
+                    onOpenManual = onNavigateToManual,
+                    onShare = onExportRoute,
+                    onCheckUpdate = onCheckUpdate,
+                    promosExpiringSoon = routeState.promosExpiringSoon,
+                    onExpiringSoonClick = { showExpiringSoon = true },
+                    onGlobalSearch = onGlobalSearch,
+                    onOpenSettings = onOpenSettings,
+                    onRefreshPositioned = onRefreshPositioned,
+                )
+            }
 
             if (isSyncing) {
                 LinearProgressIndicator(
@@ -225,6 +248,16 @@ fun MainRouteContent(
                     changes = syncState.syncChanges!!,
                     onDismiss = onDismissSyncChanges,
                 )
+            }
+
+            syncState.syncPreview?.let { preview ->
+                if (!isSyncing) {
+                    SyncPreviewBanner(
+                        preview = preview,
+                        onApply = onConfirmSyncPreview,
+                        onCancel = onCancelSyncPreview,
+                    )
+                }
             }
 
             if (syncState.validationErrors.isNotEmpty() && !isSyncing) {
@@ -285,11 +318,12 @@ fun MainRouteContent(
                             .weight(1f)
                             .fillMaxHeight(),
                     ) {
-                        DayContent(
-                            routeState = routeState,
-                            syncState = syncState,
-                            isSyncing = isSyncing,
-                            onPullRefresh = onPullRefresh,
+                            DayContent(
+                                routeState = routeState,
+                                syncState = syncState,
+                                isSyncing = isSyncing,
+                                onHeaderVisibilityChanged = { headerVisible = it },
+                                onPullRefresh = onPullRefresh,
                             onBrandClick = onBrandClick,
                             onAddressClick = onAddressClick,
                             onShareLocal = onShareLocal,
@@ -306,6 +340,7 @@ fun MainRouteContent(
                         routeState = routeState,
                         syncState = syncState,
                         isSyncing = isSyncing,
+                        onHeaderVisibilityChanged = { headerVisible = it },
                         onPullRefresh = onPullRefresh,
                         onBrandClick = onBrandClick,
                         onAddressClick = onAddressClick,
@@ -585,6 +620,78 @@ private fun SyncChangesBanner(changes: PlanillaChanges, onDismiss: () -> Unit) {
 }
 
 @Composable
+private fun SyncPreviewBanner(
+    preview: SyncPreview,
+    onApply: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    val dimens = LocalAppDimens.current
+    val summary = buildList {
+        if (preview.changes.added.isNotEmpty()) {
+            add(stringResource(R.string.sync_cambios_agregados, preview.changes.added.size))
+        }
+        if (preview.changes.removed.isNotEmpty()) {
+            add(stringResource(R.string.sync_cambios_eliminados, preview.changes.removed.size))
+        }
+        if (preview.changes.moved.isNotEmpty()) {
+            add(stringResource(R.string.sync_cambios_movidos, preview.changes.moved.size))
+        }
+    }.joinToString(" · ")
+    val metadata = stringResource(R.string.sync_preview_summary, preview.routeCount, preview.entryCount)
+    val warning = preview.validationErrorCount.takeIf { it > 0 }?.let {
+        stringResource(R.string.sync_preview_invalid, it)
+    }
+    val previewCd = stringResource(R.string.sync_preview_cd)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = dimens.spacingLg, vertical = dimens.spacingXs)
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            .semantics { contentDescription = previewCd }
+            .padding(horizontal = dimens.spacingLg, vertical = dimens.spacingSm),
+    ) {
+        Text(
+            text = stringResource(R.string.sync_preview_title),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+        Text(
+            text = metadata,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+        if (summary.isNotBlank()) {
+            Text(
+                text = summary,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        }
+        warning?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(onClick = onCancel) {
+                Text(stringResource(R.string.sync_preview_cancel))
+            }
+            Button(onClick = onApply) {
+                Text(stringResource(R.string.sync_preview_apply))
+            }
+        }
+    }
+}
+
+@Composable
 private fun ChangesSection(
     title: String,
     lines: List<String>,
@@ -776,19 +883,37 @@ private fun DayContent(
     routeState: RouteUiState,
     syncState: SyncUiState,
     isSyncing: Boolean,
+    onHeaderVisibilityChanged: (Boolean) -> Unit,
     onPullRefresh: () -> Unit,
     onBrandClick: (String) -> Unit,
     onAddressClick: (String) -> Unit,
     onShareLocal: (String) -> Unit,
 ) {
     val dimens = LocalAppDimens.current
+    val gridState = rememberLazyGridState()
+
+    LaunchedEffect(gridState) {
+        var previousIndex = 0
+        var previousOffset = 0
+        snapshotFlow { gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset }
+            .collectLatest { (index, offset) ->
+                val atTop = index == 0 && offset == 0
+                val movingDown = index > previousIndex ||
+                    (index == previousIndex && offset > previousOffset)
+                onHeaderVisibilityChanged(atTop || !movingDown)
+                previousIndex = index
+                previousOffset = offset
+            }
+    }
+
     PullToRefreshBox(
         isRefreshing = isSyncing,
         onRefresh = onPullRefresh,
         modifier = Modifier.fillMaxSize(),
     ) {
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 380.dp),
+            state = gridState,
+            columns = GridCells.Adaptive(minSize = dimens.routeGridMinWidth),
             contentPadding = PaddingValues(bottom = dimens.contentPaddingBottom),
             verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
             horizontalArrangement = Arrangement.spacedBy(dimens.spacingLg),

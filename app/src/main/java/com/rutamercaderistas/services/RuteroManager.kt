@@ -34,6 +34,10 @@ class RuteroManager(
 
     private val parser = ExcelParser()
     private val syncMutex = Mutex()
+    private var pendingMasterFile: File? = null
+
+    private val pendingMasterPath: File
+        get() = File(context.filesDir, "$EXCEL_FILE_NAME.pending")
 
     suspend fun <T> withSyncLock(block: suspend () -> T): T {
         syncMutex.lock()
@@ -48,24 +52,83 @@ class RuteroManager(
      * Guarda el archivo Excel maestro asegurando que se reemplace el anterior.
      */
     suspend fun saveMasterExcel(bytes: ByteArray): Boolean = withContext(Dispatchers.IO) {
-        val target = File(context.filesDir, EXCEL_FILE_NAME)
-        val temp = File(context.filesDir, "$EXCEL_FILE_NAME.tmp")
+        val staged = stageMasterExcel(bytes).getOrElse {
+            Timber.e(it, "Error validando Excel maestro")
+            return@withContext false
+        }
+        if (!commitStagedMasterExcel()) {
+            Timber.e("Error reemplazando Excel maestro")
+            return@withContext false
+        }
+        Timber.d("NEW_FILE_SAVED: Excel válido con %d rutas y %d registros", staged.ruteros.size, staged.entries.size)
+        true
+    }
+
+    suspend fun stageMasterExcel(bytes: ByteArray): Result<StagedMasterExcel> = withContext(Dispatchers.IO) {
+        pendingMasterFile?.delete()
+        val temp = pendingMasterPath
+        temp.delete()
         try {
             temp.writeBytes(bytes)
-            if (temp.length() <= 0 || !isValidMasterExcel(temp)) {
-                Timber.e("NEW_FILE_REJECTED: Excel vacío o con estructura inválida")
-                return@withContext false
+            if (temp.length() <= 0) {
+                temp.delete()
+                return@withContext Result.failure(Exception("Excel vacío"))
             }
 
-            replaceFile(temp, target)
+            val (ruteros, byRoute) = parser.parseAll(temp).getOrElse {
+                temp.delete()
+                return@withContext Result.failure(it)
+            }
+            if (!isValidMasterData(ruteros, byRoute)) {
+                temp.delete()
+                return@withContext Result.failure(Exception("Excel sin rutas o columnas de datos válidas"))
+            }
+
+            pendingMasterFile = temp
+            Result.success(StagedMasterExcel(ruteros, byRoute.values.flatten(), sha256(bytes)))
+        } catch (e: Exception) {
+            temp.delete()
+            Result.failure(e)
+        }
+    }
+
+    suspend fun commitStagedMasterExcel(): Boolean = withContext(Dispatchers.IO) {
+        val source = pendingMasterFile ?: pendingMasterPath.takeIf { it.exists() }
+            ?: return@withContext false
+        val target = File(context.filesDir, EXCEL_FILE_NAME)
+        try {
+            replaceFile(source, target)
+            pendingMasterFile = null
             Timber.d("NEW_FILE_SAVED: Archivo maestro guardado (%d bytes)", target.length())
             true
         } catch (e: Exception) {
-            Timber.e(e, "Error guardando Excel maestro")
+            Timber.e(e, "Error reemplazando Excel maestro")
             false
-        } finally {
-            if (temp.exists()) temp.delete()
         }
+    }
+
+    suspend fun discardStagedMasterExcel() = withContext(Dispatchers.IO) {
+        pendingMasterFile?.delete()
+        pendingMasterPath.delete()
+        pendingMasterFile = null
+    }
+
+    suspend fun hasStagedMasterExcel(): Boolean = withContext(Dispatchers.IO) {
+        val file = pendingMasterFile ?: pendingMasterPath
+        if (!file.exists()) return@withContext false
+        if (System.currentTimeMillis() - file.lastModified() > STAGED_PREVIEW_MAX_AGE_MS) {
+            file.delete()
+            return@withContext false
+        }
+        true
+    }
+
+    suspend fun readStagedMasterExcel(): StagedMasterExcel? = withContext(Dispatchers.IO) {
+        if (!hasStagedMasterExcel()) return@withContext null
+        val file = pendingMasterFile ?: pendingMasterPath
+        val (ruteros, byRoute) = parser.parseAll(file).getOrNull() ?: return@withContext null
+        if (!isValidMasterData(ruteros, byRoute)) return@withContext null
+        StagedMasterExcel(ruteros, byRoute.values.flatten(), sha256(file.readBytes()))
     }
 
     /**
@@ -109,11 +172,6 @@ class RuteroManager(
         success
     }
 
-    private suspend fun isValidMasterExcel(file: File): Boolean {
-        val (ruteros, byRoute) = parser.parseAll(file).getOrNull() ?: return false
-        return isValidMasterData(ruteros, byRoute)
-    }
-
     private fun isValidMasterData(
         ruteros: List<String>,
         byRoute: Map<String, List<EntradaRuta>>,
@@ -135,6 +193,11 @@ class RuteroManager(
             )
         }
     }
+
+    private fun sha256(bytes: ByteArray): String = java.security.MessageDigest
+        .getInstance("SHA-256")
+        .digest(bytes)
+        .joinToString("") { "%02x".format(it) }
 
     /**
      * Carga la lista de ruteros desde Room.
@@ -177,6 +240,14 @@ class RuteroManager(
     }
 
 }
+
+private const val STAGED_PREVIEW_MAX_AGE_MS = 24 * 60 * 60 * 1000L
+
+data class StagedMasterExcel(
+    val ruteros: List<String>,
+    val entries: List<EntradaRuta>,
+    val contentHash: String,
+)
 
 internal fun isValidMasterImport(
     ruteros: List<String>,

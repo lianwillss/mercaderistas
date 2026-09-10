@@ -48,7 +48,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.datastore.preferences.core.edit
@@ -130,7 +130,7 @@ fun HeaderSection(
     val scope = rememberCoroutineScope()
     val userScale by context.prefsDataStore.data
         .map { it[PreferencesRepository.KEY_FONT_SCALE] ?: 1f }
-        .collectAsState(initial = 1f)
+        .collectAsStateWithLifecycle(initialValue = 1f)
     val themeBackground = MaterialTheme.colorScheme.background
 
     val infiniteTransition = rememberInfiniteTransition()

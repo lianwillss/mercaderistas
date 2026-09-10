@@ -6,6 +6,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.rutamercaderistas.Constants
 import com.rutamercaderistas.data.network.downloadBytes
+import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.services.RuteroManager
 import com.rutamercaderistas.services.RuteroRepository
 import dagger.assisted.Assisted
@@ -18,12 +19,17 @@ class SyncWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
     private val ruteroManager: RuteroManager,
     private val repository: RuteroRepository,
+    private val preferencesRepository: PreferencesRepository,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
         return ruteroManager.withSyncLock {
             try {
                 val activeRoute = repository.getActiveRuteroName()
+                if (ruteroManager.hasStagedMasterExcel()) {
+                    Timber.d("Hay una vista previa de Excel pendiente; se conserva para confirmación")
+                    return@withSyncLock Result.success()
+                }
                 val ts = System.currentTimeMillis()
                 val url = "${Constants.DRIVE_EXPORT_URL}&ts=$ts"
                 val bytes = downloadBytes(url = url).getOrNull()
@@ -41,7 +47,8 @@ class SyncWorker @AssistedInject constructor(
 
                 val ok = ruteroManager.createIndex()
                 if (ok) {
-                        val routes = ruteroManager.loadIndex()
+                    preferencesRepository.setLastSyncTime(System.currentTimeMillis())
+                    val routes = ruteroManager.loadIndex()
                         val routeToReload = activeRoute?.takeIf { it in routes } ?: routes.firstOrNull()
                         if (routeToReload != null) {
                             val entries = ruteroManager.loadRoute(routeToReload)

@@ -8,9 +8,9 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.map
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -75,7 +75,7 @@ fun MercaderistasTheme(content: @Composable () -> Unit) {
     }
     val userScale by context.prefsDataStore.data
         .map { it[PreferencesRepository.KEY_FONT_SCALE] ?: 1f }
-        .collectAsState(initial = 1f)
+        .collectAsStateWithLifecycle(initialValue = 1f)
     val systemFontScale = context.resources.configuration.fontScale
     val baseDensity = LocalDensity.current
     // Tope de escala: con zoom alto del sistema la app explotaba en tamaño y

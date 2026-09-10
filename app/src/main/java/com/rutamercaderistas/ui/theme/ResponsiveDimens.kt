@@ -17,6 +17,7 @@ fun rs(): Float {
 
 @Immutable
 data class AppDimens(
+    val isCompact: Boolean = false,
     val spacingXs: Dp = 4.dp,
     val spacingSm: Dp = 8.dp,
     val spacingMd: Dp = 12.dp,
@@ -34,6 +35,7 @@ data class AppDimens(
     val touchMin: Dp = 48.dp,
     val contentPaddingBottom: Dp = 96.dp,
     val promoButtonSize: Dp = 56.dp,
+    val routeGridMinWidth: Dp = 380.dp,
 )
 
 val LocalAppDimens = staticCompositionLocalOf { AppDimens() }
@@ -41,8 +43,10 @@ val LocalAppDimens = staticCompositionLocalOf { AppDimens() }
 @Composable
 fun rememberAppDimens(): AppDimens {
     val factor = rs()
+    val compact = factor < 0.9f
     return with(factor) {
         AppDimens(
+            isCompact = compact,
             spacingXs = (4 * this).dp,
             spacingSm = (8 * this).dp,
             spacingMd = (12 * this).dp,
@@ -60,6 +64,7 @@ fun rememberAppDimens(): AppDimens {
             touchMin = 48.dp,
             contentPaddingBottom = (96 * this).dp,
             promoButtonSize = (56 * this).dp,
+            routeGridMinWidth = if (compact) 320.dp else 380.dp,
         )
     }
 }

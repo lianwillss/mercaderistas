@@ -14,4 +14,13 @@ class CompactDensityTest {
     fun `density above compact cap is reduced to 480 dpi equivalent`() {
         assertEquals(3f, compactDensity(4f), 0f)
     }
+
+    @Test
+    fun `common density profiles never exceed the compact cap`() {
+        val profiles = listOf(1.75f, 2f, 2.625f, 3f, 3.5f, 4f)
+
+        profiles.forEach { density ->
+            assertEquals(minOf(density, COMPACT_DENSITY), compactDensity(density), 0f)
+        }
+    }
 }

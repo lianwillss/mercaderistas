@@ -281,6 +281,12 @@
     <string name="sync_indexando">Indexando rutas…</string>
     <string name="sync_actualizando_promos">Actualizando promociones…</string>
     <string name="sync_datos_actualizados">Datos actualizados</string>
+    <string name="sync_preview_title">Cambios disponibles en el Excel</string>
+    <string name="sync_preview_summary">%1$d rutas · %2$d registros</string>
+    <string name="sync_preview_invalid">%1$d filas con advertencias</string>
+    <string name="sync_preview_apply">Aplicar cambios</string>
+    <string name="sync_preview_cancel">Cancelar</string>
+    <string name="sync_preview_cd">Vista previa de cambios del Excel</string>
     <string name="sync_sin_conexion">Sin conexión</string>
     <string name="sync_sin_internet">Sin conexión a Internet</string>
     <string name="sync_error_drive">Error de descarga desde Drive. Revisa tu conexión o inténtalo más tarde.</string>

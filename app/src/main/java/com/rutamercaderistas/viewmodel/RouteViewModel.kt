@@ -377,21 +377,30 @@ class RouteViewModel @Inject constructor(
     }
 
     fun updateSyncLabel() {
-        val label = if (!fileRepository.excelExists()) context.getString(R.string.ruta_hoy)
-        else {
-            val modified = Instant.ofEpochMilli(fileRepository.excelLastModified())
-            val now = Instant.now()
-            val minutes = ChronoUnit.MINUTES.between(modified, now)
-            val hours = ChronoUnit.HOURS.between(modified, now)
-            val days = ChronoUnit.DAYS.between(modified, now)
-            when {
-                minutes < 1 -> context.getString(R.string.ruta_ahora)
-                minutes < 60 -> context.getString(R.string.ruta_hace_min, minutes)
-                hours < 24 -> context.getString(R.string.ruta_hace_h, hours)
-                else -> context.getString(R.string.ruta_hace_d, days)
+        viewModelScope.launch {
+            val lastSync = preferencesRepository.getLastSyncTime()
+            val timestamp = when {
+                lastSync > 0L -> lastSync
+                fileRepository.excelExists() -> fileRepository.excelLastModified()
+                else -> 0L
             }
+            val label = if (timestamp == 0L) {
+                context.getString(R.string.ruta_hoy)
+            } else {
+                val modified = Instant.ofEpochMilli(timestamp)
+                val now = Instant.now()
+                val minutes = ChronoUnit.MINUTES.between(modified, now)
+                val hours = ChronoUnit.HOURS.between(modified, now)
+                val days = ChronoUnit.DAYS.between(modified, now)
+                when {
+                    minutes < 1 -> context.getString(R.string.ruta_ahora)
+                    minutes < 60 -> context.getString(R.string.ruta_hace_min, minutes)
+                    hours < 24 -> context.getString(R.string.ruta_hace_h, hours)
+                    else -> context.getString(R.string.ruta_hace_d, days)
+                }
+            }
+            _uiState.update { it.copy(lastSyncRelative = label) }
         }
-        _uiState.update { it.copy(lastSyncRelative = label) }
     }
 
     fun exportRoute() {

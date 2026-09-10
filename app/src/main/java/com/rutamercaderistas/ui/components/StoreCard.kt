@@ -74,6 +74,7 @@ fun StoreCard(
     modifier: Modifier = Modifier
 ) {
     val dimens = LocalAppDimens.current
+    val cardPadding = if (dimens.isCompact) dimens.spacingMd else dimens.spacingLg
     var visible by remember { mutableStateOf(false) }
     val animAlpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
@@ -96,6 +97,10 @@ fun StoreCard(
             promos.isNotEmpty()
         }
     }
+    val identity = listOf(local.codigo, local.rutero, local.cadena, local.formato)
+        .filter { it.isNotBlank() }
+        .distinct()
+        .joinToString(" · ")
 
     LaunchedEffect(Unit) { visible = true }
 
@@ -113,7 +118,7 @@ fun StoreCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(dimens.spacingLg)
+                .padding(horizontal = cardPadding, vertical = cardPadding)
                 .animateContentSize(animationSpec = tween(250))
         ) {
             // ── Header row ──
@@ -143,7 +148,11 @@ fun StoreCard(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = local.local.ifBlank { stringResource(R.string.sin_numero) },
-                                style = MaterialTheme.typography.titleLarge,
+                                style = if (dimens.isCompact) {
+                                    MaterialTheme.typography.titleMedium
+                                } else {
+                                    MaterialTheme.typography.titleLarge
+                                },
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
@@ -161,12 +170,14 @@ fun StoreCard(
                             }
                         }
 
-                        if (local.codigo.isNotBlank()) {
+                        if (identity.isNotBlank()) {
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = local.codigo,
-                                style = MaterialTheme.typography.bodySmall,
+                                text = identity,
+                                style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
