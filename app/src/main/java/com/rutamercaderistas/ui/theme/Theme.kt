@@ -82,7 +82,9 @@ fun MercaderistasTheme(content: @Composable () -> Unit) {
     // obligaba a scrollear de más. Se respeta el zoom hasta 1.3x y ahí se frena
     // para conservar la densidad de información. Solo afecta sp, no dp.
     val effectiveFontScale = (systemFontScale * userScale).coerceAtMost(MAX_FONT_SCALE)
-    val density = Density(baseDensity.density, effectiveFontScale)
+    // Avoid allowing a large system display zoom to make every component oversized.
+    // Touch targets keep their 48.dp semantic size; only the app's visual density is capped.
+    val density = Density(compactDensity(baseDensity.density), effectiveFontScale)
     CompositionLocalProvider(
         LocalAppDimens provides dimens,
         LocalDensity provides density,
