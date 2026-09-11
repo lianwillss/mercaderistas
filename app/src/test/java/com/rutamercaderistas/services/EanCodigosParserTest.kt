@@ -27,4 +27,24 @@ class EanCodigosParserTest {
         assertTrue("parser should succeed", result.isSuccess)
         assertTrue("should parse > 0 products, got ${result.getOrNull()}", (result.getOrNull() ?: 0) > 0)
     }
+
+    @Test
+    fun `asmode asset is mapped to ASMODE`() {
+        assertTrue(brandFromFilename("ean_asmode.xlsx") == "ASMODE")
+        assertTrue(brandFromFilename("ean_dix.xlsx") == "ASMODE")
+        assertTrue(brandFromFilename("ean_cu.xlsx") == "CUK")
+    }
+
+    @Test
+    fun `asmode xlsx parses products`() = runTest {
+        val dao = mockk<EanProductDao>(relaxed = true)
+        coEvery { dao.clearAll() } returns Unit
+        coEvery { dao.insertAll(any()) } returns Unit
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
+
+        val result = parser.loadFromFile("src/main/assets/ean_asmode.xlsx")
+
+        assertTrue("parser should succeed", result.isSuccess)
+        assertTrue("should parse ASMODE products", (result.getOrNull() ?: 0) > 0)
+    }
 }

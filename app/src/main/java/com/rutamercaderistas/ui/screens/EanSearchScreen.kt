@@ -2,6 +2,7 @@ package com.rutamercaderistas.ui.screens
 
 import android.app.Activity
 import android.content.ClipboardManager
+import android.content.Intent
 import android.graphics.Bitmap
 import android.util.LruCache
 import android.widget.Toast
@@ -85,6 +86,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.core.content.FileProvider
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.DropdownMenu
@@ -107,6 +109,7 @@ import com.rutamercaderistas.ui.components.IosModal
 import com.rutamercaderistas.services.brandNote
 import com.rutamercaderistas.services.compactNorm
 import com.rutamercaderistas.services.normalizeSearch
+import com.rutamercaderistas.util.ShareImageGenerator
 import com.rutamercaderistas.ui.theme.AccentBlue
 import com.rutamercaderistas.ui.theme.AccentBlueSoft
 import com.rutamercaderistas.ui.theme.AccentGreen
@@ -631,6 +634,34 @@ fun EanSearchScreen(
                     modifier = Modifier.heightIn(min = dimens.touchMin),
                 ) {
                     Text(stringResource(R.string.ean_copy_cd))
+                }
+                Spacer(modifier = Modifier.height(dimens.spacingSm))
+                Button(
+                    onClick = {
+                        try {
+                            val file = ShareImageGenerator.generateForEanProduct(
+                                context = context,
+                                productName = product.descripcionProducto,
+                                ean = product.eanPrincipal,
+                            )
+                            val uri = FileProvider.getUriForFile(
+                                context,
+                                "${context.packageName}.fileprovider",
+                                file,
+                            )
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "image/png"
+                                putExtra(Intent.EXTRA_STREAM, uri)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.ean_share_image)))
+                        } catch (_: Exception) {
+                            Toast.makeText(context, R.string.ean_share_error, Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    modifier = Modifier.heightIn(min = dimens.touchMin),
+                ) {
+                    Text(stringResource(R.string.ean_share_image))
                 }
             }
         }

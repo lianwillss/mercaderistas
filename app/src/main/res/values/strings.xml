@@ -336,6 +336,8 @@
     <string name="ean_barcode_title">Código de barras</string>
     <string name="ean_barcode_cd">Código de barras del producto %s</string>
     <string name="ean_barcode_zoom_hint">Toca para ampliar y verificar el código</string>
+    <string name="ean_share_image">Compartir imagen</string>
+    <string name="ean_share_error">No se pudo preparar la imagen</string>
     <string name="ean_zoom_cd">Ampliar código de barras</string>
     <string name="ean_refresh_cd">Actualizar catálogo EAN</string>
     <string name="ean_empty_results">Sin resultados para \"%s\"</string>

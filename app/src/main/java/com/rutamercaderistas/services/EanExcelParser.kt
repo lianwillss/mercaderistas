@@ -14,7 +14,7 @@ import java.io.InputStream
 import java.text.Normalizer
 import javax.inject.Inject
 
-const val EAN_DATA_VERSION = 23
+const val EAN_DATA_VERSION = 26
 
 // Prefijo/sufijo de los archivos Excel de catálogo EAN en assets.
 // Para agregar más productos basta con soltar otro archivo "ean*.xlsx"
@@ -38,6 +38,9 @@ private val EAN_FILE_BRANDS = mapOf(
     "suk" to "SUK",
     "vegmonkey" to "VEGMONKEY",
     "japi_jane" to "JAPI JANE",
+    "asmode" to "ASMODE",
+    "dix" to "ASMODE",
+    "cu" to "CUK",
 )
 
 // Alias de marca: la empresa ve algunas marcas con un nombre distinto al del
@@ -60,7 +63,7 @@ private val BRAND_CANONICAL_NOTES = mapOf(
 
 fun brandNote(canonical: String): String? = BRAND_CANONICAL_NOTES[normalizeSearch(canonical)]
 
-private fun brandFromFilename(fileName: String): String {
+internal fun brandFromFilename(fileName: String): String {
     val base = fileName.removePrefix(EAN_ASSET_PREFIX)
         .removePrefix("_")
         .removeSuffix(EAN_ASSET_SUFFIX)
@@ -106,7 +109,9 @@ class EanExcelParser @Inject constructor(
     suspend fun parseAndSave(inputStream: InputStream): Result<Int> {
         return try {
             val products = parse(inputStream)
-            val deduped = dedupe(products)
+            val dedupeResult = dedupeEanProducts(products)
+            logDedupe(dedupeResult)
+            val deduped = dedupeResult.products
             if (deduped.isNotEmpty()) {
                 eanProductDao.clearAll()
                 eanProductDao.insertAll(deduped)
@@ -121,12 +126,12 @@ class EanExcelParser @Inject constructor(
     // Evita productos duplicados al combinar varios archivos "ean*.xlsx" (o
     // dentro de uno solo). La clave es el EAN; si el EAN está vacío se usa el
     // SKU Cencosud. Los productos sin ninguno de los dos no se deduplican.
-    // Si un duplicado trae `conversion` (CAJA) y el original no, se fusiona.
-    private fun dedupe(products: List<EanProductEntity>): List<EanProductEntity> {
+    internal fun dedupeEanProducts(products: List<EanProductEntity>): EanDedupeResult {
         val map = mutableMapOf<String, EanProductEntity>()
         val blanks = mutableListOf<EanProductEntity>()
+        var duplicatesMerged = 0
         for (p in products) {
-            val key = p.eanPrincipal.ifBlank { p.codCencosud }
+            val key = p.eanPrincipal.trim().ifBlank { p.codCencosud.trim() }
             if (key.isBlank()) {
                 blanks.add(p)
                 continue
@@ -134,11 +139,71 @@ class EanExcelParser @Inject constructor(
             val existing = map[key]
             if (existing == null) {
                 map[key] = p
-            } else if (existing.conversion.isBlank() && p.conversion.isNotBlank()) {
-                map[key] = existing.copy(conversion = p.conversion)
+            } else {
+                map[key] = mergeProducts(existing, p)
+                duplicatesMerged++
             }
         }
-        return map.values + blanks
+        return EanDedupeResult(products = map.values + blanks, duplicatesMerged = duplicatesMerged)
+    }
+
+    private fun mergeProducts(first: EanProductEntity, second: EanProductEntity): EanProductEntity {
+        val primary = if (eanCompleteness(second) > eanCompleteness(first)) second else first
+        val fallback = if (primary === first) second else first
+        fun choose(primaryValue: String, fallbackValue: String): String =
+            primaryValue.ifBlank { fallbackValue }
+
+        return primary.copy(
+            codCencosud = choose(primary.codCencosud, fallback.codCencosud),
+            codProveedor = choose(primary.codProveedor, fallback.codProveedor),
+            eanPrincipal = choose(primary.eanPrincipal, fallback.eanPrincipal),
+            descripcionProducto = choose(primary.descripcionProducto, fallback.descripcionProducto),
+            descripcionNorm = choose(primary.descripcionNorm, fallback.descripcionNorm),
+            marca = choose(primary.marca, fallback.marca),
+            marcaNorm = choose(primary.marcaNorm, fallback.marcaNorm),
+            descripcionNormNospace = choose(primary.descripcionNormNospace, fallback.descripcionNormNospace),
+            marcaNormNospace = choose(primary.marcaNormNospace, fallback.marcaNormNospace),
+            unBase = choose(primary.unBase, fallback.unBase),
+            unPedido = choose(primary.unPedido, fallback.unPedido),
+            conversion = choose(primary.conversion, fallback.conversion),
+            estado = choose(primary.estado, fallback.estado),
+            catN1Cencosud = choose(primary.catN1Cencosud, fallback.catN1Cencosud),
+            catN2Cencosud = choose(primary.catN2Cencosud, fallback.catN2Cencosud),
+            catN3Cencosud = choose(primary.catN3Cencosud, fallback.catN3Cencosud),
+            catN4Cencosud = choose(primary.catN4Cencosud, fallback.catN4Cencosud),
+            catN1Proveedor = choose(primary.catN1Proveedor, fallback.catN1Proveedor),
+            catN2Proveedor = choose(primary.catN2Proveedor, fallback.catN2Proveedor),
+            catN3Proveedor = choose(primary.catN3Proveedor, fallback.catN3Proveedor),
+            catN4Proveedor = choose(primary.catN4Proveedor, fallback.catN4Proveedor),
+            codigoBarra = choose(primary.codigoBarra, fallback.codigoBarra),
+        )
+    }
+
+    private fun eanCompleteness(product: EanProductEntity): Int = listOf(
+        product.codCencosud,
+        product.codProveedor,
+        product.eanPrincipal,
+        product.descripcionProducto,
+        product.marca,
+        product.unBase,
+        product.unPedido,
+        product.conversion,
+        product.estado,
+        product.catN1Cencosud,
+        product.catN2Cencosud,
+        product.catN3Cencosud,
+        product.catN4Cencosud,
+        product.catN1Proveedor,
+        product.catN2Proveedor,
+        product.catN3Proveedor,
+        product.catN4Proveedor,
+        product.codigoBarra,
+    ).count { it.isNotBlank() }
+
+    private fun logDedupe(result: EanDedupeResult) {
+        if (result.duplicatesMerged > 0) {
+            Timber.i("EAN: %d duplicados fusionados; %d productos finales", result.duplicatesMerged, result.products.size)
+        }
     }
 
     private fun parse(inputStream: InputStream, defaultBrand: String? = null): List<EanProductEntity> {
@@ -349,7 +414,9 @@ class EanExcelParser @Inject constructor(
                     Timber.e(e, "Error parseando catálogo EAN: $file")
                 }
             }
-            val deduped = dedupe(all)
+            val dedupeResult = dedupeEanProducts(all)
+            logDedupe(dedupeResult)
+            val deduped = dedupeResult.products
             if (deduped.isNotEmpty()) {
                 eanProductDao.clearAll()
                 eanProductDao.insertAll(deduped)
@@ -380,3 +447,8 @@ class EanExcelParser @Inject constructor(
         prefs().edit().putInt("ean_data_version", version).apply()
     }
 }
+
+data class EanDedupeResult(
+    val products: List<EanProductEntity>,
+    val duplicatesMerged: Int,
+)
