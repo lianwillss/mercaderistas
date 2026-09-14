@@ -83,7 +83,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.rutamercaderistas.ui.theme.AppDimens
+import com.rutamercaderistas.ui.theme.AppWindowWidth
 import com.rutamercaderistas.ui.theme.ComponentShapes
+import com.rutamercaderistas.ui.theme.appWindowWidth
 import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.ui.theme.rs
 import com.rutamercaderistas.ui.theme.storeColor
@@ -147,7 +149,7 @@ fun AllLocalesScreen(
         }
     }
 
-    val isWide = LocalConfiguration.current.screenWidthDp >= 840
+    val isWide = appWindowWidth(LocalConfiguration.current.screenWidthDp.dp) == AppWindowWidth.Expanded
 
     if (isWide) {
         AllLocalesTwoPane(
@@ -256,10 +258,19 @@ private fun AllLocalesTwoPane(
                 EmptyLocales(query = searchQuery)
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(horizontal = dimens.spacingMd, vertical = dimens.spacingXs),
+                    contentPadding = PaddingValues(
+                        start = dimens.spacingMd,
+                        end = dimens.spacingMd,
+                        top = dimens.spacingXs,
+                        bottom = dimens.scrollBottomPadding,
+                    ),
                     verticalArrangement = Arrangement.spacedBy(10.dp * rs()),
                 ) {
-                    itemsIndexed(locales, key = { _, local -> local.codigo }) { index, local ->
+                    itemsIndexed(
+                        locales,
+                        key = { _, local -> local.codigo + "|" + local.local },
+                        contentType = { _, _ -> "locale" },
+                    ) { index, local ->
                         var visible by remember { mutableStateOf(false) }
                         val animAlpha by animateFloatAsState(
                             targetValue = if (visible) 1f else 0f,
@@ -441,22 +452,28 @@ private fun CountAndGrid(
     } else {
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 340.dp),
-            contentPadding = PaddingValues(horizontal = dimens.spacingMd, vertical = dimens.spacingXs),
+            contentPadding = PaddingValues(
+                start = dimens.spacingMd,
+                end = dimens.spacingMd,
+                top = dimens.spacingXs,
+                bottom = dimens.scrollBottomPadding,
+            ),
             verticalArrangement = Arrangement.spacedBy(10.dp * rs()),
             horizontalArrangement = Arrangement.spacedBy(10.dp * rs()),
         ) {
             itemsIndexed(
                 items = locales,
-                key = { _, local -> local.codigo }
+                key = { _, local -> local.codigo + "|" + local.local },
+                contentType = { _, _ -> "locale" },
             ) { index, local ->
                 var visible by remember { mutableStateOf(false) }
                 val animAlpha by animateFloatAsState(
                     targetValue = if (visible) 1f else 0f,
-                    animationSpec = tween(250, delayMillis = index * 50),
+                    animationSpec = tween(250, delayMillis = minOf(index, 8) * 40),
                 )
                 val animOffsetY by animateDpAsState(
                     targetValue = if (visible) 0.dp else 12.dp,
-                    animationSpec = tween(250, delayMillis = index * 50),
+                    animationSpec = tween(250, delayMillis = minOf(index, 8) * 40),
                 )
                 LaunchedEffect(Unit) { visible = true }
 

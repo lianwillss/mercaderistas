@@ -16,6 +16,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.PaddingValues
@@ -65,6 +66,8 @@ import com.rutamercaderistas.ui.components.AppNavigationRail
 import com.rutamercaderistas.ui.components.BottomBarKey
 import com.rutamercaderistas.ui.components.OnboardingOverlay
 import com.rutamercaderistas.models.DiaSemana
+import com.rutamercaderistas.ui.theme.AppWindowWidth
+import com.rutamercaderistas.ui.theme.appWindowWidth
 
 import com.rutamercaderistas.viewmodel.RouteUiState
 import com.rutamercaderistas.viewmodel.SyncUiState
@@ -152,9 +155,10 @@ fun MainScreen(
         }
     }
 
-    val isCompactWidth = LocalConfiguration.current.screenWidthDp < 600
+    val windowWidth = appWindowWidth(LocalConfiguration.current.screenWidthDp.dp)
+    val isCompactWidth = windowWidth == AppWindowWidth.Compact
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize()) {
         Scaffold(
             bottomBar = if (isCompactWidth) {
                 {
@@ -170,11 +174,10 @@ fun MainScreen(
             } else {
                 {}
             },
-            contentWindowInsets = if (isCompactWidth) {
-                WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
-            } else {
-                WindowInsets(0.dp)
-            },
+            // The custom bottom bar applies the navigation-bar inset itself.
+            // Expanded layouts have no bottom bar, so the content must consume it here.
+            contentWindowInsets = if (isCompactWidth) WindowInsets(0.dp)
+            else WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
         ) { scaffoldPadding ->
             Row(modifier = Modifier.fillMaxSize()) {
                 if (!isCompactWidth) {
@@ -190,10 +193,11 @@ fun MainScreen(
             NavHost(
                 navController = navController,
                 startDestination = MainRoute,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .weight(1f)
-                    .padding(scaffoldPadding),
+                 modifier = Modifier
+                     .fillMaxSize()
+                     .weight(1f)
+                     .padding(scaffoldPadding)
+                     .consumeWindowInsets(scaffoldPadding),
             ) {
                 composable<MainRoute> {
                     MainRouteContent(
@@ -249,7 +253,7 @@ fun MainScreen(
                     popExitTransition = { slideDownExit },
                 ) {
                     BoxWithConstraints {
-                        val isWide = maxWidth >= 600.dp
+                         val isWide = appWindowWidth(maxWidth) != AppWindowWidth.Compact
                         if (isWide) {
                             PromotionsListDetailScreen(
                                 promotionsByBrand = routeUiState.promotionsByBrand,

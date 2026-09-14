@@ -505,8 +505,10 @@ fun EanSearchScreen(
                                 .fillMaxWidth()
                                 .weight(1f),
                             contentPadding = PaddingValues(
-                                horizontal = 0.dp,
-                                vertical = dimens.spacingSm,
+                                start = 0.dp,
+                                end = 0.dp,
+                                top = dimens.spacingSm,
+                                bottom = dimens.scrollBottomPadding,
                             ),
                             verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
                         ) {
@@ -514,6 +516,11 @@ fun EanSearchScreen(
                                 when (it) {
                                     is EanBrandRow -> "brand_${it.brand}"
                                     is EanProductRow -> it.product.id
+                                }
+                            }, contentType = { _, it ->
+                                when (it) {
+                                    is EanBrandRow -> "brand_header"
+                                    is EanProductRow -> "product"
                                 }
                             }) { index, row ->
                                 var visible by remember { mutableStateOf(false) }

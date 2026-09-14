@@ -1,6 +1,5 @@
 package com.rutamercaderistas.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -54,7 +53,6 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -77,6 +75,8 @@ import com.rutamercaderistas.ui.components.ShimmerLoadingContent
 import com.rutamercaderistas.ui.components.StoreCard
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.LocalAppDimens
+import com.rutamercaderistas.ui.theme.AppWindowWidth
+import com.rutamercaderistas.ui.theme.appWindowWidth
 import com.rutamercaderistas.ui.theme.rs
 import androidx.compose.ui.geometry.Offset
 import com.rutamercaderistas.viewmodel.RouteUiState
@@ -84,12 +84,6 @@ import com.rutamercaderistas.viewmodel.SyncUiState
 import com.rutamercaderistas.viewmodel.PlanillaChanges
 import com.rutamercaderistas.viewmodel.SyncPreview
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.collectLatest
-import androidx.compose.runtime.snapshotFlow
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -131,7 +125,6 @@ fun MainRouteContent(
 
     var searchActive by remember { mutableStateOf(false) }
     var showExpiringSoon by remember { mutableStateOf(false) }
-    var headerVisible by rememberSaveable { mutableStateOf(true) }
 
     val activeDayNumbers by remember(activeDays) {
         derivedStateOf { activeDays.map { day -> diaDelMes(day) } }
@@ -160,7 +153,7 @@ fun MainRouteContent(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        val isWide = maxWidth >= 600.dp
+        val isWide = appWindowWidth(maxWidth) != AppWindowWidth.Compact
         var selectedDayIndex by remember { mutableStateOf(0) }
         val currentDay = if (isWide) {
             activeDays.getOrNull(selectedDayIndex) ?: activeDays.firstOrNull()
@@ -175,10 +168,6 @@ fun MainRouteContent(
             }
         }
 
-        LaunchedEffect(selectedRoute) {
-            headerVisible = true
-        }
-
         LaunchedEffect(currentDay, routeState.isRouteLoading) {
             if (!routeState.isRouteLoading) {
                 onSetCurrentDay(currentDay)
@@ -187,25 +176,19 @@ fun MainRouteContent(
 
         Column(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            AnimatedVisibility(
-                visible = headerVisible || isSyncing,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically(),
-            ) {
-                HeaderSection(
-                    isOnline = syncState.isOnline,
-                    lastSyncRelative = routeState.lastSyncRelative,
-                    onRefresh = onHeaderRefresh,
-                    onOpenManual = onNavigateToManual,
-                    onShare = onExportRoute,
-                    onCheckUpdate = onCheckUpdate,
-                    promosExpiringSoon = routeState.promosExpiringSoon,
-                    onExpiringSoonClick = { showExpiringSoon = true },
-                    onGlobalSearch = onGlobalSearch,
-                    onOpenSettings = onOpenSettings,
-                    onRefreshPositioned = onRefreshPositioned,
-                )
-            }
+            HeaderSection(
+                isOnline = syncState.isOnline,
+                lastSyncRelative = routeState.lastSyncRelative,
+                onRefresh = onHeaderRefresh,
+                onOpenManual = onNavigateToManual,
+                onShare = onExportRoute,
+                onCheckUpdate = onCheckUpdate,
+                promosExpiringSoon = routeState.promosExpiringSoon,
+                onExpiringSoonClick = { showExpiringSoon = true },
+                onGlobalSearch = onGlobalSearch,
+                onOpenSettings = onOpenSettings,
+                onRefreshPositioned = onRefreshPositioned,
+            )
 
             if (isSyncing) {
                 LinearProgressIndicator(
@@ -311,7 +294,6 @@ fun MainRouteContent(
                                 routeState = routeState,
                                 syncState = syncState,
                                 isSyncing = isSyncing,
-                                onHeaderVisibilityChanged = { headerVisible = it },
                                 onPullRefresh = onPullRefresh,
                             onBrandClick = onBrandClick,
                             onAddressClick = onAddressClick,
@@ -329,7 +311,6 @@ fun MainRouteContent(
                         routeState = routeState,
                         syncState = syncState,
                         isSyncing = isSyncing,
-                        onHeaderVisibilityChanged = { headerVisible = it },
                         onPullRefresh = onPullRefresh,
                         onBrandClick = onBrandClick,
                         onAddressClick = onAddressClick,
@@ -352,7 +333,7 @@ fun MainRouteContent(
             Box(modifier = Modifier.weight(1f)) {
                 if (isSyncing) {
                     LazyColumn(
-                        contentPadding = PaddingValues(bottom = dimens.contentPaddingBottom),
+                        contentPadding = PaddingValues(bottom = dimens.scrollBottomPadding),
                         verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
                         modifier = Modifier.fillMaxSize(),
                     ) {
@@ -753,7 +734,6 @@ private fun DayContent(
     routeState: RouteUiState,
     syncState: SyncUiState,
     isSyncing: Boolean,
-    onHeaderVisibilityChanged: (Boolean) -> Unit,
     onPullRefresh: () -> Unit,
     onBrandClick: (String) -> Unit,
     onAddressClick: (String) -> Unit,
@@ -761,34 +741,44 @@ private fun DayContent(
 ) {
     val dimens = LocalAppDimens.current
     val gridState = rememberLazyGridState()
-
-    LaunchedEffect(gridState) {
-        var previousIndex = 0
-        var previousOffset = 0
-        snapshotFlow { gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset }
-            .collectLatest { (index, offset) ->
-                val atTop = index == 0 && offset == 0
-                val movingDown = index > previousIndex ||
-                    (index == previousIndex && offset > previousOffset)
-                onHeaderVisibilityChanged(atTop || !movingDown)
-                previousIndex = index
-                previousOffset = offset
+    val scrollProgress by remember {
+        derivedStateOf {
+            val info = gridState.layoutInfo
+            val total = info.totalItemsCount
+            val visible = info.visibleItemsInfo
+            if (total <= 0 || visible.isEmpty()) 0f
+            else {
+                val last = visible.lastOrNull()?.index ?: 0
+                ((last + 1).toFloat() / total.toFloat()).coerceIn(0f, 1f)
             }
+        }
     }
+    val showScrollProgress = routeState.currentDayLocales.size > 4
 
     PullToRefreshBox(
         isRefreshing = isSyncing,
         onRefresh = onPullRefresh,
         modifier = Modifier.fillMaxSize(),
     ) {
-        LazyVerticalGrid(
-            state = gridState,
-            columns = GridCells.Adaptive(minSize = dimens.routeGridMinWidth),
-            contentPadding = PaddingValues(bottom = dimens.contentPaddingBottom),
-            verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
-            horizontalArrangement = Arrangement.spacedBy(dimens.spacingLg),
-            modifier = Modifier.fillMaxSize(),
-        ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            if (showScrollProgress) {
+                LinearProgressIndicator(
+                    progress = { scrollProgress },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                )
+            }
+            LazyVerticalGrid(
+                state = gridState,
+                columns = GridCells.Adaptive(minSize = dimens.routeGridMinWidth),
+                contentPadding = PaddingValues(bottom = dimens.scrollBottomPadding),
+                verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
+                horizontalArrangement = Arrangement.spacedBy(dimens.spacingLg),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f),
+            ) {
             val locales = routeState.currentDayLocales
             if (locales.isEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
@@ -840,6 +830,7 @@ private fun DayContent(
                 items(
                     count = locales.size,
                     key = { index -> "${locales[index].codigo}|${locales[index].local}" },
+                    contentType = { "locale" },
                 ) { index ->
                     val local = locales[index]
                     StoreCard(
@@ -854,6 +845,7 @@ private fun DayContent(
                     )
                 }
             }
+            }
         }
     }
 }
@@ -867,7 +859,12 @@ private fun DayList(
 ) {
     val dimens = LocalAppDimens.current
     LazyColumn(
-        contentPadding = PaddingValues(dimens.spacingMd),
+        contentPadding = PaddingValues(
+            start = dimens.spacingMd,
+            top = dimens.spacingMd,
+            end = dimens.spacingMd,
+            bottom = dimens.scrollBottomPadding,
+        ),
         verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
         modifier = Modifier
             .fillMaxHeight()

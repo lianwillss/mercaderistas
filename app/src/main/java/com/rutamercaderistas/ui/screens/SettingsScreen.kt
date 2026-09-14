@@ -100,8 +100,9 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(dimens.spacingMd),
+                .padding(dimens.spacingMd)
+                .padding(bottom = dimens.scrollBottomPadding)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(dimens.spacingMd),
         ) {
             SettingsCard(title = stringResource(R.string.settings_font_size)) {

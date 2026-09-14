@@ -311,8 +311,10 @@ fun GlobalSearchScreen(
         } else {
             LazyColumn(
                 contentPadding = PaddingValues(
-                    horizontal = dimens.spacingXl,
-                    vertical = dimens.spacingMd,
+                    start = dimens.spacingXl,
+                    end = dimens.spacingXl,
+                    top = dimens.spacingMd,
+                    bottom = dimens.scrollBottomPadding,
                 ),
                 verticalArrangement = Arrangement.spacedBy(dimens.spacingMd),
             ) {
@@ -320,7 +322,7 @@ fun GlobalSearchScreen(
                     item {
                         SectionTitle(stringResource(R.string.busqueda_locales))
                     }
-                    items(filteredLocales, key = { it.codigo + it.local }) { local ->
+                    items(filteredLocales, key = { it.codigo + it.local }, contentType = { "locale" }) { local ->
                         LocaleSearchRow(
                             local = local,
                             onAddressClick = onAddressClick,
@@ -331,7 +333,7 @@ fun GlobalSearchScreen(
                     item {
                         SectionTitle(stringResource(R.string.busqueda_promociones))
                     }
-                    items(filteredPromotions, key = { it.id }) { promo ->
+                    items(filteredPromotions, key = { it.id }, contentType = { "promotion" }) { promo ->
                         PromotionSearchRow(
                             promo = promo,
                             onBrandClick = onBrandClick,

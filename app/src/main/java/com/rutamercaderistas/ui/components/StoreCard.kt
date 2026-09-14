@@ -78,11 +78,11 @@ fun StoreCard(
     var visible by remember { mutableStateOf(false) }
     val animAlpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
-        animationSpec = tween(250, delayMillis = index * 50)
+        animationSpec = tween(250, delayMillis = minOf(index, 8) * 40)
     )
     val animOffsetY by animateDpAsState(
         targetValue = if (visible) 0.dp else 12.dp,
-        animationSpec = tween(250, delayMillis = index * 50)
+        animationSpec = tween(250, delayMillis = minOf(index, 8) * 40)
     )
 
     val brandCleanCache = remember(local) {

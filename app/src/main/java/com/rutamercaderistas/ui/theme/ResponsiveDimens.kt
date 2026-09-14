@@ -33,9 +33,9 @@ data class AppDimens(
     val iconXl: Dp = 36.dp,
     val iconXxl: Dp = 40.dp,
     val touchMin: Dp = 48.dp,
-    val contentPaddingBottom: Dp = 96.dp,
     val promoButtonSize: Dp = 56.dp,
     val routeGridMinWidth: Dp = 380.dp,
+    val scrollBottomPadding: Dp = 32.dp,
 )
 
 val LocalAppDimens = staticCompositionLocalOf { AppDimens() }
@@ -62,9 +62,9 @@ fun rememberAppDimens(): AppDimens {
             iconXl = (36 * this).dp,
             iconXxl = (40 * this).dp,
             touchMin = 48.dp,
-            contentPaddingBottom = (96 * this).dp,
             promoButtonSize = (56 * this).dp,
             routeGridMinWidth = if (compact) 320.dp else 380.dp,
+            scrollBottomPadding = (32 * this).dp,
         )
     }
 }

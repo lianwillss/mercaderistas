@@ -379,7 +379,7 @@ fun PromotionsOverviewScreen(
             } else {
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 480.dp),
-                    contentPadding = PaddingValues(start = dimens.spacingLg, end = dimens.spacingLg, top = dimens.spacingXs, bottom = dimens.contentPaddingBottom),
+                    contentPadding = PaddingValues(start = dimens.spacingLg, end = dimens.spacingLg, top = dimens.spacingXs, bottom = dimens.scrollBottomPadding),
                     verticalArrangement = Arrangement.spacedBy(dimens.spacingXxl),
                     horizontalArrangement = Arrangement.spacedBy(dimens.spacingLg),
                 ) {

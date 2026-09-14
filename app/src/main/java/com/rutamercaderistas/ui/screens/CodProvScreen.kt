@@ -77,8 +77,9 @@ fun CodProvScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = dimens.spacingMd, vertical = dimens.spacingSm),
+                .padding(horizontal = dimens.spacingMd, vertical = dimens.spacingSm)
+                .padding(bottom = dimens.scrollBottomPadding)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
         ) {
             CodProvItems.forEachIndexed { index, item ->
