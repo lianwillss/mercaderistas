@@ -182,8 +182,6 @@ class MainActivity : ComponentActivity() {
                             ctx.startActivity(android.content.Intent.createChooser(intent, ctx.getString(R.string.compartir_local)))
                         },
                          onDismissSyncChanges = { syncViewModel.clearChanges() },
-                         onConfirmSyncPreview = { syncViewModel.confirmSyncPreview(routeUiState.selectedRoute) },
-                         onCancelSyncPreview = { syncViewModel.cancelSyncPreview() },
                         onSharePromo = { promo ->
                             val text = buildString {
                                 appendLine("\uD83D\uDCE3 ${promo.productName}")

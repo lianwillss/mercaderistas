@@ -317,6 +317,7 @@ fun GlobalSearchScreen(
                     bottom = dimens.scrollBottomPadding,
                 ),
                 verticalArrangement = Arrangement.spacedBy(dimens.spacingMd),
+                modifier = Modifier.weight(1f),
             ) {
                 if (filteredLocales.isNotEmpty()) {
                     item {

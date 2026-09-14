@@ -48,12 +48,6 @@ data class PlanillaChanges(
         changedAddress.isEmpty() && changedBrands.isEmpty() && affectsToday.isEmpty()
 }
 
-data class SyncPreview(
-    val changes: PlanillaChanges,
-    val routeCount: Int,
-    val entryCount: Int,
-)
-
 data class MovedLocales(
     val local: String,
     val fromDays: String,
@@ -201,7 +195,6 @@ data class SyncUiState(
     val snackbarMessage: String? = null,
     val syncError: String? = null,
     val syncChanges: PlanillaChanges? = null,
-    val syncPreview: SyncPreview? = null,
 ) {
     val isSyncing: Boolean get() = state is SyncState.Syncing
     val syncPhase: String? get() = (state as? SyncState.Syncing)?.phase
@@ -222,14 +215,6 @@ class SyncViewModel @Inject constructor(
 
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var syncJob: kotlinx.coroutines.Job? = null
-    private var pendingPreview: PendingSyncPreview? = null
-
-    private data class PendingSyncPreview(
-        val preview: SyncPreview,
-        val oldEntries: List<EntradaRuta>,
-        val activeRoute: String?,
-        val currentHash: String?,
-    )
 
     private val connectivityManager =
         getApplication<Application>().getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -237,32 +222,6 @@ class SyncViewModel @Inject constructor(
     init {
         checkConnectivity()
         registerNetworkMonitor()
-        restoreStagedPreview()
-    }
-
-    private fun restoreStagedPreview() {
-        viewModelScope.launch {
-            val staged = ruteroManager.withSyncLock { ruteroManager.readStagedMasterExcel() }
-                ?: return@launch
-            val oldEntries = ruteroManager.loadAllEntries()
-            val activeRoute = repository.getActiveRuteroName()
-            val changes = if (oldEntries.isEmpty()) {
-                PlanillaChanges()
-            } else {
-                computePlanillaChanges(oldEntries, staged.entries, activeRoute, activeRoute?.let { todayDia() })
-            }
-            val preview = SyncPreview(
-                changes = changes,
-                routeCount = staged.ruteros.size,
-                entryCount = staged.entries.size,
-            )
-            if (changes.isEmpty) {
-                ruteroManager.withSyncLock { ruteroManager.discardStagedMasterExcel() }
-                return@launch
-            }
-            pendingPreview = PendingSyncPreview(preview, oldEntries, activeRoute, staged.contentHash)
-            _state.update { it.copy(syncPreview = preview) }
-        }
     }
 
     private fun checkConnectivity() {
@@ -313,9 +272,9 @@ class SyncViewModel @Inject constructor(
 
     fun syncFromDrive() {
         syncJob?.cancel()
-        _state.value = _state.value.copy(state = SyncState.Syncing(), syncError = null, syncChanges = null, syncPreview = null)
+        _state.value = _state.value.copy(state = SyncState.Syncing(), syncError = null, syncChanges = null)
         syncJob = viewModelScope.launch {
-            val result = performDriveSync(previewOnly = false)
+            val result = performDriveSync()
             _state.value = _state.value.copy(state = SyncState.Idle)
             result.messageOrNull()?.let { msg ->
                 _state.value = _state.value.copy(syncError = msg)
@@ -323,12 +282,10 @@ class SyncViewModel @Inject constructor(
         }
     }
 
-    private suspend fun performDriveSync(previewOnly: Boolean): SyncResult<Boolean> {
+    private suspend fun performDriveSync(): SyncResult<Boolean> {
         return ruteroManager.withSyncLock {
             withContext(Dispatchers.IO) {
             try {
-                pendingPreview = null
-                ruteroManager.discardStagedMasterExcel()
                 val oldEntries = ruteroManager.loadAllEntries()
                 val activeRoute = repository.getActiveRuteroName()
                 // Incremental: si el ETag no cambió, no hay nada que hacer
@@ -362,31 +319,7 @@ class SyncViewModel @Inject constructor(
                     _state.value = _state.value.copy(state = SyncState.Idle)
                     return@withContext SyncResult.NoChange
                 }
-                if (previewOnly) {
-                    val staged = ruteroManager.stageMasterExcel(bytes).getOrElse {
-                        _state.value = _state.value.copy(state = SyncState.Idle)
-                        return@withContext SyncResult.Error(getApplication<Application>().getString(R.string.sync_error_excel))
-                    }
-                    val changes = if (oldEntries.isEmpty()) {
-                        PlanillaChanges()
-                    } else {
-                        computePlanillaChanges(oldEntries, staged.entries, activeRoute, todayDia())
-                    }
-                    val preview = SyncPreview(
-                        changes = changes,
-                        routeCount = staged.ruteros.size,
-                        entryCount = staged.entries.size,
-                    )
-                    if (!changes.isEmpty) {
-                        pendingPreview = PendingSyncPreview(preview, oldEntries, activeRoute, currentHash)
-                        _state.value = _state.value.copy(state = SyncState.Idle, syncPreview = preview)
-                        return@withContext SyncResult.NoChange
-                    }
-                    if (!ruteroManager.commitStagedMasterExcel()) {
-                        _state.value = _state.value.copy(state = SyncState.Idle)
-                        return@withContext SyncResult.Error(getApplication<Application>().getString(R.string.sync_error_excel))
-                    }
-                } else if (!ruteroManager.saveMasterExcel(bytes)) {
+                if (!ruteroManager.saveMasterExcel(bytes)) {
                     _state.value = _state.value.copy(state = SyncState.Idle)
                     return@withContext SyncResult.Error(getApplication<Application>().getString(R.string.sync_error_excel))
                 }
@@ -446,9 +379,9 @@ class SyncViewModel @Inject constructor(
 
     fun syncFromDriveWithRouteReload(currentRoute: String?) {
         syncJob?.cancel()
-        _state.value = _state.value.copy(state = SyncState.Syncing(), syncError = null, syncChanges = null, syncPreview = null)
+        _state.value = _state.value.copy(state = SyncState.Syncing(), syncError = null, syncChanges = null)
         syncJob = viewModelScope.launch {
-            val result = performDriveSync(previewOnly = currentRoute != null)
+            val result = performDriveSync()
             when (result) {
                 is SyncResult.Success -> {
                     val index = ruteroManager.loadIndex()
@@ -486,62 +419,6 @@ class SyncViewModel @Inject constructor(
                 }
             }
         }
-    }
-
-    fun confirmSyncPreview(currentRoute: String?) {
-        val pending = pendingPreview ?: return
-        syncJob?.cancel()
-        _state.value = _state.value.copy(
-            state = SyncState.Syncing(phase = getApplication<Application>().getString(R.string.sync_indexando)),
-            syncPreview = null,
-            syncError = null,
-        )
-        syncJob = viewModelScope.launch {
-            val result = ruteroManager.withSyncLock {
-                withContext(Dispatchers.IO) {
-                    pendingPreview = null
-                    if (!ruteroManager.commitStagedMasterExcel()) {
-                        SyncResult.Error(getApplication<Application>().getString(R.string.sync_error_excel))
-                    } else {
-                        completeCommittedSync(pending.oldEntries, pending.activeRoute, pending.currentHash)
-                    }
-                }
-            }
-            when (result) {
-                is SyncResult.Success -> reloadRouteAfterSync(currentRoute)
-                is SyncResult.Error -> _state.value = _state.value.copy(state = SyncState.Idle, syncError = result.message)
-                is SyncResult.NoChange -> _state.value = _state.value.copy(state = SyncState.Idle)
-                is SyncResult.Offline -> _state.value = _state.value.copy(state = SyncState.Idle, syncError = getApplication<Application>().getString(R.string.sync_sin_conexion))
-            }
-        }
-    }
-
-    fun cancelSyncPreview() {
-        pendingPreview = null
-        _state.value = _state.value.copy(syncPreview = null)
-        viewModelScope.launch {
-            ruteroManager.withSyncLock { ruteroManager.discardStagedMasterExcel() }
-        }
-    }
-
-    private suspend fun reloadRouteAfterSync(currentRoute: String?) {
-        val index = ruteroManager.loadIndex()
-        val routeToLoad = if (currentRoute != null && index.contains(currentRoute)) {
-            currentRoute
-        } else {
-            index.firstOrNull()
-        }
-        if (routeToLoad != null) {
-            val entries = ruteroManager.loadRoute(routeToLoad)
-            if (entries.isNotEmpty()) {
-                repository.clear()
-                repository.setEntries(entries, routeToLoad)
-            }
-        }
-        _state.value = _state.value.copy(
-            state = SyncState.Idle,
-            snackbarMessage = getApplication<Application>().getString(R.string.sync_datos_actualizados),
-        )
     }
 
     fun clearSnackbar() {

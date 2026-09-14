@@ -26,10 +26,6 @@ class SyncWorker @AssistedInject constructor(
         return ruteroManager.withSyncLock {
             try {
                 val activeRoute = repository.getActiveRuteroName()
-                if (ruteroManager.hasStagedMasterExcel()) {
-                    Timber.d("Hay una vista previa de Excel pendiente; se conserva para confirmación")
-                    return@withSyncLock Result.success()
-                }
                 val ts = System.currentTimeMillis()
                 val url = "${Constants.DRIVE_EXPORT_URL}&ts=$ts"
                 val bytes = downloadBytes(url = url).getOrNull()

@@ -82,7 +82,6 @@ import androidx.compose.ui.geometry.Offset
 import com.rutamercaderistas.viewmodel.RouteUiState
 import com.rutamercaderistas.viewmodel.SyncUiState
 import com.rutamercaderistas.viewmodel.PlanillaChanges
-import com.rutamercaderistas.viewmodel.SyncPreview
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -105,8 +104,6 @@ fun MainRouteContent(
     onShareLocal: (String) -> Unit,
     onGlobalSearch: () -> Unit = {},
     onDismissSyncChanges: () -> Unit = {},
-    onConfirmSyncPreview: () -> Unit = {},
-    onCancelSyncPreview: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onRefreshPositioned: (Offset) -> Unit = {},
     showUpdateBanner: Boolean = false,
@@ -227,16 +224,6 @@ fun MainRouteContent(
                     changes = syncState.syncChanges!!,
                     onDismiss = onDismissSyncChanges,
                 )
-            }
-
-            syncState.syncPreview?.let { preview ->
-                if (!isSyncing) {
-                    SyncPreviewBanner(
-                        preview = preview,
-                        onApply = onConfirmSyncPreview,
-                        onCancel = onCancelSyncPreview,
-                    )
-                }
             }
 
             Spacer(modifier = Modifier.height(dimens.spacingXs))
@@ -584,68 +571,6 @@ private fun SyncChangesBanner(changes: PlanillaChanges, onDismiss: () -> Unit) {
                         )
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SyncPreviewBanner(
-    preview: SyncPreview,
-    onApply: () -> Unit,
-    onCancel: () -> Unit,
-) {
-    val dimens = LocalAppDimens.current
-    val summary = buildList {
-        if (preview.changes.added.isNotEmpty()) {
-            add(stringResource(R.string.sync_cambios_agregados, preview.changes.added.size))
-        }
-        if (preview.changes.removed.isNotEmpty()) {
-            add(stringResource(R.string.sync_cambios_eliminados, preview.changes.removed.size))
-        }
-        if (preview.changes.moved.isNotEmpty()) {
-            add(stringResource(R.string.sync_cambios_movidos, preview.changes.moved.size))
-        }
-    }.joinToString(" · ")
-    val metadata = stringResource(R.string.sync_preview_summary, preview.routeCount, preview.entryCount)
-    val previewCd = stringResource(R.string.sync_preview_cd)
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = dimens.spacingLg, vertical = dimens.spacingXs)
-            .clip(MaterialTheme.shapes.medium)
-            .background(MaterialTheme.colorScheme.primaryContainer)
-            .semantics { contentDescription = previewCd }
-            .padding(horizontal = dimens.spacingLg, vertical = dimens.spacingSm),
-    ) {
-        Text(
-            text = stringResource(R.string.sync_preview_title),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
-        )
-        Text(
-            text = metadata,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
-        )
-        if (summary.isNotBlank()) {
-            Text(
-                text = summary,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = onCancel) {
-                Text(stringResource(R.string.sync_preview_cancel))
-            }
-            Button(onClick = onApply) {
-                Text(stringResource(R.string.sync_preview_apply))
             }
         }
     }

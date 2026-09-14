@@ -216,6 +216,7 @@ private fun AllLocalesSinglePane(
             searchQuery = searchQuery,
             onAddressClick = onAddressClick,
             dimens = dimens,
+            modifier = Modifier.weight(1f),
         )
     }
 }
@@ -255,7 +256,7 @@ private fun AllLocalesTwoPane(
                 modifier = Modifier.padding(horizontal = dimens.spacingLg, vertical = dimens.spacingXs)
             )
             if (locales.isEmpty() && searchQuery.isNotBlank()) {
-                EmptyLocales(query = searchQuery)
+                EmptyLocales(query = searchQuery, modifier = Modifier.weight(1f))
             } else {
                 LazyColumn(
                     contentPadding = PaddingValues(
@@ -265,6 +266,7 @@ private fun AllLocalesTwoPane(
                         bottom = dimens.scrollBottomPadding,
                     ),
                     verticalArrangement = Arrangement.spacedBy(10.dp * rs()),
+                    modifier = Modifier.weight(1f),
                 ) {
                     itemsIndexed(
                         locales,
@@ -440,27 +442,30 @@ private fun CountAndGrid(
     searchQuery: String,
     onAddressClick: (String) -> Unit,
     dimens: AppDimens,
+    modifier: Modifier = Modifier,
 ) {
-    Text(
-        text = stringResource(R.string.locales_count, locales.size),
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = dimens.spacingLg, vertical = dimens.spacingXs)
-    )
-    if (locales.isEmpty() && searchQuery.isNotBlank()) {
-        EmptyLocales(query = searchQuery)
-    } else {
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 340.dp),
-            contentPadding = PaddingValues(
-                start = dimens.spacingMd,
-                end = dimens.spacingMd,
-                top = dimens.spacingXs,
-                bottom = dimens.scrollBottomPadding,
-            ),
-            verticalArrangement = Arrangement.spacedBy(10.dp * rs()),
-            horizontalArrangement = Arrangement.spacedBy(10.dp * rs()),
-        ) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(R.string.locales_count, locales.size),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = dimens.spacingLg, vertical = dimens.spacingXs)
+        )
+        if (locales.isEmpty() && searchQuery.isNotBlank()) {
+            EmptyLocales(query = searchQuery, modifier = Modifier.weight(1f))
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 340.dp),
+                contentPadding = PaddingValues(
+                    start = dimens.spacingMd,
+                    end = dimens.spacingMd,
+                    top = dimens.spacingXs,
+                    bottom = dimens.scrollBottomPadding,
+                ),
+                verticalArrangement = Arrangement.spacedBy(10.dp * rs()),
+                horizontalArrangement = Arrangement.spacedBy(10.dp * rs()),
+                modifier = Modifier.weight(1f),
+            ) {
             itemsIndexed(
                 items = locales,
                 key = { _, local -> local.codigo + "|" + local.local },
@@ -490,14 +495,16 @@ private fun CountAndGrid(
                     LocaleCardContent(local = local, onAddressClick = onAddressClick)
                 }
             }
+            }
         }
     }
 }
 
 @Composable
-private fun EmptyLocales(query: String) {
+private fun EmptyLocales(query: String, modifier: Modifier = Modifier) {
     Box(
         modifier = Modifier
+            .then(modifier)
             .fillMaxWidth()
             .fillMaxHeight(),
         contentAlignment = Alignment.Center,

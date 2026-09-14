@@ -85,7 +85,7 @@ class RuteroManager(
             }
 
             pendingMasterFile = temp
-            Result.success(StagedMasterExcel(ruteros, byRoute.values.flatten(), sha256(bytes)))
+            Result.success(StagedMasterExcel(ruteros, byRoute.values.flatten()))
         } catch (e: Exception) {
             temp.delete()
             Result.failure(e)
@@ -105,30 +105,6 @@ class RuteroManager(
             Timber.e(e, "Error reemplazando Excel maestro")
             false
         }
-    }
-
-    suspend fun discardStagedMasterExcel() = withContext(Dispatchers.IO) {
-        pendingMasterFile?.delete()
-        pendingMasterPath.delete()
-        pendingMasterFile = null
-    }
-
-    suspend fun hasStagedMasterExcel(): Boolean = withContext(Dispatchers.IO) {
-        val file = pendingMasterFile ?: pendingMasterPath
-        if (!file.exists()) return@withContext false
-        if (System.currentTimeMillis() - file.lastModified() > STAGED_PREVIEW_MAX_AGE_MS) {
-            file.delete()
-            return@withContext false
-        }
-        true
-    }
-
-    suspend fun readStagedMasterExcel(): StagedMasterExcel? = withContext(Dispatchers.IO) {
-        if (!hasStagedMasterExcel()) return@withContext null
-        val file = pendingMasterFile ?: pendingMasterPath
-        val (ruteros, byRoute) = parser.parseAll(file).getOrNull() ?: return@withContext null
-        if (!isValidMasterData(ruteros, byRoute)) return@withContext null
-        StagedMasterExcel(ruteros, byRoute.values.flatten(), sha256(file.readBytes()))
     }
 
     /**
@@ -194,11 +170,6 @@ class RuteroManager(
         }
     }
 
-    private fun sha256(bytes: ByteArray): String = java.security.MessageDigest
-        .getInstance("SHA-256")
-        .digest(bytes)
-        .joinToString("") { "%02x".format(it) }
-
     /**
      * Carga la lista de ruteros desde Room.
      */
@@ -241,12 +212,9 @@ class RuteroManager(
 
 }
 
-private const val STAGED_PREVIEW_MAX_AGE_MS = 24 * 60 * 60 * 1000L
-
 data class StagedMasterExcel(
     val ruteros: List<String>,
     val entries: List<EntradaRuta>,
-    val contentHash: String,
 )
 
 internal fun isValidMasterImport(

@@ -345,7 +345,9 @@ fun PromotionsOverviewScreen(
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = onRefresh,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
         ) {
             if (isRefreshing && promotionsByBrand.isEmpty()) {
                 ShimmerPromotionsContent(modifier = Modifier.padding(top = 4.dp))
@@ -386,15 +388,16 @@ fun PromotionsOverviewScreen(
                     itemsIndexed(
                         items = filteredEntries,
                         key = { _, entry -> entry.first },
+                        contentType = { _, _ -> "brand_promotions" },
                     ) { index, (brand, promos) ->
                         var visible by remember { mutableStateOf(false) }
                         val animAlpha by animateFloatAsState(
                             targetValue = if (visible) 1f else 0f,
-                            animationSpec = tween(250, delayMillis = index * 50),
+                            animationSpec = tween(250, delayMillis = minOf(index, 8) * 40),
                         )
                         val animOffsetY by animateDpAsState(
                             targetValue = if (visible) 0.dp else 12.dp,
-                            animationSpec = tween(250, delayMillis = index * 50),
+                            animationSpec = tween(250, delayMillis = minOf(index, 8) * 40),
                         )
                         LaunchedEffect(Unit) { visible = true }
 
