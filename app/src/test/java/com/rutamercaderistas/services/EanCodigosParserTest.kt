@@ -29,10 +29,11 @@ class EanCodigosParserTest {
     }
 
     @Test
-    fun `asmode asset is mapped to ASMODE`() {
+    fun `brand assets are mapped correctly`() {
         assertTrue(brandFromFilename("ean_asmode.xlsx") == "ASMODE")
         assertTrue(brandFromFilename("ean_dix.xlsx") == "ASMODE")
         assertTrue(brandFromFilename("ean_cu.xlsx") == "CUK")
+        assertTrue(brandFromFilename("ean_bwild.xlsx") == "BWILD")
     }
 
     @Test
@@ -46,5 +47,18 @@ class EanCodigosParserTest {
 
         assertTrue("parser should succeed", result.isSuccess)
         assertTrue("should parse ASMODE products", (result.getOrNull() ?: 0) > 0)
+    }
+
+    @Test
+    fun `bwild xlsx parses products`() = runTest {
+        val dao = mockk<EanProductDao>(relaxed = true)
+        coEvery { dao.clearAll() } returns Unit
+        coEvery { dao.insertAll(any()) } returns Unit
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
+
+        val result = parser.loadFromFile("src/main/assets/ean_bwild.xlsx")
+
+        assertTrue("parser should succeed", result.isSuccess)
+        assertTrue("should parse BWILD products", (result.getOrNull() ?: 0) > 0)
     }
 }

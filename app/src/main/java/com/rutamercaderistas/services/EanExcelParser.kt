@@ -14,7 +14,7 @@ import java.io.InputStream
 import java.text.Normalizer
 import javax.inject.Inject
 
-const val EAN_DATA_VERSION = 26
+const val EAN_DATA_VERSION = 27
 
 // Prefijo/sufijo de los archivos Excel de catálogo EAN en assets.
 // Para agregar más productos basta con soltar otro archivo "ean*.xlsx"
@@ -41,6 +41,7 @@ private val EAN_FILE_BRANDS = mapOf(
     "asmode" to "ASMODE",
     "dix" to "ASMODE",
     "cu" to "CUK",
+    "bwild" to "BWILD",
 )
 
 // Alias de marca: la empresa ve algunas marcas con un nombre distinto al del
@@ -48,6 +49,7 @@ private val EAN_FILE_BRANDS = mapOf(
 // Se aplica al importar para que agrupen y se muestren con el nombre correcto.
 private val BRAND_ALIASES = mapOf(
     "lola" to "Kobbo",
+    "b fresh" to "BWILD",
 )
 
 // Marcas excluidas del catálogo EAN (ya no se comercializan).

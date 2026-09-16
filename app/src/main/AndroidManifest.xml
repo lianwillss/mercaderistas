@@ -39,6 +39,12 @@
             android:exported="false"
             android:theme="@style/Theme.RutaMercaderistas"/>
 
+        <activity
+            android:name="com.journeyapps.barcodescanner.CaptureActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.RutaMercaderistas"
+            tools:replace="screenOrientation,android:theme"/>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

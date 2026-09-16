@@ -102,6 +102,7 @@ import com.journeyapps.barcodescanner.BarcodeEncoder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.google.zxing.integration.android.IntentIntegrator
+
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.EanProductEntity
@@ -186,8 +187,12 @@ fun EanSearchScreen(
         ).show()
         val activity = context as? Activity
         if (activity != null) {
+            val integrator = IntentIntegrator(activity)
+                .setOrientationLocked(false)
+                .setPrompt(activity.getString(R.string.ean_scanning_cd))
+                .setBeepEnabled(true)
             scannerLauncher.launch(
-                IntentIntegrator(activity).createScanIntent()
+                integrator.createScanIntent()
             )
         }
     }
