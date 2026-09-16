@@ -38,3 +38,5 @@ jobs:
           files: app/build/outputs/apk/release/app-universal-release.apk
           generate_release_notes: true
           overwrite_files: true
+          draft: false
+          prerelease: false
