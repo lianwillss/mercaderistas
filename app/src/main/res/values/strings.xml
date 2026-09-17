@@ -344,6 +344,8 @@
     <string name="ean_scanning_cd">Iniciando escáner</string>
     <string name="ean_search_label">Buscar producto por nombre, EAN o SKU</string>
     <string name="ean_catalog_meta">Catálogo v%1$d · %2$d productos</string>
+    <string name="ean_empty_catalog">Catálogo vacío — toca para recargar</string>
+    <string name="ean_reload_catalog">Recargar catálogo</string>
     <string name="ean_no_results_hint">Revisa la ortografía o prueba con menos palabras.</string>
     <string name="ean_clear_search">Limpiar búsqueda</string>
     <string name="ean_recent_searches">Búsquedas recientes</string>

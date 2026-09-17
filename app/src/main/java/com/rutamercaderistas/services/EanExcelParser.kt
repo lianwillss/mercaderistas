@@ -91,6 +91,8 @@ class EanExcelParser @Inject constructor(
     private val eanProductDao: EanProductDao,
 ) {
 
+    private var lastDiagnostics: EanDiagnostics = EanDiagnostics()
+
     // Mapea columnas por NOMBRE de encabezado (no por posición fija), porque
     // distintos archivos "ean*.xlsx" pueden tener distinto orden de columnas.
     private data class ColumnMap(
@@ -203,10 +205,18 @@ class EanExcelParser @Inject constructor(
     ).count { it.isNotBlank() }
 
     private fun logDedupe(result: EanDedupeResult) {
-        if (result.duplicatesMerged > 0) {
-            Timber.i("EAN: %d duplicados fusionados; %d productos finales", result.duplicatesMerged, result.products.size)
+        val d = lastDiagnostics
+        if (result.duplicatesMerged > 0 || d.invalidEanCleared > 0 || d.emptyFiles > 0) {
+            Timber.i(
+                "EAN: %d productos finales; %d duplicados fusionados; %d EAN inválidos limpiados; %d archivos vacíos",
+                result.products.size, result.duplicatesMerged, d.invalidEanCleared, d.emptyFiles
+            )
+        } else {
+            Timber.i("EAN: %d productos finales", result.products.size)
         }
     }
+
+    fun getLastDiagnostics(): EanDiagnostics = lastDiagnostics
 
     private fun parse(inputStream: InputStream, defaultBrand: String? = null): List<EanProductEntity> {
         val workbook = XSSFWorkbook(inputStream)
@@ -344,6 +354,7 @@ class EanExcelParser @Inject constructor(
         // Validación silenciosa: EAN debe ser 8-14 dígitos numéricos; si es inválido se limpia sin mostrar error
         if (eanPrincipal.isNotBlank() && (!eanPrincipal.all { it.isDigit() } || eanPrincipal.length !in 8..14)) {
             Timber.d("EAN inválido descartado: %s (%s)", eanPrincipal, descripcion)
+            lastDiagnostics = lastDiagnostics.copy(invalidEanCleared = lastDiagnostics.invalidEanCleared + 1)
             eanPrincipal = ""
         }
 
@@ -402,6 +413,7 @@ class EanExcelParser @Inject constructor(
     // Cargar desde assets (todos los archivos "ean_*.xlsx" se combinan)
     suspend fun loadFromAssets(): Result<Int> {
         return try {
+            lastDiagnostics = EanDiagnostics()
             val assetFiles = (context.assets.list("") ?: emptyArray())
                 .filter {
                     it.startsWith(EAN_ASSET_PREFIX, ignoreCase = true) &&
@@ -414,9 +426,12 @@ class EanExcelParser @Inject constructor(
             val all = mutableListOf<EanProductEntity>()
             for (file in assetFiles) {
                 try {
-                    context.assets.open(file).use { stream ->
-                        all.addAll(parse(stream, brandFromFilename(file)))
+                    val parsed = context.assets.open(file).use { stream -> parse(stream, brandFromFilename(file)) }
+                    if (parsed.isEmpty()) {
+                        lastDiagnostics = lastDiagnostics.copy(emptyFiles = lastDiagnostics.emptyFiles + 1)
+                        Timber.w("EAN: archivo vacío o sin productos: %s", file)
                     }
+                    all.addAll(parsed)
                 } catch (e: Exception) {
                     Timber.e(e, "Error parseando catálogo EAN: $file")
                 }
@@ -490,4 +505,9 @@ class EanExcelParser @Inject constructor(
 data class EanDedupeResult(
     val products: List<EanProductEntity>,
     val duplicatesMerged: Int,
+)
+
+data class EanDiagnostics(
+    val invalidEanCleared: Int = 0,
+    val emptyFiles: Int = 0,
 )

@@ -262,7 +262,10 @@ fun EanSearchScreen(
                             text = state.progress,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.semantics { contentDescription = loadingCd },
+                            modifier = Modifier.semantics {
+                                contentDescription = loadingCd
+                                liveRegion = LiveRegionMode.Polite
+                            },
                         )
                     }
                 }
@@ -458,9 +461,34 @@ fun EanSearchScreen(
                             )
                         }
 
-                    if (value.query.isNotBlank() && value.results.isEmpty()) {
+                    if (value.results.isEmpty()) {
                         Box(modifier = Modifier.weight(1f)) {
-                            EanEmptyState(query = value.query, onClear = { viewModel.clearQuery() })
+                            if (value.query.isBlank()) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(dimens.spacingXl),
+                                    verticalArrangement = Arrangement.Center,
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.ean_empty_catalog),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.semantics { heading() },
+                                    )
+                                    Spacer(modifier = Modifier.height(dimens.spacingMd))
+                                    Button(
+                                        onClick = { viewModel.forceReload() },
+                                        modifier = Modifier.heightIn(min = dimens.touchMin),
+                                    ) {
+                                        Text(stringResource(R.string.ean_reload_catalog))
+                                    }
+                                }
+                            } else {
+                                EanEmptyState(query = value.query, onClear = { viewModel.clearQuery() })
+                            }
                         }
                     } else {
                         val brandsInResults = remember(value.results) {
@@ -479,39 +507,47 @@ fun EanSearchScreen(
                             ) {
                                 if (brandsInResults.size > 1) {
                                     item(key = "ean_brand_all") {
-                                        FilterChip(
-                                            selected = brandFilter == null,
-                                            onClick = { brandFilter = null },
-                                            label = { Text(stringResource(R.string.todas)) },
-                                        )
+                                        Box(modifier = Modifier.heightIn(min = dimens.touchMin)) {
+                                            FilterChip(
+                                                selected = brandFilter == null,
+                                                onClick = { brandFilter = null },
+                                                label = { Text(stringResource(R.string.todas)) },
+                                            )
+                                        }
                                     }
                                     items(brandsInResults, key = { "ean_brand_$it" }) { brandKey ->
-                                        FilterChip(
-                                            selected = brandFilter == brandKey,
-                                            onClick = { brandFilter = if (brandFilter == brandKey) null else brandKey },
-                                            label = {
-                                                Text(
-                                                    if (brandKey == NO_BRAND_KEY) stringResource(R.string.ean_sin_marca)
-                                                    else brandKey
-                                                )
-                                            },
-                                        )
+                                        Box(modifier = Modifier.heightIn(min = dimens.touchMin)) {
+                                            FilterChip(
+                                                selected = brandFilter == brandKey,
+                                                onClick = { brandFilter = if (brandFilter == brandKey) null else brandKey },
+                                                label = {
+                                                    Text(
+                                                        if (brandKey == NO_BRAND_KEY) stringResource(R.string.ean_sin_marca)
+                                                        else brandKey
+                                                    )
+                                                },
+                                            )
+                                        }
                                     }
                                 }
                                 if (cajasInResults.isNotEmpty()) {
                                     item(key = "ean_caja_all") {
-                                        FilterChip(
-                                            selected = cajaFilter == null,
-                                            onClick = { cajaFilter = null },
-                                            label = { Text("Todas cajas") },
-                                        )
+                                        Box(modifier = Modifier.heightIn(min = dimens.touchMin)) {
+                                            FilterChip(
+                                                selected = cajaFilter == null,
+                                                onClick = { cajaFilter = null },
+                                                label = { Text("Todas cajas") },
+                                            )
+                                        }
                                     }
                                     items(cajasInResults, key = { "ean_caja_$it" }) { caja ->
-                                        FilterChip(
-                                            selected = cajaFilter == caja,
-                                            onClick = { cajaFilter = if (cajaFilter == caja) null else caja },
-                                            label = { Text("CAJA ×$caja") },
-                                        )
+                                        Box(modifier = Modifier.heightIn(min = dimens.touchMin)) {
+                                            FilterChip(
+                                                selected = cajaFilter == caja,
+                                                onClick = { cajaFilter = if (cajaFilter == caja) null else caja },
+                                                label = { Text("CAJA ×$caja") },
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -738,6 +774,7 @@ private fun EanProductCard(
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.semantics { heading() },
             )
 
             if (product.eanPrincipal.isNotBlank()) {
@@ -758,7 +795,7 @@ private fun EanProductCard(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            Column(modifier = Modifier.semantics(mergeDescendants = true) {}) {
+            Column {
                 if (product.eanPrincipal.isNotBlank()) {
                     Text(
                         text = stringResource(R.string.ean_codigo_label, product.eanPrincipal),

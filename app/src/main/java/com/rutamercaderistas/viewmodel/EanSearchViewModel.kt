@@ -182,8 +182,13 @@ class EanSearchViewModel @Inject constructor(
     }
 
     fun onBarcodeScanned(barcode: String) {
-        _uiState.value = EanSearchUiState.BarcodeResult(barcode)
-        onQueryChange(barcode)
+        val digits = barcode.filter { it.isDigit() }
+        val normalized = when {
+            digits.length == 12 && digits.all { it.isDigit() } -> "0$digits"
+            else -> barcode
+        }
+        _uiState.value = EanSearchUiState.BarcodeResult(normalized)
+        onQueryChange(normalized)
     }
 
     fun clearQuery() {
