@@ -59,12 +59,18 @@ class EanSearchViewModel @Inject constructor(
         loadDatabase()
     }
 
+    private val _brandCounts = MutableStateFlow<Map<String, Int>>(emptyMap())
+    val brandCounts: StateFlow<Map<String, Int>> = _brandCounts
+
     private fun loadDatabase() {
         debounceJob?.cancel()
         viewModelScope.launch {
             _uiState.value = EanSearchUiState.Loading("Cargando base de datos EAN...")
+            val currentHash = eanExcelParser.computeAssetsHash()
+            val storedHash = eanExcelParser.getEanAssetsHash()
             val needsImport = eanProductDao.count() == 0 ||
                 eanExcelParser.getEanDataVersion() < EAN_DATA_VERSION ||
+                (currentHash.isNotBlank() && storedHash != currentHash) ||
                 eanProductDao.hasUnnormalized() > 0
 
             if (needsImport) {
@@ -72,7 +78,9 @@ class EanSearchViewModel @Inject constructor(
                 val result = eanExcelParser.loadFromAssets()
                 result.onSuccess { count ->
                     eanExcelParser.setEanDataVersion(EAN_DATA_VERSION)
+                    if (currentHash.isNotBlank()) eanExcelParser.setEanAssetsHash(currentHash)
                     _catalogMeta.value = EAN_DATA_VERSION to count
+                    refreshBrandCounts()
                     _uiState.value = EanSearchUiState.Loading("Base de datos lista ($count productos)")
                 }.onFailure { e ->
                     _uiState.value = EanSearchUiState.Error("Error cargando base de datos: ${e.message}")
@@ -80,9 +88,18 @@ class EanSearchViewModel @Inject constructor(
                 }
             } else {
                 _catalogMeta.value = EAN_DATA_VERSION to eanProductDao.count()
+                refreshBrandCounts()
             }
             observeSearch("")
         }
+    }
+
+    private suspend fun refreshBrandCounts() {
+        try {
+            val all = eanProductDao.getAll().first()
+            _brandCounts.value = all.groupBy { it.marca.ifBlank { "Sin marca" } }
+                .mapValues { it.value.size }
+        } catch (_: Exception) {}
     }
 
     private fun observeSearch(query: String) {
@@ -100,8 +117,33 @@ class EanSearchViewModel @Inject constructor(
             flow {
                 val candidates = tokens.flatMap { tok -> eanProductDao.searchCandidates(tok).first() }
                     .distinctBy { it.id }
+                val queryTrim = query.trim()
+                val queryTrimZero = queryTrim.trimStart('0')
+                val queryCompact = compactNorm(query)
                 val result = candidates
                     .filter { e -> tokens.all { t -> e.containsToken(t) } }
+                    .sortedWith(
+                        compareByDescending<EanProductEntity> { e ->
+                            // 1) EAN exacto (ignorando ceros a la izquierda)
+                            val eanZero = e.eanPrincipal.trimStart('0')
+                            if (e.eanPrincipal == queryTrim || (queryTrimZero.isNotEmpty() && eanZero == queryTrimZero) || e.codigoBarra.trimStart('0') == queryTrimZero) 3 else 0
+                        }.thenByDescending { e ->
+                            // 2) SKU exacto
+                            if (e.codCencosud == queryTrim || e.codProveedor == queryTrim) 2 else 0
+                        }.thenByDescending { e ->
+                            // 3) Marca exacta (ej: "cuk" == "cuk", "japi jane" compact)
+                            if (e.marcaNorm == queryCompact || e.marcaNormNospace == queryCompact) 2 else 0
+                        }.thenByDescending { e ->
+                            // 4) Todos los tokens golpean la marca
+                            val brandHits = tokens.count { t -> e.marcaNorm.contains(t) || e.marcaNormNospace.contains(t) }
+                            when {
+                                brandHits == tokens.size && tokens.isNotEmpty() -> 1
+                                brandHits > 0 -> 0
+                                else -> -1
+                            }
+                        }.thenBy { e -> e.marca }
+                         .thenBy { e -> e.descripcionProducto }
+                    )
                     .take(50)
                 emit(result)
             }
@@ -159,7 +201,9 @@ class EanSearchViewModel @Inject constructor(
             val result = eanExcelParser.loadFromAssets()
             result.onSuccess { count ->
                 eanExcelParser.setEanDataVersion(EAN_DATA_VERSION)
+                eanExcelParser.setEanAssetsHash(eanExcelParser.computeAssetsHash())
                 _catalogMeta.value = EAN_DATA_VERSION to count
+                refreshBrandCounts()
                 _uiState.value = EanSearchUiState.Loading("Catálogo actualizado ($count productos)")
                 observeSearch("")
             }.onFailure { e ->

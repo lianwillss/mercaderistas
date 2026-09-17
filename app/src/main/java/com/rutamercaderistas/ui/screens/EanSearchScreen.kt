@@ -466,37 +466,60 @@ fun EanSearchScreen(
                         val brandsInResults = remember(value.results) {
                             value.results.map { it.marca.ifBlank { NO_BRAND_KEY } }.distinct()
                         }
+                        val cajasInResults = remember(value.results) {
+                            value.results.mapNotNull { it.conversion.trim().takeIf { c -> c.isNotBlank() } }.distinct().sortedBy { it.toIntOrNull() ?: Int.MAX_VALUE }
+                        }
                         var brandFilter by remember(value.query) { mutableStateOf<String?>(null) }
-                        if (brandsInResults.size > 1) {
+                        var cajaFilter by remember(value.query) { mutableStateOf<String?>(null) }
+                        if (brandsInResults.size > 1 || cajasInResults.isNotEmpty()) {
                             LazyRow(
                                 modifier = Modifier.fillMaxWidth(),
                                 contentPadding = PaddingValues(vertical = dimens.spacingXs),
                                 horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
                             ) {
-                                item(key = "ean_brand_all") {
-                                    FilterChip(
-                                        selected = brandFilter == null,
-                                        onClick = { brandFilter = null },
-                                        label = { Text(stringResource(R.string.todas)) },
-                                    )
+                                if (brandsInResults.size > 1) {
+                                    item(key = "ean_brand_all") {
+                                        FilterChip(
+                                            selected = brandFilter == null,
+                                            onClick = { brandFilter = null },
+                                            label = { Text(stringResource(R.string.todas)) },
+                                        )
+                                    }
+                                    items(brandsInResults, key = { "ean_brand_$it" }) { brandKey ->
+                                        FilterChip(
+                                            selected = brandFilter == brandKey,
+                                            onClick = { brandFilter = if (brandFilter == brandKey) null else brandKey },
+                                            label = {
+                                                Text(
+                                                    if (brandKey == NO_BRAND_KEY) stringResource(R.string.ean_sin_marca)
+                                                    else brandKey
+                                                )
+                                            },
+                                        )
+                                    }
                                 }
-                                items(brandsInResults, key = { "ean_brand_$it" }) { brandKey ->
-                                    FilterChip(
-                                        selected = brandFilter == brandKey,
-                                        onClick = { brandFilter = if (brandFilter == brandKey) null else brandKey },
-                                        label = {
-                                            Text(
-                                                if (brandKey == NO_BRAND_KEY) stringResource(R.string.ean_sin_marca)
-                                                else brandKey
-                                            )
-                                        },
-                                    )
+                                if (cajasInResults.isNotEmpty()) {
+                                    item(key = "ean_caja_all") {
+                                        FilterChip(
+                                            selected = cajaFilter == null,
+                                            onClick = { cajaFilter = null },
+                                            label = { Text("Todas cajas") },
+                                        )
+                                    }
+                                    items(cajasInResults, key = { "ean_caja_$it" }) { caja ->
+                                        FilterChip(
+                                            selected = cajaFilter == caja,
+                                            onClick = { cajaFilter = if (cajaFilter == caja) null else caja },
+                                            label = { Text("CAJA ×$caja") },
+                                        )
+                                    }
                                 }
                             }
                         }
-                        val rows = remember(value.results, brandFilter) {
+                        val rows = remember(value.results, brandFilter, cajaFilter) {
                             buildList<EanResultRow> {
                                 value.results
+                                    .filter { cajaFilter == null || it.conversion.trim() == cajaFilter }
                                     .groupBy { it.marca.ifBlank { "\u0000" } }
                                     .forEach { (brandKey, products) ->
                                         if (brandFilter != null && brandKey != brandFilter) return@forEach
@@ -564,16 +587,29 @@ fun EanSearchScreen(
 
                     }
 
+                    val brandCounts by viewModel.brandCounts.collectAsStateWithLifecycle()
                     catalogMeta?.let { (version, count) ->
-                        Text(
-                            text = stringResource(R.string.ean_catalog_meta, version, count),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = dimens.spacingXs),
-                        )
+                        val breakdown = brandCounts.entries.sortedByDescending { it.value }
+                            .take(6).joinToString(" · ") { "${it.key} ${it.value}" }
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(top = dimens.spacingXs),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.ean_catalog_meta, version, count),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                            )
+                            if (breakdown.isNotBlank()) {
+                                Text(
+                                    text = breakdown,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                    textAlign = TextAlign.Center,
+                                )
+                            }
+                        }
                     }
 
                     }
@@ -753,12 +789,26 @@ private fun EanProductCard(
                         )
                     }
                     if (product.conversion.isNotBlank()) {
-                        EanCodeChip(
-                            label = "CAJA",
-                            value = product.conversion,
-                            query = query,
-                            color = MaterialTheme.colorScheme.tertiary,
-                        )
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(MaterialTheme.colorScheme.tertiaryContainer)
+                                .padding(horizontal = 10.dp, vertical = 5.dp),
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "CAJA",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "×${product.conversion}",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                )
+                            }
+                        }
                     }
                     if (product.codProveedor.isNotBlank() && product.codProveedor.trim() != "19") {
                         EanCodeChip(

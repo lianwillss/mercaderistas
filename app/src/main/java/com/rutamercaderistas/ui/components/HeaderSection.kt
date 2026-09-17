@@ -102,7 +102,7 @@ private val TWO_PI = (2 * PI).toFloat()
 @Composable
 private fun rememberFechaHoy(): String? {
     val formatter = remember {
-        DateTimeFormatter.ofPattern("EEEE d", Locale("es", "CL"))
+        DateTimeFormatter.ofPattern("EEEE d", Locale.forLanguageTag("es-CL"))
     }
     return remember { LocalDate.now().format(formatter).replaceFirstChar { it.uppercase() } }
 }

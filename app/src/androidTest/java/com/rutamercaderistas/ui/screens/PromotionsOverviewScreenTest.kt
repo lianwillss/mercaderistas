@@ -1,8 +1,11 @@
 package com.rutamercaderistas.ui.screens
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performScrollToNode
 import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.ui.theme.MercaderistasTheme
@@ -64,5 +67,30 @@ class PromotionsOverviewScreenTest {
             }
         }
         composeTestRule.onNodeWithText("CUK").assertIsDisplayed()
+    }
+
+    @Test
+    fun lastBrandCanBeReachedAfterScrolling() {
+        val testData = (0 until 20).associate { index ->
+            "BRAND_$index" to listOf(
+                PromotionEntity(
+                    brand = "BRAND_$index",
+                    chain = "Jumbo",
+                    productName = "Producto $index",
+                    price = "$1.000",
+                ),
+            )
+        }
+        composeTestRule.setContent {
+            MercaderistasTheme {
+                PromotionsOverviewScreen(
+                    promotionsByBrand = testData,
+                    onClose = {},
+                )
+            }
+        }
+
+        composeTestRule.onRoot().performScrollToNode(hasText("BRAND_19"))
+        composeTestRule.onNodeWithText("BRAND_19").assertIsDisplayed()
     }
 }

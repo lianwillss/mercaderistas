@@ -252,7 +252,7 @@ private fun formatSyncHistoryDate(timestamp: Long): String {
         val dt = java.time.Instant.ofEpochMilli(timestamp)
             .atZone(java.time.ZoneId.systemDefault())
             .toLocalDateTime()
-        dt.format(java.time.format.DateTimeFormatter.ofPattern("d MMM, HH:mm", java.util.Locale("es")))
+        dt.format(java.time.format.DateTimeFormatter.ofPattern("d MMM, HH:mm", java.util.Locale.forLanguageTag("es")))
     } catch (_: Exception) {
         ""
     }

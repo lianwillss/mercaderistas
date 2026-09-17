@@ -54,7 +54,7 @@ object ApkDownloader {
                 return@withContext DownloadResult.Error("Error de servidor (HTTP ${response.code})")
             }
 
-            val body = response.body ?: return@withContext DownloadResult.Error("Respuesta vacía del servidor")
+            val body = response.body
             val contentLength = body.contentLength()
             Timber.i("APK Content-Length: %d", contentLength)
 
@@ -98,7 +98,7 @@ object ApkDownloader {
                 apkFile.absolutePath,
                 PackageManager.GET_ACTIVITIES
             )
-            info?.versionCode ?: 0
+            info?.longVersionCode?.toInt() ?: 0
         } catch (e: Exception) {
             Timber.w(e, "Error leyendo versionCode del APK descargado")
             0

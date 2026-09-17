@@ -35,7 +35,7 @@ object UpdateChecker {
                 for (i in 0 until assets.length()) {
                     val asset = assets.optJSONObject(i)
                         if (asset?.optString("name", "") == "app-universal-release.apk") {
-                        apkUrl = asset.optString("browser_download_url", null)
+                        apkUrl = asset.optString("browser_download_url").takeIf { it.isNotBlank() }
                         break
                     }
                 }

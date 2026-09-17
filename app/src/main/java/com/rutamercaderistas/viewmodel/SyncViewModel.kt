@@ -435,6 +435,12 @@ class SyncViewModel @Inject constructor(
             if (changes.added.isNotEmpty()) add(app.getString(R.string.sync_cambios_agregados, changes.added.size))
             if (changes.removed.isNotEmpty()) add(app.getString(R.string.sync_cambios_eliminados, changes.removed.size))
             if (changes.moved.isNotEmpty()) add(app.getString(R.string.sync_cambios_movidos, changes.moved.size))
+            if (changes.changedAddress.isNotEmpty()) {
+                add(app.getString(R.string.sync_cambios_direcciones, changes.changedAddress.size))
+            }
+            if (changes.changedBrands.isNotEmpty()) {
+                add(app.getString(R.string.sync_cambios_marcas, changes.changedBrands.size))
+            }
         }.joinToString(" · ")
     }
 

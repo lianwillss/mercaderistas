@@ -30,6 +30,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -182,7 +187,7 @@ fun PdfViewerScreen(
                     }
                 }
                 pdfFile != null -> {
-                    AndroidView(
+                        AndroidView(
                         factory = { ctx ->
                             PDFView(ctx, null).apply {
                                 fromFile(pdfFile)
@@ -210,7 +215,9 @@ fun PdfViewerScreen(
                                 setMaxZoom(4f)
                             }
                         },
-                        modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom)),
                     )
 
                     Box(
@@ -382,5 +389,4 @@ fun renderThumbnail(renderer: PdfRenderer, pageIndex: Int): Bitmap {
     page.close()
     return bmp
 }
-
 

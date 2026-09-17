@@ -442,6 +442,12 @@ private fun SyncChangesBanner(changes: PlanillaChanges, onDismiss: () -> Unit) {
         if (changes.added.isNotEmpty()) add(stringResource(R.string.sync_cambios_agregados, changes.added.size))
         if (changes.removed.isNotEmpty()) add(stringResource(R.string.sync_cambios_eliminados, changes.removed.size))
         if (changes.moved.isNotEmpty()) add(stringResource(R.string.sync_cambios_movidos, changes.moved.size))
+        if (changes.changedAddress.isNotEmpty()) {
+            add(stringResource(R.string.sync_cambios_direcciones, changes.changedAddress.size))
+        }
+        if (changes.changedBrands.isNotEmpty()) {
+            add(stringResource(R.string.sync_cambios_marcas, changes.changedBrands.size))
+        }
     }.joinToString(" · ")
     Row(
         modifier = Modifier

@@ -1,47 +1,67 @@
 # Mercaderistas — Guía del repo
 
-App Android (Kotlin + Compose + Hilt + Room) de rutas para mercaderistas: descarga Excel de Drive, organiza locales por día, muestra promociones y abre catálogos PDF por marca (OCR). Detalles de arquitectura en `ARQUITECTURA.md` (algunas secciones están desactualizadas; el código manda).
+App Android de rutas para mercaderistas: Kotlin, Compose, Hilt, Room y WorkManager. El código manda sobre `ARQUITECTURA.md`/`SPEC.md` si difieren.
 
 ## Comandos
 
-- No hay Java en el PATH. Usar siempre:
+- Java no está en `PATH`; anteponer siempre:
   `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew <task>`
-- Build + tests (verificación estándar): `./gradlew :app:testDebugUnitTest :app:assembleRelease`
-- Test único: `./gradlew :app:testDebugUnitTest --tests "com.rutamercaderistas.viewmodel.RouteViewModelTest"`
-- No existe `rg` → usar `grep`.
-- Tests JVM puros (JUnit4 + MockK + coroutines-test), **sin Robolectric**: no se puede resolver `R.string` real en tests.
+- Verificación estándar, en dos comandos para aislar carreras de tests:
+  `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew --no-parallel :app:testDebugUnitTest`
+  y luego `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleRelease`.
+- Test enfocado: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:testDebugUnitTest --tests "com.rutamercaderistas.viewmodel.RouteViewModelTest"`.
+- Tests de dispositivo Compose: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:connectedDebugAndroidTest`; requieren un dispositivo/emulador conectado.
+- Toolchain verificada: Gradle 9.6, AGP 9.2.1, Kotlin 2.4.0, Compose BOM 2025.06.00, Java 17.
+- Este entorno no tiene `rg`; usar `grep`/Glob para búsquedas.
 
-## Release (CI)
+## Arquitectura
 
-- CI `.github/workflows/release.yml` corre solo al pushear un tag `v*`; crea la release en GitHub con `app/build/outputs/apk/release/app-universal-release.apk`.
-- Acciones fijadas por SHA — no cambiar a tags flotantes. `action-gh-release` v3 usa `overwrite_files` (ya no `overwrite`).
-- Firma: `keystore.properties` (gitignored, texto plano) para local; CI usa `KEYSTORE_BASE64`/`KEYSTORE_PASSWORD`/`KEY_ALIAS`/`KEY_PASSWORD` como secrets + `KEYSTORE_PATH` env.
-- La verdad de versión es `versionCode`/`versionName` en `app/build.gradle` (`version.json` se eliminó por stale: nada lo usaba).
+- Único módulo `:app`; la entrada es `MainActivity`, la aplicación Hilt es `MercaderistasApp`.
+- Estado de pantalla: ViewModels + `StateFlow`; Compose recolecta con `collectAsStateWithLifecycle()`.
+- Datos persistentes: Room (`AppDatabase`); preferencias: DataStore (`PreferencesRepository`).
+- Sincronización en segundo plano: WorkManager + `SyncWorker`/`PromotionRefreshWorker`.
+- La navegación principal usa `NavigationSuiteScaffold`; `AppWindowWidth` centraliza Compact `<600dp`, Medium `<840dp` y Expanded.
 
-## Testing — races de coroutines
+## Tests
 
-- Varios ViewModels usan `withContext(Dispatchers.Default)` (ej. `observeEntries` en `RouteViewModel`). `advanceUntilIdle()` **no espera** a esos threads reales → tests flaky (`UncaughtExceptionsBeforeTest`).
-- Patrón a usar: helper `awaitOnMain { condition }` (poll con `advanceUntilIdle()` + `Thread.sleep(10)`, deadline 5s), ya presente en `RouteViewModelTest`. Úsalo tras cada llamada que dispare `observeEntries` (selectRoute, loadInitialData, setCurrentDay).
-- ViewModels que emiten strings de UI inyectan `@ApplicationContext Context` (RouteViewModel) o son `AndroidViewModel` (SyncViewModel). En tests, mockear `context.getString(...)` con el valor literal esperado.
+- Tests locales son JUnit4 + MockK + `kotlinx-coroutines-test`, sin Robolectric; no asumir `R.string` real en `src/test` y mockear `Context.getString()` cuando corresponda.
+- `RouteViewModel` calcula parte del estado en `Dispatchers.Default`; `advanceUntilIdle()` no espera esos hilos reales. Usar el helper `awaitOnMain { ... }` de `RouteViewModelTest` después de `selectRoute`, `loadInitialData` y `setCurrentDay`.
+- La suite puede producir `UncaughtExceptionsBeforeTest` por carreras globales de `Dispatchers.Main`; ejecutar con `--no-parallel` y repetir un test aislado antes de atribuirlo al cambio.
+- Las pruebas instrumentadas no se ejecutan sin dispositivo; agregar cobertura de scroll ahí, no en tests JVM.
 
-## PDF de marcas (delicado)
+## Sync del rutero
 
-- Manual empaquetado: `app/src/main/res/raw/manual_marcas.pdf` (107 págs, "MANUAL 4.0"). `manual.4.0.pdf` en la raíz es la fuente sin trackear; al actualizar, reemplazar el raw y reverificar páginas.
-- `models/BrandReference.kt`: mapa `brandPages` (marca → página) + `getPageRange()`. Los rangos se calculan desde los inicios ordenados y el fallback recorta al siguiente inicio conocido (`knownBrandStarts`) — **no** `page..page+PAGES_PER_BRAND`. Nunca ampliar un rango para que invada marcas vecinas (bug histórico: COMERCIAL SZ 46 invadía CORRALES DEL SUR/CUK).
-- La normalización quita tildes/espacios (`normalizeMarca`). Si una marca del Excel no matchea el mapa, agregar alias en `brandPages` (ej. "MORETTA" → misma página que "MORETTA WINES").
-- Para verificar contra el Excel real: `curl -sL "<DRIVE_EXPORT_URL de Constants.kt>"` y leer con `openpyxl` (hoja "RUTA RUTERO", columna CLIENTE).
+- URLs fuente están en `Constants.kt`: `DRIVE_EXPORT_URL` para el XLSX del rutero y `PROMOTIONS_CSV_URL` para promociones.
+- `RuteroManager` serializa sync con `withSyncLock`, escribe a temporal, valida estructura, reemplaza atómicamente y luego `createIndex()` actualiza Room dentro de una transacción.
+- `SyncViewModel` aplica automáticamente un Excel válido; no existe confirmación Aplicar/Cancelar. El hash/ETag y la hora de último sync se guardan solo después de indexar correctamente.
+- La validación estructural rechaza archivo vacío/sin rutas/campos esenciales; no convertir validaciones de filas en banners bloqueantes sin una petición explícita.
+- Al cambiar el sync, preservar la recarga de la ruta activa y el cálculo del diff (agregados, eliminados, movidos, direcciones y marcas).
 
-## Sync de datos
+## Catálogo EAN
 
-- Excel desde Google Sheets (URL en `Constants.DRIVE_EXPORT_URL`). Parser (Apache POI SAX) busca la hoja por nombre "RUTA RUTERO" o por encabezados (fix v11.53) — el nombre puede variar entre versiones del archivo.
-- Solo `es` (resConfigs "es"). Strings siempre en `app/src/main/res/values/strings.xml`, nunca hardcodeados.
+- Todos los assets `app/src/main/assets/ean*.xlsx` se combinan automáticamente; si el nombre no es obvio, agregarlo a `EAN_FILE_BRANDS` en `EanExcelParser.kt`.
+- Al agregar/cambiar un asset EAN, incrementar `EAN_DATA_VERSION` para forzar la reimportación en instalaciones existentes y agregar una prueba del archivo/mapeo.
+- Deduplicación: clave EAN, fallback SKU Cencosud; conserva la fila más completa y fusiona campos no vacíos. No perder ceros iniciales de códigos.
+- Catálogos actuales incluyen ASMODE, DIX y CUK; los Excel originales de la raíz son fuentes locales y no se deben commitear salvo petición explícita.
 
-## Diseño
+## PDF de marcas
 
-Ver `SPEC.md` (spec completo) y `ui/theme/Type.kt`.
+- El manual empaquetado está en `app/src/main/res/raw/manual_marcas.pdf` (107 páginas, MANUAL 4.0); `manual.4.0.pdf` en la raíz es fuente local no trackeada.
+- `models/BrandReference.kt` contiene `brandPages` y calcula rangos con inicios ordenados/`knownBrandStarts`; nunca usar `page..page+PAGES_PER_BRAND` ni invadir la marca siguiente.
+- Si una marca del Excel no coincide tras normalización, agregar alias en `brandPages` (ejemplo: MORETTA → MORETTA WINES).
 
-- Inter (bundled) como fuente; **evitar Roboto**. Nada de `fontSize`/`fontWeight` hardcodeados en composables — heredar de `MaterialTheme.typography`.
-- No ALL CAPS; nombres de locales en natural case.
-- Solo light theme (sin dark mode) → no agregar previews `NIGHT_YES`.
-- `touchMin = 48.dp` en `AppDimens` (usarlo para targets táctiles, no 44dp fijo).
-- Colores por cadena en `Color.kt`. M3 estándar: `Theme.kt` solo define `lightColorScheme`.
+## Compose y diseño
+
+- Solo tema claro; Inter está empaquetada. Usar `MaterialTheme.colorScheme`, `.typography`, `.shapes` y `AppDimens`; no introducir `fontSize`/`fontWeight` ni colores crudos en nuevos composables.
+- `touchMin = 48.dp`; no reducir targets interactivos para compactar la interfaz.
+- La densidad visual se limita al equivalente lógico de 480dpi y la escala de fuente a 1.3x para conservar información en teléfonos con zoom alto.
+- Scroll: aplicar insets una sola vez; el `Scaffold` reserva barra/sistema, las listas usan `scrollBottomPadding`, keys estables y `contentType`. No añadir `paddingBottom` arbitrario ni cambiar la altura del viewport durante el gesto.
+- Si se modifica una lista, probar último elemento, texto largo, zoom alto, navegación gestual y navegación de tres botones.
+
+## Release y Git
+
+- La versión oficial es `versionCode`/`versionName` en `app/build.gradle`; cada release debe subir ambos y usar un tag `v*` nuevo.
+- `.github/workflows/release.yml` corre solo al hacer push de un tag `v*` y publica `app-universal-release.apk`.
+- Acciones CI están fijadas por SHA; no cambiar a tags flotantes. `softprops/action-gh-release` usa `overwrite_files`.
+- Firma local: `keystore.properties` (gitignored). CI: `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`, `KEYSTORE_PATH`.
+- No incluir secretos ni los Excel fuente de la raíz en commits. No hacer commit, tag o push salvo petición explícita.

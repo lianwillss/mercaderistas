@@ -11,16 +11,22 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Scaffold
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ShoppingBag
+import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.outlined.Badge
+import androidx.compose.material.icons.outlined.ShoppingBag
+import androidx.compose.material.icons.outlined.Storefront
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
@@ -39,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.core.view.WindowCompat
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -61,8 +68,6 @@ import com.rutamercaderistas.ui.navigation.ManualRoute
 import com.rutamercaderistas.ui.navigation.PromotionsRoute
 import com.rutamercaderistas.ui.navigation.SettingsRoute
 import androidx.compose.ui.platform.LocalConfiguration
-import com.rutamercaderistas.ui.components.AppBottomBar
-import com.rutamercaderistas.ui.components.AppNavigationRail
 import com.rutamercaderistas.ui.components.BottomBarKey
 import com.rutamercaderistas.ui.components.OnboardingOverlay
 import com.rutamercaderistas.models.DiaSemana
@@ -153,49 +158,77 @@ fun MainScreen(
         }
     }
 
-    val windowWidth = appWindowWidth(LocalConfiguration.current.screenWidthDp.dp)
-    val isCompactWidth = windowWidth == AppWindowWidth.Compact
-
     Box(modifier = modifier.fillMaxSize()) {
-        Scaffold(
-            bottomBar = if (isCompactWidth) {
-                {
-                    AppBottomBar(
-                        selectedKey = currentKey,
-                        onNavigate = onBottomNav,
-                        stats = routeUiState.stats,
-                        marcasConPromo = routeUiState.marcasConPromo,
-                        promosExpiringToday = routeUiState.promosExpiringToday,
-                        hasPlanillaChanges = syncUiState.syncChanges?.isEmpty == false,
-                    )
-                }
-            } else {
-                {}
+        NavigationSuiteScaffold(
+            navigationSuiteItems = {
+                item(
+                    selected = currentKey == BottomBarKey.MAIN,
+                    onClick = { onBottomNav(BottomBarKey.MAIN) },
+                    icon = {
+                        BadgedBox(
+                            badge = {
+                                if (syncUiState.syncChanges?.isEmpty == false) Badge()
+                            },
+                        ) {
+                            Icon(
+                                imageVector = if (currentKey == BottomBarKey.MAIN) Icons.Filled.Storefront else Icons.Outlined.Storefront,
+                                contentDescription = null,
+                            )
+                        }
+                    },
+                    label = { Text(stringResource(R.string.rutero_title)) },
+                )
+                item(
+                    selected = currentKey == BottomBarKey.MARCAS,
+                    onClick = { onBottomNav(BottomBarKey.MARCAS) },
+                    icon = {
+                        BadgedBox(
+                            badge = {
+                                if (routeUiState.marcasConPromo > 0) {
+                                    Badge { Text(routeUiState.marcasConPromo.toString()) }
+                                }
+                            },
+                        ) {
+                            Icon(
+                                imageVector = if (currentKey == BottomBarKey.MARCAS) Icons.Filled.ShoppingBag else Icons.Outlined.ShoppingBag,
+                                contentDescription = null,
+                            )
+                        }
+                    },
+                    label = { Text(stringResource(R.string.stats_marcas_label)) },
+                )
+                item(
+                    selected = currentKey == BottomBarKey.LOCALES,
+                    onClick = { onBottomNav(BottomBarKey.LOCALES) },
+                    icon = {
+                        Icon(
+                            imageVector = if (currentKey == BottomBarKey.LOCALES) Icons.Filled.Visibility else Icons.Outlined.Visibility,
+                            contentDescription = null,
+                        )
+                    },
+                    label = { Text(stringResource(R.string.stats_locales_label)) },
+                )
+                item(
+                    selected = currentKey == BottomBarKey.CODPROV,
+                    onClick = { onBottomNav(BottomBarKey.CODPROV) },
+                    icon = { Icon(Icons.Outlined.Badge, contentDescription = null) },
+                    label = { Text(stringResource(R.string.stats_cod_prov_label)) },
+                )
+                item(
+                    selected = currentKey == BottomBarKey.EAN,
+                    onClick = { onBottomNav(BottomBarKey.EAN) },
+                    icon = { Icon(painterResource(R.drawable.ic_barcode), contentDescription = null) },
+                    label = { Text(stringResource(R.string.stats_cod_ean_label)) },
+                )
             },
-            // The custom bottom bar applies the navigation-bar inset itself.
-            // Expanded layouts have no bottom bar, so the content must consume it here.
-            contentWindowInsets = if (isCompactWidth) WindowInsets(0.dp)
-            else WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
-        ) { scaffoldPadding ->
-            Row(modifier = Modifier.fillMaxSize()) {
-                if (!isCompactWidth) {
-                    AppNavigationRail(
-                        selectedKey = currentKey,
-                        onNavigate = onBottomNav,
-                        stats = routeUiState.stats,
-                        marcasConPromo = routeUiState.marcasConPromo,
-                        promosExpiringToday = routeUiState.promosExpiringToday,
-                        hasPlanillaChanges = syncUiState.syncChanges?.isEmpty == false,
-                    )
-                }
+            modifier = Modifier.fillMaxSize(),
+        ) {
             NavHost(
                 navController = navController,
                 startDestination = MainRoute,
-                 modifier = Modifier
-                     .fillMaxSize()
-                     .weight(1f)
-                     .padding(scaffoldPadding)
-                     .consumeWindowInsets(scaffoldPadding),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)),
             ) {
                 composable<MainRoute> {
                     MainRouteContent(
@@ -351,7 +384,6 @@ fun MainScreen(
             )
         }
     }
-}
 
 @Composable
 private fun SystemBarAppearance(

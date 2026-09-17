@@ -7,6 +7,8 @@
     <string name="sync_cambios_agregados">%1$d agregados</string>
     <string name="sync_cambios_eliminados">%1$d quitados</string>
     <string name="sync_cambios_movidos">%1$d movidos de día</string>
+    <string name="sync_cambios_direcciones">%1$d direcciones actualizadas</string>
+    <string name="sync_cambios_marcas">%1$d marcas actualizadas</string>
     <string name="sync_cambios_cd">Cambios detectados en la planilla</string>
     <string name="ver_detalle">Ver detalle</string>
     <string name="sync_sec_agregados">Agregados</string>
@@ -57,7 +59,7 @@
     <string name="copiar_link">Copia primero el link de Google Drive</string>
     <string name="reiniciar_carga">Reintentar carga</string>
     <string name="error_carga_mensaje">Error: %s</string>
-    <string name="contador_paginas">%d de %d</string>
+    <string name="contador_paginas">%1$d de %2$d</string>
     <string name="cerrar">Cerrar</string>
     <string name="stats_locales">%d locales</string>
     <string name="stats_marcas">%d marcas</string>
@@ -83,7 +85,7 @@
     <string name="header_sincronizar_cd">Sincronizar ruta</string>
     <string name="header_buscar_cd">Buscar locales y promociones</string>
     <string name="abrir_maps_cd">Abrir %s en Maps</string>
-    <string name="bottom_tab_cd">%s, pestaña %d de 5</string>
+    <string name="bottom_tab_cd">%1$s, pestaña %2$d de 5</string>
     <string name="bottom_tab_seleccionada_cd">Seleccionada</string>
     <string name="bottom_tab_no_seleccionada_cd">No seleccionada</string>
     <string name="header_menu_cd">Menú</string>
@@ -341,7 +343,7 @@
     <string name="ean_loading_cd">Cargando catálogo</string>
     <string name="ean_scanning_cd">Iniciando escáner</string>
     <string name="ean_search_label">Buscar producto por nombre, EAN o SKU</string>
-    <string name="ean_catalog_meta">Catálogo v%d · %d productos</string>
+    <string name="ean_catalog_meta">Catálogo v%1$d · %2$d productos</string>
     <string name="ean_no_results_hint">Revisa la ortografía o prueba con menos palabras.</string>
     <string name="ean_clear_search">Limpiar búsqueda</string>
     <string name="ean_recent_searches">Búsquedas recientes</string>

@@ -5,7 +5,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 object DateFormatters {
-    private val es = Locale("es")
+    private val es = Locale.forLanguageTag("es")
     val full: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", es)
     val short: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM", es)
 

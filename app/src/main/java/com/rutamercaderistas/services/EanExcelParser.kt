@@ -340,7 +340,12 @@ class EanExcelParser @Inject constructor(
         // Un EAN de 12 dígitos suele ser un UPC-A; se normaliza a EAN-13 anteponiendo
         // 0 para que el código de barras se genere correctamente y la búsqueda por el
         // código escaneado (12 dígitos) lo encuentre como subcadena del EAN-13.
-        val eanPrincipal = if (eanRaw.length == 12 && eanRaw.all { it.isDigit() }) "0$eanRaw" else eanRaw
+        var eanPrincipal = if (eanRaw.length == 12 && eanRaw.all { it.isDigit() }) "0$eanRaw" else eanRaw
+        // Validación silenciosa: EAN debe ser 8-14 dígitos numéricos; si es inválido se limpia sin mostrar error
+        if (eanPrincipal.isNotBlank() && (!eanPrincipal.all { it.isDigit() } || eanPrincipal.length !in 8..14)) {
+            Timber.d("EAN inválido descartado: %s (%s)", eanPrincipal, descripcion)
+            eanPrincipal = ""
+        }
 
         if (eanPrincipal.isBlank() && codCencosud.isBlank() && codigoBarra.isBlank() && descripcion.isBlank()) {
             return null
@@ -447,6 +452,38 @@ class EanExcelParser @Inject constructor(
 
     fun setEanDataVersion(version: Int) {
         prefs().edit().putInt("ean_data_version", version).apply()
+    }
+
+    fun getEanAssetsHash(): String = prefs().getString("ean_assets_hash", "") ?: ""
+
+    fun setEanAssetsHash(hash: String) {
+        prefs().edit().putString("ean_assets_hash", hash).apply()
+    }
+
+    fun computeAssetsHash(): String {
+        return try {
+            val files = (context.assets.list("") ?: emptyArray())
+                .filter { it.startsWith(EAN_ASSET_PREFIX, ignoreCase = true) && it.endsWith(EAN_ASSET_SUFFIX, ignoreCase = true) }
+                .sorted()
+            if (files.isEmpty()) return ""
+            val md = java.security.MessageDigest.getInstance("SHA-256")
+            for (f in files) {
+                md.update(f.toByteArray())
+                try {
+                    context.assets.openFd(f).use { fd -> md.update(fd.length.toString().toByteArray()) }
+                } catch (_: Exception) {
+                    // Fallback: hash first KB of content
+                    try {
+                        context.assets.open(f).use { ins ->
+                            val buf = ByteArray(1024)
+                            val read = ins.read(buf)
+                            if (read > 0) md.update(buf, 0, read)
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+            md.digest().joinToString("") { "%02x".format(it) }
+        } catch (_: Exception) { "" }
     }
 }
 
