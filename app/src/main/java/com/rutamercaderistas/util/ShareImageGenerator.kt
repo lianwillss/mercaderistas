@@ -26,7 +26,7 @@ object ShareImageGenerator {
         val digits = ean.filter(Char::isDigit)
         val barcode = BarcodeEncoder().encodeBitmap(
             digits,
-            if (digits.length == 13) BarcodeFormat.EAN_13 else BarcodeFormat.CODE_128,
+            if (digits.length == 13 && digits[0] != '0') BarcodeFormat.EAN_13 else if (digits.length == 12) BarcodeFormat.EAN_13 else BarcodeFormat.CODE_128,
             960,
             300,
         )

@@ -128,6 +128,11 @@ class EanSearchViewModel @Inject constructor(
                             val eanZero = e.eanPrincipal.trimStart('0')
                             if (e.eanPrincipal == queryTrim || (queryTrimZero.isNotEmpty() && eanZero == queryTrimZero) || e.codigoBarra.trimStart('0') == queryTrimZero) 3 else 0
                         }.thenByDescending { e ->
+                            // 1b) EAN contiene query (o viceversa) - caso PEPILU 06110112277 en 0606110112277
+                            val eanZero = e.eanPrincipal.trimStart('0')
+                            val barraZero = e.codigoBarra.trimStart('0')
+                            if (eanZero.contains(queryTrimZero) || queryTrimZero.contains(eanZero) || barraZero.contains(queryTrimZero) || (eanZero.isNotEmpty() && queryTrimZero.isNotEmpty() && levenshtein(eanZero, queryTrimZero) <= 2)) 2 else 0
+                        }.thenByDescending { e ->
                             // 2) SKU exacto
                             if (e.codCencosud == queryTrim || e.codProveedor == queryTrim) 2 else 0
                         }.thenByDescending { e ->
@@ -225,12 +230,16 @@ class EanSearchViewModel @Inject constructor(
 
 // Coincidencia de un token (ya compacto) contra cualquier campo del producto.
 // Para los códigos se ignora el relleno de ceros a la izquierda, de modo que
-// "12" encuentre "000012" y viceversa.
+// "12" encuentre "000012" y viceversa. Incluye fallback Levenshtein <=2 para
+// EANs con 1-2 dígitos errados por lectura (caso PEPILU 06110112277 vs 0606110112277).
 private fun EanProductEntity.containsToken(t: String): Boolean {
     val tt = t.trimStart('0')
     fun String.codeHit(): Boolean {
         val f = this.trimStart('0')
-        return f.contains(tt) || this.contains(t, ignoreCase = true)
+        if (f.contains(tt) || this.contains(t, ignoreCase = true)) return true
+        // Fallback edit distance para códigos numéricos largos (EAN/SKU)
+        if (tt.length >= 8 && f.length >= 8 && levenshtein(f, tt) <= 2) return true
+        return false
     }
     return eanPrincipal.codeHit()
         || codCencosud.codeHit()
@@ -242,4 +251,22 @@ private fun EanProductEntity.containsToken(t: String): Boolean {
         || marcaNorm.contains(t, ignoreCase = true)
         || descripcionNormNospace.contains(t, ignoreCase = true)
         || marcaNormNospace.contains(t, ignoreCase = true)
+}
+
+private fun levenshtein(a: String, b: String): Int {
+    if (a == b) return 0
+    if (a.isEmpty()) return b.length
+    if (b.isEmpty()) return a.length
+    val dp = IntArray(b.length + 1) { it }
+    for (i in 1..a.length) {
+        var prev = dp[0]
+        dp[0] = i
+        for (j in 1..b.length) {
+            val cur = dp[j]
+            val cost = if (a[i - 1] == b[j - 1]) 0 else 1
+            dp[j] = minOf(dp[j] + 1, dp[j - 1] + 1, prev + cost)
+            prev = cur
+        }
+    }
+    return dp[b.length]
 }

@@ -1009,7 +1009,9 @@ private fun BarcodeImage(ean: String, modifier: Modifier = Modifier) {
         withContext(Dispatchers.Default) {
             val generated = try {
                 val encoder = BarcodeEncoder()
-                val format = if (digits.length == 13) BarcodeFormat.EAN_13 else BarcodeFormat.CODE_128
+                // EAN-13 con 0 inicial pierde el 0 al escanearse como UPC-A en algunos lectores.
+                // Generamos CODE_128 para preservar el 0 inicial exacto.
+                val format = if (digits.length == 13 && digits[0] != '0') BarcodeFormat.EAN_13 else if (digits.length == 12) BarcodeFormat.EAN_13 else BarcodeFormat.CODE_128
                 encoder.encodeBitmap(digits, format, 800, 280)
             } catch (e: WriterException) {
                 try {
