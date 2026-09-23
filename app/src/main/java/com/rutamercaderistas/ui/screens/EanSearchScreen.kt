@@ -9,8 +9,12 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -42,6 +46,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.History
@@ -167,6 +172,9 @@ fun EanSearchScreen(
     val searchHistory by viewModel.searchHistory.collectAsStateWithLifecycle()
 
     var zoomProduct by remember { mutableStateOf<EanProductEntity?>(null) }
+    var showFlejes by remember { mutableStateOf(false) }
+    // Código estático para modo impresión de flejes Jumbo — mismo para todas las tiendas
+    val flejesCode = "FLEJES"
 
     val scannerLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -318,6 +326,7 @@ fun EanSearchScreen(
                             label = "eanSearchElevation",
                         )
                         val scanCd = stringResource(R.string.escanear_codigo_barras)
+                        val flejesCd = stringResource(R.string.flejes_button_cd)
                         var historyExpanded by remember { mutableStateOf(false) }
                         val matchingHistory = remember(searchHistory, value.query) {
                             if (value.query.isBlank()) searchHistory
@@ -418,6 +427,41 @@ fun EanSearchScreen(
                                     },
                                 )
                             }
+                            }
+                            Spacer(modifier = Modifier.width(dimens.spacingSm))
+                            // Botón Flejes — entre buscador y scanner, con efecto iluminado 2026
+                            val flejesInfinite = rememberInfiniteTransition(label = "flejesGlow")
+                            val flejesGlow by flejesInfinite.animateFloat(
+                                initialValue = 0.45f, targetValue = 1f,
+                                animationSpec = infiniteRepeatable(tween(1400), RepeatMode.Reverse),
+                                label = "flejesGlow",
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .shadow(10.dp * flejesGlow, CircleShape, clip = false)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primaryContainer)
+                                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f + 0.25f * flejesGlow), CircleShape)
+                                    .clickable(
+                                        onClick = { showFlejes = true },
+                                        role = Role.Button,
+                                        onClickLabel = flejesCd,
+                                    )
+                                    .semantics { contentDescription = flejesCd },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Print,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .graphicsLayer {
+                                            scaleX = 1f + 0.06f * flejesGlow
+                                            scaleY = 1f + 0.06f * flejesGlow
+                                        },
+                                )
                             }
                             Spacer(modifier = Modifier.width(dimens.spacingSm))
                             Box(
@@ -750,6 +794,48 @@ fun EanSearchScreen(
             }
         }
     }
+
+    if (showFlejes) {
+        val flejesGlow2 by rememberInfiniteTransition(label = "flejesBarcodeGlow").animateFloat(
+            initialValue = 0.35f, targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(1600), RepeatMode.Reverse),
+            label = "flejesBarcodeGlow",
+        )
+        IosModal(
+            visible = true,
+            onDismiss = { showFlejes = false },
+            title = stringResource(R.string.flejes_barcode_title),
+            subtitle = null,
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(18.dp * flejesGlow2, RoundedCornerShape(16.dp), clip = false)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.White)
+                        .padding(12.dp),
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.img_flejes_barcode),
+                        contentDescription = stringResource(R.string.flejes_barcode_cd),
+                        modifier = Modifier.fillMaxWidth(),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                    )
+                }
+                Spacer(modifier = Modifier.height(dimens.spacingSm))
+                Text(
+                    text = stringResource(R.string.flejes_barcode_title),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -997,11 +1083,13 @@ private fun EanCodeChip(label: String, value: String, color: Color, query: Strin
 
 @Composable
 private fun BarcodeImage(ean: String, modifier: Modifier = Modifier) {
+    val isAlphanumeric = remember(ean) { ean.any { !it.isDigit() } }
     val digits = remember(ean) { ean.filter { it.isDigit() } }
-    var bitmap by remember(digits) { mutableStateOf<Bitmap?>(barcodeCache.get(digits)) }
+    val cacheKey = remember(ean) { ean }
+    var bitmap by remember(cacheKey) { mutableStateOf<Bitmap?>(barcodeCache.get(cacheKey)) }
 
-    LaunchedEffect(digits) {
-        val cached = barcodeCache.get(digits)
+    LaunchedEffect(cacheKey) {
+        val cached = barcodeCache.get(cacheKey)
         if (cached != null) {
             bitmap = cached
             return@LaunchedEffect
@@ -1010,19 +1098,20 @@ private fun BarcodeImage(ean: String, modifier: Modifier = Modifier) {
             val generated = try {
                 val encoder = BarcodeEncoder()
                 // EAN-13 con 0 inicial pierde el 0 al escanearse como UPC-A en algunos lectores.
-                // Generamos CODE_128 para preservar el 0 inicial exacto.
-                val format = if (digits.length == 13 && digits[0] != '0') BarcodeFormat.EAN_13 else if (digits.length == 12) BarcodeFormat.EAN_13 else BarcodeFormat.CODE_128
-                encoder.encodeBitmap(digits, format, 800, 280)
+                // Generamos CODE_128 para preservar el 0 inicial exacto o para códigos alfanuméricos como FLEJES.
+                val format = if (!isAlphanumeric && digits.length == 13 && digits[0] != '0') BarcodeFormat.EAN_13 else if (!isAlphanumeric && digits.length == 12) BarcodeFormat.EAN_13 else BarcodeFormat.CODE_128
+                val data = if (format == BarcodeFormat.CODE_128) ean else digits
+                encoder.encodeBitmap(data, format, 800, 280)
             } catch (e: WriterException) {
                 try {
-                    BarcodeEncoder().encodeBitmap(digits, BarcodeFormat.CODE_128, 800, 280)
+                    BarcodeEncoder().encodeBitmap(if (isAlphanumeric) ean else digits, BarcodeFormat.CODE_128, 800, 280)
                 } catch (e2: WriterException) {
                     null
                 }
             } catch (e: IllegalArgumentException) {
                 null
             }
-            if (generated != null) barcodeCache.put(digits, generated)
+            if (generated != null) barcodeCache.put(cacheKey, generated)
             bitmap = generated
         }
     }

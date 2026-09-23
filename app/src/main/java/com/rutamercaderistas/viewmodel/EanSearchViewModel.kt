@@ -69,7 +69,6 @@ class EanSearchViewModel @Inject constructor(
             val currentHash = eanExcelParser.computeAssetsHash()
             val storedHash = eanExcelParser.getEanAssetsHash()
             val needsImport = eanProductDao.count() == 0 ||
-                eanExcelParser.getEanDataVersion() < EAN_DATA_VERSION ||
                 (currentHash.isNotBlank() && storedHash != currentHash) ||
                 eanProductDao.hasUnnormalized() > 0
 
@@ -128,10 +127,15 @@ class EanSearchViewModel @Inject constructor(
                             val eanZero = e.eanPrincipal.trimStart('0')
                             if (e.eanPrincipal == queryTrim || (queryTrimZero.isNotEmpty() && eanZero == queryTrimZero) || e.codigoBarra.trimStart('0') == queryTrimZero) 3 else 0
                         }.thenByDescending { e ->
-                            // 1b) EAN contiene query (o viceversa) - caso PEPILU 06110112277 en 0606110112277
+                            // 1b) EAN prefijo (escaner parcial) prioriza startsWith sobre contains
                             val eanZero = e.eanPrincipal.trimStart('0')
                             val barraZero = e.codigoBarra.trimStart('0')
-                            if (eanZero.contains(queryTrimZero) || queryTrimZero.contains(eanZero) || barraZero.contains(queryTrimZero) || (eanZero.isNotEmpty() && queryTrimZero.isNotEmpty() && levenshtein(eanZero, queryTrimZero) <= 2)) 2 else 0
+                            if (eanZero.startsWith(queryTrimZero) || barraZero.startsWith(queryTrimZero)) 2 else 0
+                        }.thenByDescending { e ->
+                            // 1c) EAN contiene query (o viceversa) - caso PEPILU 06110112277 en 0606110112277
+                            val eanZero = e.eanPrincipal.trimStart('0')
+                            val barraZero = e.codigoBarra.trimStart('0')
+                            if (eanZero.contains(queryTrimZero) || queryTrimZero.contains(eanZero) || barraZero.contains(queryTrimZero) || (eanZero.isNotEmpty() && queryTrimZero.isNotEmpty() && levenshtein(eanZero, queryTrimZero) <= 2)) 1 else 0
                         }.thenByDescending { e ->
                             // 2) SKU exacto
                             if (e.codCencosud == queryTrim || e.codProveedor == queryTrim) 2 else 0
