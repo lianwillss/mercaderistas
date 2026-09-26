@@ -39,8 +39,11 @@ class PromotionRepository @Inject constructor(
             val bytes = withContext(Dispatchers.IO) {
                 try {
                     Timber.d("Promociones: descargando CSV desde %s", Constants.PROMOTIONS_CSV_URL)
-                    downloadBytes(Constants.PROMOTIONS_CSV_URL).getOrElse {
-                        Timber.w("Promociones: falló descarga CSV")
+                    downloadBytes(
+                        url = Constants.PROMOTIONS_CSV_URL,
+                        maxBytes = 10L * 1024 * 1024,
+                    ).getOrElse { error ->
+                        Timber.w(error, "Promociones: falló descarga CSV")
                         return@withContext null
                     }
                 } catch (e: Exception) {
