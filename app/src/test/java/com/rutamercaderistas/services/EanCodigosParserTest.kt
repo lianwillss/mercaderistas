@@ -64,6 +64,25 @@ class EanCodigosParserTest {
     }
 
     @Test
+    fun `bwild xlsx yields all 33 sku under BWILD`() = runTest {
+        val dao = mockk<EanProductDao>(relaxed = true)
+        coEvery { dao.clearAll() } returns Unit
+        val slot = io.mockk.slot<List<com.rutamercaderistas.data.local.EanProductEntity>>()
+        coEvery { dao.insertAll(capture(slot)) } returns Unit
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
+
+        val result = parser.loadFromFile("src/main/assets/ean_bwild.xlsx")
+
+        assertTrue("parser should succeed", result.isSuccess)
+        // El archivo trae 33 filas: 18 "B FRESH" + 15 "B.TAN", ambas marcas BWILD
+        assertTrue("debe importar 33 productos, got ${result.getOrNull()}", result.getOrNull() == 33)
+        val inserted = slot.captured
+        assertTrue("insertados deben ser 33, got ${inserted.size}", inserted.size == 33)
+        val brands = inserted.map { it.marca }.toSet()
+        assertTrue("todo debe agrupar en BWILD, got $brands", brands == setOf("BWILD"))
+    }
+
+    @Test
     fun `super xlsx parses products`() = runTest {
         val dao = mockk<EanProductDao>(relaxed = true)
         coEvery { dao.clearAll() } returns Unit

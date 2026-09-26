@@ -51,6 +51,7 @@ private val EAN_FILE_BRANDS = mapOf(
 private val BRAND_ALIASES = mapOf(
     "lola" to "Kobbo",
     "b fresh" to "BWILD",
+    "b.tan" to "BWILD",
     "caso&cia" to "CASO Y CIA",
     "caso & cia" to "CASO Y CIA",
 )
