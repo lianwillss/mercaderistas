@@ -78,7 +78,12 @@ class EanSearchViewModel @Inject constructor(
             _uiState.value = EanSearchUiState.Loading("Cargando base de datos EAN...")
             val currentHash = eanExcelParser.computeAssetsHash()
             val storedHash = eanExcelParser.getEanAssetsHash()
+            // La versión fuerza reimportación en instalados: sin este chequeo,
+            // cambios de alias/marca (p. ej. B.TAN → BWILD) nunca llegaban a
+            // equipos que ya habían importado.
+            val storedVersion = try { eanExcelParser.getEanDataVersion() } catch (_: Exception) { 0 }
             val needsImport = eanProductDao.count() == 0 ||
+                storedVersion < EAN_DATA_VERSION ||
                 (currentHash.isNotBlank() && storedHash != currentHash) ||
                 eanProductDao.hasUnnormalized() > 0
 

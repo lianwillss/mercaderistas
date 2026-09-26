@@ -122,6 +122,29 @@ class EanSearchViewModelTest {
     }
 
     @Test
+    fun `stale data version forces reimport on existing installs`() = runTest {
+        // Caso B.TAN → BWILD: el equipo ya importó (hay datos, hash igual),
+        // pero con versión vieja; debe reimportar para aplicar alias/marcas.
+        coEvery { dao.count() } returns 33
+        coEvery { dao.hasUnnormalized() } returns 0
+        every { dao.getAll() } returns flowOf(emptyList())
+        every { dao.pagingSourceAll() } answers { FakePagingSource(emptyList()) }
+        every { dao.searchCandidates(any()) } returns flowOf(emptyList())
+        every { parser.computeAssetsHash() } returns "abc123"
+        every { parser.getEanAssetsHash() } returns "abc123"
+        every { parser.getEanDataVersion() } returns EAN_DATA_VERSION - 1
+        coEvery { parser.loadFromAssets() } returns Result.success(33)
+
+        val vm = EanSearchViewModel(dao, parser, prefs)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify(exactly = 1) { parser.loadFromAssets() }
+        coVerify(exactly = 1) { parser.setEanDataVersion(EAN_DATA_VERSION) }
+        assertTrue(vm.uiState.value is EanSearchUiState.Ready)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
     fun `token search matches across word order`() = runTest {
         val product = EanProductEntity(
             eanPrincipal = "111",
