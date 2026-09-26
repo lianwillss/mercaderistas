@@ -29,11 +29,16 @@ class UpdateCheckWorker @AssistedInject constructor(
         return try {
             val info = UpdateChecker.check(BuildConfig.VERSION_CODE)
             if (info.available) {
-                if (preferencesRepository.getLastNotifiedUpdateCode() == info.versionCode) {
+                // Dedupe por tag (v12.20.1 ≠ v12.20 aunque colisionen en code).
+                if (info.tag.isNotBlank() &&
+                    preferencesRepository.getLastNotifiedUpdateTag() == info.tag
+                ) {
                     Timber.i("Update %s ya notificado, se omite", info.versionName)
                     return Result.success()
                 }
-                preferencesRepository.setLastNotifiedUpdateCode(info.versionCode)
+                if (info.tag.isNotBlank()) {
+                    preferencesRepository.setLastNotifiedUpdateTag(info.tag)
+                }
                 Timber.i("Update disponible en segundo plano: %s", info.versionName)
 
                 val intent = Intent(applicationContext, MainActivity::class.java).apply {

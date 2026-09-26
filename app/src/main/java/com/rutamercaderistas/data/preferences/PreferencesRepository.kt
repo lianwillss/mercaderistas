@@ -27,6 +27,8 @@ data class PendingUpdate(
     val versionName: String,
     val versionCode: Int,
     val apkUrl: String,
+    /** Tag completo ("v12.20.1"): versionCode colisiona en patch, el tag no. */
+    val versionTag: String = "",
 )
 
 val Context.prefsDataStore: DataStore<Preferences> by preferencesDataStore(name = "mercaderistas_prefs")
@@ -53,7 +55,10 @@ class PreferencesRepository @Inject constructor(
         private val KEY_PENDING_UPDATE_NAME = stringPreferencesKey("pending_update_name")
         private val KEY_PENDING_UPDATE_CODE = intPreferencesKey("pending_update_code")
         private val KEY_PENDING_UPDATE_URL = stringPreferencesKey("pending_update_url")
+        private val KEY_PENDING_UPDATE_TAG = stringPreferencesKey("pending_update_tag")
         private val KEY_LAST_NOTIFIED_UPDATE = intPreferencesKey("last_notified_update_code")
+        private val KEY_LAST_NOTIFIED_TAG = stringPreferencesKey("last_notified_update_tag")
+        private val KEY_UPDATE_NOTIF_ASKED = stringPreferencesKey("update_notif_asked")
         private val KEY_SYNC_HISTORY = stringPreferencesKey("sync_history")
         private const val SEARCH_HISTORY_MAX = 8
         private const val LOCALES_SEARCH_HISTORY_MAX = 8
@@ -262,6 +267,8 @@ class PreferencesRepository @Inject constructor(
             prefs[KEY_PENDING_UPDATE_NAME] = entry.versionName
             prefs[KEY_PENDING_UPDATE_CODE] = entry.versionCode
             prefs[KEY_PENDING_UPDATE_URL] = entry.apkUrl
+            if (entry.versionTag.isNotBlank()) prefs[KEY_PENDING_UPDATE_TAG] = entry.versionTag
+            else prefs.remove(KEY_PENDING_UPDATE_TAG)
         }
     }
 
@@ -273,6 +280,7 @@ class PreferencesRepository @Inject constructor(
             versionName = prefs[KEY_PENDING_UPDATE_NAME].orEmpty(),
             versionCode = code,
             apkUrl = prefs[KEY_PENDING_UPDATE_URL].orEmpty(),
+            versionTag = prefs[KEY_PENDING_UPDATE_TAG].orEmpty(),
         )
     }
 
@@ -281,6 +289,7 @@ class PreferencesRepository @Inject constructor(
             prefs.remove(KEY_PENDING_UPDATE_NAME)
             prefs.remove(KEY_PENDING_UPDATE_CODE)
             prefs.remove(KEY_PENDING_UPDATE_URL)
+            prefs.remove(KEY_PENDING_UPDATE_TAG)
         }
     }
 
@@ -289,5 +298,20 @@ class PreferencesRepository @Inject constructor(
 
     suspend fun setLastNotifiedUpdateCode(code: Int) {
         context.prefsDataStore.edit { it[KEY_LAST_NOTIFIED_UPDATE] = code }
+    }
+
+    /** Dedupe de aviso por tag completo (v12.20.1 ≠ v12.20 aunque colisionen en code). */
+    suspend fun getLastNotifiedUpdateTag(): String =
+        context.prefsDataStore.data.first()[KEY_LAST_NOTIFIED_TAG].orEmpty()
+
+    suspend fun setLastNotifiedUpdateTag(tag: String) {
+        context.prefsDataStore.edit { it[KEY_LAST_NOTIFIED_TAG] = tag }
+    }
+
+    suspend fun wasUpdateNotifAsked(): Boolean =
+        context.prefsDataStore.data.first()[KEY_UPDATE_NOTIF_ASKED] != null
+
+    suspend fun setUpdateNotifAsked() {
+        context.prefsDataStore.edit { it[KEY_UPDATE_NOTIF_ASKED] = "true" }
     }
 }

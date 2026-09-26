@@ -52,6 +52,8 @@ class UpdateViewModelTest {
             coEvery { clearPendingUpdate() } returns Unit
             coEvery { getLastNotifiedUpdateCode() } returns 0
             coEvery { setLastNotifiedUpdateCode(any()) } returns Unit
+            coEvery { getLastNotifiedUpdateTag() } returns ""
+            coEvery { setLastNotifiedUpdateTag(any()) } returns Unit
         }
         viewModel = track(UpdateViewModel(application, preferencesRepository))
     }
@@ -78,11 +80,11 @@ class UpdateViewModelTest {
         throw AssertionError("Condición no cumplida dentro del timeout")
     }
 
-    private fun mockAvailableUpdate(code: Int = 12002, name: String = "12.02") {
+    private fun mockAvailableUpdate(code: Int = 12002, name: String = "12.02", tag: String = "v12.02") {
         mockkObject(UpdateChecker)
         coEvery {
             UpdateChecker.check(any())
-        } returns UpdateInfo(available = true, versionCode = code, versionName = name, apkUrl = "http://x.apk")
+        } returns UpdateInfo(available = true, versionCode = code, versionName = name, apkUrl = "http://x.apk", tag = tag)
     }
 
     @Test
@@ -111,9 +113,9 @@ class UpdateViewModelTest {
         try {
             viewModel.checkForUpdate(force = true, showFeedback = false)
             awaitOnMain {
-                viewModel.pendingUpdate.value == PendingUpdate("12.02", 12002, "http://x.apk")
+                viewModel.pendingUpdate.value == PendingUpdate("12.02", 12002, "http://x.apk", "v12.02")
             }
-            coVerify { preferencesRepository.setPendingUpdate(PendingUpdate("12.02", 12002, "http://x.apk")) }
+            coVerify { preferencesRepository.setPendingUpdate(PendingUpdate("12.02", 12002, "http://x.apk", "v12.02")) }
             awaitOnMain { viewModel.showUpdateBanner.value }
         } finally {
             unmockkObject(UpdateChecker)
@@ -124,17 +126,39 @@ class UpdateViewModelTest {
     fun `second check same version does not re-notify`() = runTest {
         mockAvailableUpdate()
         try {
-            coEvery { preferencesRepository.getLastNotifiedUpdateCode() } returns 0 andThen 12002
+            coEvery { preferencesRepository.getLastNotifiedUpdateTag() } returns "" andThen "v12.02"
             viewModel.checkForUpdate(force = true, showFeedback = false)
             awaitOnMain {
-                viewModel.pendingUpdate.value == PendingUpdate("12.02", 12002, "http://x.apk")
+                viewModel.pendingUpdate.value == PendingUpdate("12.02", 12002, "http://x.apk", "v12.02")
             }
             viewModel.checkForUpdate(force = true, showFeedback = false)
             awaitOnMain { viewModel.pendingUpdate.value != null }
             testDispatcher.scheduler.advanceUntilIdle()
             Thread.sleep(50)
             testDispatcher.scheduler.advanceUntilIdle()
-            coVerify(exactly = 1) { preferencesRepository.setLastNotifiedUpdateCode(12002) }
+            coVerify(exactly = 1) { preferencesRepository.setLastNotifiedUpdateTag("v12.02") }
+        } finally {
+            unmockkObject(UpdateChecker)
+        }
+    }
+
+    @Test
+    fun `patch version notifies again after minor notified`() = runTest {
+        mockkObject(UpdateChecker)
+        try {
+            coEvery {
+                UpdateChecker.check(any())
+            } returns UpdateInfo(available = true, versionCode = 12020, versionName = "12.20.1", apkUrl = "http://x.apk", tag = "v12.20.1")
+            coEvery { preferencesRepository.getLastNotifiedUpdateTag() } returns "v12.20"
+            viewModel.checkForUpdate(force = true, showFeedback = false)
+            awaitOnMain {
+                viewModel.pendingUpdate.value == PendingUpdate("12.20.1", 12020, "http://x.apk", "v12.20.1")
+            }
+            testDispatcher.scheduler.advanceUntilIdle()
+            awaitOnMain {
+                viewModel.state.value is UpdateUiState.Dialog
+            }
+            coVerify { preferencesRepository.setLastNotifiedUpdateTag("v12.20.1") }
         } finally {
             unmockkObject(UpdateChecker)
         }
@@ -167,7 +191,7 @@ class UpdateViewModelTest {
             awaitOnMain { viewModel.showUpdateBanner.value }
             viewModel.suppressUntilTomorrow()
             awaitOnMain { !viewModel.showUpdateBanner.value }
-            assertEquals(PendingUpdate("12.02", 12002, "http://x.apk"), viewModel.pendingUpdate.value)
+            assertEquals(PendingUpdate("12.02", 12002, "http://x.apk", "v12.02"), viewModel.pendingUpdate.value)
         } finally {
             unmockkObject(UpdateChecker)
         }

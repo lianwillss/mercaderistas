@@ -15,7 +15,7 @@ import java.io.InputStream
 import java.text.Normalizer
 import javax.inject.Inject
 
-const val EAN_DATA_VERSION = 30
+const val EAN_DATA_VERSION = 31
 
 // Prefijo/sufijo de los archivos Excel de catálogo EAN en assets.
 // Para agregar más productos basta con soltar otro archivo "ean*.xlsx"
@@ -44,6 +44,7 @@ private val EAN_FILE_BRANDS = mapOf(
     "cu" to "CUK",
     "bwild" to "BWILD",
     "super" to "CASO Y CIA",
+    "ccc" to "CASO Y CIA",
 )
 
 // Alias de marca: la empresa ve algunas marcas con un nombre distinto al del
@@ -116,9 +117,9 @@ class EanExcelParser @Inject constructor(
         val catProveedor: List<Int?> = listOf(null, null, null, null),
     )
 
-    suspend fun parseAndSave(inputStream: InputStream): Result<Int> {
+    suspend fun parseAndSave(inputStream: InputStream, defaultBrand: String? = null): Result<Int> {
         return try {
-            val products = parse(inputStream)
+            val products = parse(inputStream, defaultBrand)
             val dedupeResult = dedupeEanProducts(products)
             logDedupe(dedupeResult)
             val deduped = dedupeResult.products
@@ -459,11 +460,11 @@ class EanExcelParser @Inject constructor(
         }
     }
 
-    // Cargar desde archivo descargado
-    suspend fun loadFromFile(filePath: String): Result<Int> {
+    // Cargar desde archivo descargado (defaultBrand para archivos sin columna Marca)
+    suspend fun loadFromFile(filePath: String, defaultBrand: String? = null): Result<Int> {
         return try {
             val inputStream = java.io.FileInputStream(filePath)
-            parseAndSave(inputStream)
+            parseAndSave(inputStream, defaultBrand)
         } catch (e: Exception) {
             Timber.e(e, "Error loading EAN file from path: $filePath")
             Result.failure(e)

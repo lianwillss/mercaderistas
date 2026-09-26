@@ -96,6 +96,29 @@ class PreferencesRepositoryTest {
     }
 
     @Test
+    fun `lastNotifiedUpdateTag roundtrip`() = runTest {
+        assertEquals("", repository.getLastNotifiedUpdateTag())
+        repository.setLastNotifiedUpdateTag("v12.20.1")
+        assertEquals("v12.20.1", repository.getLastNotifiedUpdateTag())
+    }
+
+    @Test
+    fun `pendingUpdate conserva versionTag`() = runTest {
+        repository.setPendingUpdate(PendingUpdate("12.20.1", 12020, "http://x.apk", "v12.20.1"))
+        assertEquals(
+            PendingUpdate("12.20.1", 12020, "http://x.apk", "v12.20.1"),
+            repository.getPendingUpdate()
+        )
+    }
+
+    @Test
+    fun `updateNotifAsked roundtrip`() = runTest {
+        assertEquals(false, repository.wasUpdateNotifAsked())
+        repository.setUpdateNotifAsked()
+        assertEquals(true, repository.wasUpdateNotifAsked())
+    }
+
+    @Test
     fun `lastSyncCheck defaults to 0 and roundtrips`() = runTest {
         assertEquals(0L, repository.getLastSyncCheck())
         repository.setLastSyncCheck(987654321L)

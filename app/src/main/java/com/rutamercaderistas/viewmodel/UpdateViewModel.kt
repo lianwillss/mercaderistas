@@ -89,7 +89,10 @@ class UpdateViewModel @Inject constructor(
             val stored = withContext(Dispatchers.IO) {
                 preferencesRepository.getPendingUpdate()
             }
-            if (stored != null && stored.versionCode > BuildConfig.VERSION_CODE) {
+            if (stored != null && UpdateChecker.isPendingNewer(
+                    stored.versionTag, stored.versionCode, BuildConfig.VERSION_CODE
+                )
+            ) {
                 _pendingUpdate.value = stored
             } else if (stored != null) {
                 withContext(Dispatchers.IO) { preferencesRepository.clearPendingUpdate() }
@@ -128,16 +131,16 @@ class UpdateViewModel @Inject constructor(
                     pendingApkUrl = info.apkUrl
                     withContext(Dispatchers.IO) {
                         preferencesRepository.setPendingUpdate(
-                            PendingUpdate(info.versionName, info.versionCode, info.apkUrl)
+                            PendingUpdate(info.versionName, info.versionCode, info.apkUrl, info.tag)
                         )
                     }
-                    _pendingUpdate.value = PendingUpdate(info.versionName, info.versionCode, info.apkUrl)
+                    _pendingUpdate.value = PendingUpdate(info.versionName, info.versionCode, info.apkUrl, info.tag)
                     _state.value = UpdateUiState.Dialog(
                         versionName = info.versionName,
                         versionCode = info.versionCode,
                         apkUrl = info.apkUrl,
                     )
-                    notifyOnce(info.versionCode, info.versionName)
+                    notifyOnce(info.tag, info.versionName)
                 } else {
                     clearStoredPending()
                     _state.value = if (showFeedback) {
@@ -225,16 +228,51 @@ class UpdateViewModel @Inject constructor(
         _pendingUpdate.value = null
     }
 
-    /** Notifica una sola vez por versión (evita spam en cada apertura). */
-    private suspend fun notifyOnce(versionCode: Int, versionName: String) {
-        val lastNotified = withContext(Dispatchers.IO) {
-            preferencesRepository.getLastNotifiedUpdateCode()
+    /**
+     * Notifica una sola vez por tag (evita spam en cada apertura). Por tag y
+     * no por code: v12.20.1 colisiona con v12.20 en versionCode.
+     */
+    private suspend fun notifyOnce(tag: String, versionName: String) {
+        if (tag.isBlank()) {
+            postUpdateNotification(versionName)
+            return
         }
-        if (lastNotified == versionCode) return
+        val lastNotified = withContext(Dispatchers.IO) {
+            preferencesRepository.getLastNotifiedUpdateTag()
+        }
+        if (lastNotified == tag) return
         withContext(Dispatchers.IO) {
-            preferencesRepository.setLastNotifiedUpdateCode(versionCode)
+            preferencesRepository.setLastNotifiedUpdateTag(tag)
         }
         postUpdateNotification(versionName)
+    }
+
+    /** ¿Falta el permiso de notificaciones (Android 13+)? */
+    fun hasNotifPermission(): Boolean {
+        return ActivityCompat.checkSelfPermission(
+            getApplication(), Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    /** true si corresponde pedir el permiso una vez (hay update visible). */
+    suspend fun shouldAskNotifPermission(): Boolean {
+        if (hasNotifPermission()) return false
+        return withContext(Dispatchers.IO) { !preferencesRepository.wasUpdateNotifAsked() }
+    }
+
+    fun markNotifAsked() {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { preferencesRepository.setUpdateNotifAsked() }
+        }
+    }
+
+    /** Tras conceder el permiso con un update pendiente, avisar de inmediato. */
+    fun onNotifPermissionResult(granted: Boolean) {
+        if (!granted) return
+        val pending = _pendingUpdate.value ?: return
+        viewModelScope.launch {
+            notifyOnce(pending.versionTag, pending.versionName)
+        }
     }
 
     fun dismissDialog() {

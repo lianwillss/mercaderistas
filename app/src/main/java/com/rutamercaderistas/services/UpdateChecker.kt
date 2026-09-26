@@ -11,7 +11,9 @@ data class UpdateInfo(
     val available: Boolean,
     val versionCode: Int,
     val versionName: String,
-    val apkUrl: String
+    val apkUrl: String,
+    /** Tag crudo ("v12.20.1"): clave de dedupe, versionCode colisiona en patch. */
+    val tag: String = "",
 )
 
 object UpdateChecker {
@@ -56,7 +58,8 @@ object UpdateChecker {
                 available = true,
                 versionCode = tagToVersionCode(tagName) ?: 0,
                 versionName = versionName,
-                apkUrl = apkUrl
+                apkUrl = apkUrl,
+                tag = tagName,
             )
         } catch (e: Exception) {
             Timber.e(e, "Error checking update")
@@ -133,4 +136,13 @@ object UpdateChecker {
         versionName = "",
         apkUrl = ""
     )
+
+    /**
+     * true si el pendiente guardado sigue siendo más nuevo que lo instalado.
+     * Usa el tag cuando existe (no colisiona en patch); si no, el code legacy.
+     */
+    internal fun isPendingNewer(pendingTag: String, pendingCode: Int, installedCode: Int): Boolean {
+        if (pendingTag.isNotBlank()) return isRemoteNewer(pendingTag, installedCode)
+        return pendingCode > installedCode
+    }
 }

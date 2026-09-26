@@ -8,6 +8,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.rutamercaderistas.data.preferences.BrandPagesRepository
 import com.rutamercaderistas.data.preferences.PreferencesRepository
+import com.rutamercaderistas.services.ApkDownloader
 import com.rutamercaderistas.viewmodel.SyncViewModel
 import com.rutamercaderistas.viewmodel.UpdateViewModel
 import dagger.hilt.android.HiltAndroidApp
@@ -63,7 +64,19 @@ class MercaderistasApp : Application(), Configuration.Provider {
 
     private fun cleanTempApk() {
         applicationScope.launch {
-            File(cacheDir, "apk").deleteRecursively()
+            val dir = File(cacheDir, "apk")
+            // Conservar el APK ya descargado si sigue siendo más nuevo que lo
+            // instalado (evita re-descargar tras matar la app). Si no, limpiar.
+            val apk = File(dir, "update.apk")
+            val keep = apk.exists() &&
+                ApkDownloader.readApkVersionCode(this@MercaderistasApp, apk) >
+                    BuildConfig.VERSION_CODE
+            if (keep) {
+                Timber.i("Se conserva APK pendiente de instalación")
+                dir.listFiles()?.filter { it != apk }?.forEach { it.deleteRecursively() }
+            } else {
+                dir.deleteRecursively()
+            }
         }
     }
 

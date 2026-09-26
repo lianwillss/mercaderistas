@@ -1,8 +1,11 @@
 package com.rutamercaderistas
 
+import android.Manifest
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.res.stringResource
 import com.rutamercaderistas.R
 import androidx.activity.enableEdgeToEdge
@@ -131,6 +134,21 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(Unit) {
                 updateViewModel.checkForUpdate(showFeedback = false)
                 routeViewModel.loadInitialData()
+            }
+
+            // Si hay update visible y falta el permiso de notificaciones,
+            // pedirlo una sola vez: es el canal del aviso en 2do plano.
+            // Si lo niega, igual quedan banner + diálogo dentro de la app.
+            val notifPermissionLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestPermission()
+            ) { granted ->
+                updateViewModel.onNotifPermissionResult(granted)
+            }
+            LaunchedEffect(showUpdateBanner) {
+                if (showUpdateBanner && updateViewModel.shouldAskNotifPermission()) {
+                    updateViewModel.markNotifAsked()
+                    notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
             }
 
             // Auto-sync del rutero al abrir: una sola vez, cuando ya hay ruta
