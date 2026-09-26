@@ -107,6 +107,7 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.WriterException
 import com.journeyapps.barcodescanner.BarcodeEncoder
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.withContext
 import com.google.zxing.integration.android.IntentIntegrator
 
@@ -806,6 +807,18 @@ fun EanSearchScreen(
     }
 
     if (showFlejes) {
+        // Brillo al máximo mientras se muestra el código: los lectores láser
+        // leen la pantalla mucho mejor con brillo alto. Se restaura al cerrar.
+        LaunchedEffect(Unit) {
+            val window = (context as? Activity)?.window ?: return@LaunchedEffect
+            val previous = window.attributes.screenBrightness
+            window.attributes = window.attributes.apply { screenBrightness = 1f }
+            try {
+                awaitCancellation()
+            } finally {
+                window.attributes = window.attributes.apply { screenBrightness = previous }
+            }
+        }
         val flejesGlow2 by rememberInfiniteTransition(label = "flejesBarcodeGlow").animateFloat(
             initialValue = 0.35f, targetValue = 1f,
             animationSpec = infiniteRepeatable(tween(1600), RepeatMode.Reverse),
