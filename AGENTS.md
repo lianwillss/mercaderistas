@@ -28,6 +28,7 @@ App Android de rutas para mercaderistas: Kotlin, Compose, Hilt, Room y WorkManag
 - `RouteViewModel` calcula parte del estado en `Dispatchers.Default`; `advanceUntilIdle()` no espera esos hilos reales. Usar el helper `awaitOnMain { ... }` de `RouteViewModelTest` después de `selectRoute`, `loadInitialData` y `setCurrentDay`.
 - La suite puede producir `UncaughtExceptionsBeforeTest` por carreras globales de `Dispatchers.Main`; ejecutar con `--no-parallel` y repetir un test aislado antes de atribuirlo al cambio.
 - Las pruebas instrumentadas no se ejecutan sin dispositivo; agregar cobertura de scroll ahí, no en tests JVM.
+- La búsqueda EAN usa Paging 3 (`pagingSourceAll()` + `MultiTokenPagingSource`, `Ready.pagingFlow: Flow<PagingData<...>>` con `cachedIn(viewModelScope)`). En tests JVM: mockear `android.util.Log` con `mockkStatic` (Paging loguea vía Log), usar `paging-testing` (`asSnapshot()`) y cancelar `vm.viewModelScope` al final para evitar `UncompletedCoroutinesError`. El `Pager` debe crear un `PagingSource` nuevo en cada llamada al factory.
 
 ## Sync del rutero
 

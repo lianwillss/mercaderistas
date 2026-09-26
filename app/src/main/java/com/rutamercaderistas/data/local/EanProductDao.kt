@@ -1,5 +1,6 @@
 package com.rutamercaderistas.data.local
 
+import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -66,4 +67,22 @@ interface EanProductDao {
     // Obtener todos
     @Query("SELECT * FROM ean_products ORDER BY descripcionProducto")
     fun getAll(): Flow<List<EanProductEntity>>
+
+    // PagingSource para búsqueda con tokens (AND entre tokens)
+    @Query("""
+        SELECT * FROM ean_products
+        WHERE eanPrincipal LIKE '%' || :token || '%'
+           OR codCencosud LIKE '%' || :token || '%'
+           OR codProveedor LIKE '%' || :token || '%'
+           OR codigoBarra LIKE '%' || :token || '%'
+           OR descripcion_norm LIKE '%' || :token || '%'
+           OR marca_norm LIKE '%' || :token || '%'
+           OR descripcion_norm_nospace LIKE '%' || :token || '%'
+           OR marca_norm_nospace LIKE '%' || :token || '%'
+    """)
+    fun pagingSourceForToken(token: String): PagingSource<Int, EanProductEntity>
+
+    // PagingSource para todos los productos (lista vacía)
+    @Query("SELECT * FROM ean_products ORDER BY descripcionProducto")
+    fun pagingSourceAll(): PagingSource<Int, EanProductEntity>
 }

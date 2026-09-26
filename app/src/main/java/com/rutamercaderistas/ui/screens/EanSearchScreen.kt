@@ -40,6 +40,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.LazyPagingItems
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -309,6 +311,9 @@ fun EanSearchScreen(
 
                 is EanSearchUiState.Ready -> {
                     val value = state
+                    val lazyItems: LazyPagingItems<EanProductEntity> =
+                        value.pagingFlow.collectAsLazyPagingItems()
+
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -494,9 +499,9 @@ fun EanSearchScreen(
                             }
                             }
 
-                        if (value.query.isNotEmpty() || value.results.isNotEmpty()) {
+                        if (value.query.isNotEmpty() || lazyItems.itemCount > 0) {
                             Text(
-                                text = stringResource(R.string.ean_results_count, value.results.size),
+                                text = stringResource(R.string.ean_results_count, lazyItems.itemCount),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier
@@ -505,7 +510,7 @@ fun EanSearchScreen(
                             )
                         }
 
-                    if (value.results.isEmpty()) {
+                    if (lazyItems.itemCount == 0) {
                         Box(modifier = Modifier.weight(1f)) {
                             if (value.query.isBlank()) {
                                 Column(
@@ -535,11 +540,16 @@ fun EanSearchScreen(
                             }
                         }
                     } else {
-                        val brandsInResults = remember(value.results) {
-                            value.results.map { it.marca.ifBlank { NO_BRAND_KEY } }.distinct()
+                        // Productos cargados por Paging (sin snapshot(): acceso por índice,
+                        // API estable en paging-compose 3.3).
+                        val loadedProducts = remember(lazyItems.itemCount) {
+                            (0 until lazyItems.itemCount).mapNotNull { lazyItems[it] }
                         }
-                        val cajasInResults = remember(value.results) {
-                            value.results.mapNotNull { it.conversion.trim().takeIf { c -> c.isNotBlank() } }.distinct().sortedBy { it.toIntOrNull() ?: Int.MAX_VALUE }
+                        val brandsInResults = remember(loadedProducts) {
+                            loadedProducts.map { it.marca.ifBlank { NO_BRAND_KEY } }.distinct()
+                        }
+                        val cajasInResults = remember(loadedProducts) {
+                            loadedProducts.mapNotNull { it.conversion.trim().takeIf { c -> c.isNotBlank() } }.distinct().sortedBy { it.toIntOrNull() ?: Int.MAX_VALUE }
                         }
                         var brandFilter by remember(value.query) { mutableStateOf<String?>(null) }
                         var cajaFilter by remember(value.query) { mutableStateOf<String?>(null) }
@@ -559,7 +569,7 @@ fun EanSearchScreen(
                                             )
                                         }
                                     }
-                                    items(brandsInResults, key = { "ean_brand_$it" }) { brandKey ->
+                                    items(brandsInResults, key = { brandKey -> "ean_brand_$brandKey" }) { brandKey ->
                                         Box(modifier = Modifier.heightIn(min = dimens.touchMin)) {
                                             FilterChip(
                                                 selected = brandFilter == brandKey,
@@ -584,7 +594,7 @@ fun EanSearchScreen(
                                             )
                                         }
                                     }
-                                    items(cajasInResults, key = { "ean_caja_$it" }) { caja ->
+                                    items(cajasInResults, key = { caja -> "ean_caja_$caja" }) { caja ->
                                         Box(modifier = Modifier.heightIn(min = dimens.touchMin)) {
                                             FilterChip(
                                                 selected = cajaFilter == caja,
@@ -596,16 +606,16 @@ fun EanSearchScreen(
                                 }
                             }
                         }
-                        val rows = remember(value.results, brandFilter, cajaFilter) {
+                        val rows = remember(loadedProducts, brandFilter, cajaFilter) {
                             buildList<EanResultRow> {
-                                value.results
+                                val filtered = loadedProducts
                                     .filter { cajaFilter == null || it.conversion.trim() == cajaFilter }
-                                    .groupBy { it.marca.ifBlank { "\u0000" } }
-                                    .forEach { (brandKey, products) ->
-                                        if (brandFilter != null && brandKey != brandFilter) return@forEach
-                                        add(EanBrandRow(brandKey))
-                                        products.forEach { add(EanProductRow(it)) }
-                                    }
+                                val grouped: Map<String, List<EanProductEntity>> = filtered.groupBy { it.marca.ifBlank { "\u0000" } }
+                                for ((brandKey, products) in grouped) {
+                                    if (brandFilter != null && brandKey != brandFilter) continue
+                                    add(EanBrandRow(brandKey))
+                                    products.forEach { add(EanProductRow(it)) }
+                                }
                             }
                         }
                         LazyColumn(

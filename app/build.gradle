@@ -20,8 +20,8 @@ android {
         applicationId "com.rutamercaderistas"
         minSdk 26
         targetSdk 35
-        versionCode 12015
-        versionName "12.15"
+        versionCode 12016
+        versionName "12.16"
         resConfigs "es"
         def sentryDsn = keystoreProperties['SENTRY_DSN']?.toString()?.trim() ?: ""
         buildConfigField "String", "SENTRY_DSN", "\"$sentryDsn\""
@@ -178,7 +178,12 @@ dependencies {
     // ── Room ────────────────────────────────────────────────
     implementation libs.room.runtime
     implementation libs.room.ktx
+    implementation libs.room.paging
     ksp libs.room.compiler
+
+    // ── Paging 3 ──────────────────────────────────────────
+    implementation libs.paging.runtime
+    implementation libs.paging.compose
 
     // ── WorkManager ────────────────────────────────────────
     implementation libs.work.runtime.ktx
@@ -195,6 +200,7 @@ dependencies {
     testImplementation libs.junit
     testImplementation libs.coroutines.test
     testImplementation libs.mockk
+    testImplementation libs.paging.testing
     androidTestImplementation libs.test.ext.junit
     androidTestImplementation libs.compose.ui.test.junit4
     debugImplementation libs.compose.ui.test.manifest

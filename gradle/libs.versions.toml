@@ -12,6 +12,7 @@ workRuntimeKtx = "2.9.1"
 lifecycleViewmodelCompose = "2.8.7"
 room = "2.8.4"
 ksp = "2.3.9"
+paging = "3.3.0"
 
 material = "1.14.0"
 poi = "5.5.1"
@@ -57,7 +58,12 @@ work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version
 room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+room-paging = { group = "androidx.room", name = "room-paging", version.ref = "room" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version = "1.7.3" }
+
+paging-runtime = { group = "androidx.paging", name = "paging-runtime", version.ref = "paging" }
+paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "paging" }
+paging-testing = { group = "androidx.paging", name = "paging-testing", version.ref = "paging" }
 
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 poi = { group = "org.apache.poi", name = "poi", version.ref = "poi" }
