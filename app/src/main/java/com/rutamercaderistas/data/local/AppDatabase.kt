@@ -69,10 +69,8 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         private val MIGRATION_4_5 = Migration(4, 5) { db ->
-            // Se recrea la tabla con el esquema exacto que Room espera.
-            // SQLite no permite quitar DEFAULT ni renombrar índices con ALTER,
-            // y los datos se reimportan desde assets al abrir la pantalla EAN.
-            db.execSQL("DROP TABLE IF EXISTS `ean_products`")
+            // Rebuild to remove the old defaults and preserve all catalog rows.
+            db.execSQL("ALTER TABLE `ean_products` RENAME TO `ean_products_v4`")
             db.execSQL(
                 """CREATE TABLE `ean_products` (
                 `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -96,8 +94,25 @@ abstract class AppDatabase : RoomDatabase() {
                 `catN3Proveedor` TEXT NOT NULL,
                 `catN4Proveedor` TEXT NOT NULL,
                 `codigoBarra` TEXT NOT NULL
-            )"""
+                )"""
             )
+            db.execSQL(
+                """INSERT INTO `ean_products` (
+                `id`, `codCencosud`, `codProveedor`, `eanPrincipal`,
+                `descripcionProducto`, `descripcion_norm`, `marca`, `marca_norm`,
+                `unBase`, `unPedido`, `conversion`, `estado`, `catN1Cencosud`,
+                `catN2Cencosud`, `catN3Cencosud`, `catN4Cencosud`,
+                `catN1Proveedor`, `catN2Proveedor`, `catN3Proveedor`,
+                `catN4Proveedor`, `codigoBarra`
+                )
+                SELECT `id`, `codCencosud`, `codProveedor`, `eanPrincipal`,
+                `descripcionProducto`, '', `marca`, '', `unBase`, `unPedido`,
+                `conversion`, `estado`, `catN1Cencosud`, `catN2Cencosud`,
+                `catN3Cencosud`, `catN4Cencosud`, `catN1Proveedor`,
+                `catN2Proveedor`, `catN3Proveedor`, `catN4Proveedor`, `codigoBarra`
+                FROM `ean_products_v4`"""
+            )
+            db.execSQL("DROP TABLE `ean_products_v4`")
             db.execSQL("CREATE INDEX `index_ean_products_eanPrincipal` ON `ean_products` (`eanPrincipal`)")
             db.execSQL("CREATE INDEX `index_ean_products_codCencosud` ON `ean_products` (`codCencosud`)")
             db.execSQL("CREATE INDEX `index_ean_products_codProveedor` ON `ean_products` (`codProveedor`)")
@@ -119,7 +134,6 @@ abstract class AppDatabase : RoomDatabase() {
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, DB_NAME)
                 .addMigrations(MIGRATION_1_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
-                .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
     }
 }

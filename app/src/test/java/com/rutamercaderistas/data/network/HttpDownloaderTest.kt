@@ -1,38 +1,98 @@
 package com.rutamercaderistas.data.network
 
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.Closeable
+import java.net.ServerSocket
+import kotlin.concurrent.thread
 
 class HttpDownloaderTest {
 
     @Test
+    fun `downloadBytes returns response body`() = runTest {
+        LocalHttpServer(response(200, "OK", "hello")).use { server ->
+            val result = downloadBytes(server.url)
+
+            assertTrue(result.isSuccess)
+            assertArrayEquals("hello".toByteArray(), result.getOrThrow())
+        }
+    }
+
+    @Test
+    fun `downloadBytes returns explicit failure for non successful status`() = runTest {
+        LocalHttpServer(response(503, "Service Unavailable", "unavailable")).use { server ->
+            val result = downloadBytes(server.url)
+
+            assertTrue(result.isFailure)
+            assertEquals(503, (result.exceptionOrNull() as HttpStatusException).statusCode)
+        }
+    }
+
+    @Test
+    fun `downloadBytes enforces size limit when content length is unknown`() = runTest {
+        val chunkedResponse = "HTTP/1.1 200 OK\r\n" +
+            "Transfer-Encoding: chunked\r\n" +
+            "Connection: close\r\n\r\n" +
+            "6\r\n123456\r\n0\r\n\r\n"
+        LocalHttpServer(chunkedResponse).use { server ->
+            val result = downloadBytes(server.url, maxBytes = 5)
+
+            assertTrue(result.isFailure)
+            assertTrue(result.exceptionOrNull() is DownloadSizeLimitException)
+        }
+    }
+
+    @Test
+    fun `downloadBytes follows redirects`() = runTest {
+        val redirect = "HTTP/1.1 302 Found\r\n" +
+            "Location: /content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        LocalHttpServer(redirect, response(200, "OK", "data")).use { server ->
+            val result = downloadBytes(server.url, maxRedirects = 1)
+
+            assertTrue(result.isSuccess)
+            assertArrayEquals("data".toByteArray(), result.getOrThrow())
+        }
+    }
+
+    @Test
     fun `downloadBytes fails for invalid URL`() = runTest {
-        val result = downloadBytes(url = "https://invalid.url.example")
-        assertTrue(result.isFailure)
+        assertTrue(downloadBytes("not a URL").isFailure)
+        assertTrue(downloadBytes("").isFailure)
     }
 
-    @Test
-    fun `downloadBytes fails for empty URL`() = runTest {
-        val result = downloadBytes(url = "")
-        assertTrue(result.isFailure)
+    private class LocalHttpServer(vararg responses: String) : Closeable {
+        private val server = ServerSocket(0)
+        private val serverThread = thread(isDaemon = true) {
+            responses.forEach { response ->
+                server.accept().use { socket ->
+                    val reader = socket.getInputStream().bufferedReader()
+                    while (true) {
+                        val line = reader.readLine() ?: break
+                        if (line.isEmpty()) break
+                    }
+                    socket.getOutputStream().apply {
+                        write(response.toByteArray())
+                        flush()
+                    }
+                }
+            }
+        }
+
+        val url: String = "http://127.0.0.1:${server.localPort}/"
+
+        override fun close() {
+            server.close()
+            serverThread.join(1_000)
+        }
     }
 
-    @Test
-    fun `downloadBytes respects custom timeout`() = runTest {
-        val result = downloadBytes(
-            url = "https://httpbin.org/delay/5",
-            connectTimeout = 1000,
-            readTimeout = 1000,
-        )
-        assertTrue(result.isFailure)
-    }
-
-    @Test
-    fun `downloadBytes returns data for valid URL`() = runTest {
-        val result = downloadBytes(url = "https://www.google.com")
-        assertTrue(result.isSuccess)
-        assertNotNull(result.getOrNull())
+    private companion object {
+        fun response(status: Int, reason: String, body: String): String =
+            "HTTP/1.1 $status $reason\r\n" +
+                "Content-Length: ${body.toByteArray().size}\r\n" +
+                "Connection: close\r\n\r\n$body"
     }
 }

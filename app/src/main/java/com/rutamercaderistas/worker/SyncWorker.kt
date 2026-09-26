@@ -28,7 +28,10 @@ class SyncWorker @AssistedInject constructor(
                 val activeRoute = repository.getActiveRuteroName()
                 val ts = System.currentTimeMillis()
                 val url = "${Constants.DRIVE_EXPORT_URL}&ts=$ts"
-                val bytes = downloadBytes(url = url).getOrNull()
+                val bytes = downloadBytes(url = url).getOrElse { error ->
+                    Timber.w(error, "Error descargando Excel para sync (intento %d)", runAttemptCount)
+                    null
+                }
 
                 if (bytes == null) {
                     Timber.w("downloadBytes devolvió null en SyncWorker (intento %d)", runAttemptCount)
