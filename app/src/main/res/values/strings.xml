@@ -21,6 +21,8 @@
     <string name="sync_historial_titulo">Historial de sincronizaciones</string>
     <string name="sync_historial_vacio">Aún no hay sincronizaciones con cambios.</string>
     <string name="sync_historial_borrar">Borrar historial</string>
+    <string name="sync_ultima_revision">Última revisión del Excel: %1$s</string>
+    <string name="sync_sin_revision">El Excel aún no se ha revisado en este dispositivo.</string>
     <string name="sync_ruta_hoy_titulo">Cambios en tu ruta de hoy</string>
     <string name="sync_ruta_hoy_texto">%1$s</string>
     <string name="notif_canal_sync_nombre">Sincronización</string>

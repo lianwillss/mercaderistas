@@ -101,4 +101,37 @@ class SyncViewModelTest {
         assertEquals(SyncState.Syncing(), viewModel.state.value.state)
         assertTrue(viewModel.state.value.isSyncing)
     }
+
+    @Test
+    fun `shouldAutoSync is false without previous sync`() {
+        assertFalse(viewModel.shouldAutoSync(lastSyncTime = 0L, now = 1_000_000L))
+    }
+
+    @Test
+    fun `shouldAutoSync is false within interval`() {
+        val now = 1_000_000L
+        assertFalse(
+            viewModel.shouldAutoSync(
+                lastSyncTime = now - 5 * 60 * 1000L,
+                now = now,
+            )
+        )
+    }
+
+    @Test
+    fun `shouldAutoSync is true after interval`() {
+        val now = 1_000_000L
+        assertTrue(
+            viewModel.shouldAutoSync(
+                lastSyncTime = now - 16 * 60 * 1000L,
+                now = now,
+            )
+        )
+    }
+
+    @Test
+    fun `shouldAutoSync is false for future timestamp`() {
+        val now = 1_000_000L
+        assertFalse(viewModel.shouldAutoSync(lastSyncTime = now + 60_000L, now = now))
+    }
 }

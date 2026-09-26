@@ -48,6 +48,8 @@ class PreferencesRepository @Inject constructor(
         val KEY_ONBOARDING_DONE = stringPreferencesKey("onboarding_done")
         private val KEY_LAST_SYNC_ETAG = stringPreferencesKey("last_sync_etag")
         private val KEY_LAST_SYNC_HASH = stringPreferencesKey("last_sync_hash")
+        private val KEY_LAST_SYNC_CHECK = longPreferencesKey("last_sync_check")
+        private val KEY_LAST_PROMO_REFRESH = longPreferencesKey("last_promo_refresh")
         private val KEY_PENDING_UPDATE_NAME = stringPreferencesKey("pending_update_name")
         private val KEY_PENDING_UPDATE_CODE = intPreferencesKey("pending_update_code")
         private val KEY_PENDING_UPDATE_URL = stringPreferencesKey("pending_update_url")
@@ -202,6 +204,24 @@ class PreferencesRepository @Inject constructor(
             if (value == null) prefs.remove(KEY_LAST_SYNC_HASH)
             else prefs[KEY_LAST_SYNC_HASH] = value
         }
+    }
+
+    /** Última vez que se revisó el Excel (manual, auto o worker), haya cambios o no. */
+    suspend fun getLastSyncCheck(): Long =
+        context.prefsDataStore.data.first()[KEY_LAST_SYNC_CHECK] ?: 0L
+
+    suspend fun setLastSyncCheck(value: Long) {
+        context.prefsDataStore.edit { it[KEY_LAST_SYNC_CHECK] = value }
+    }
+
+    fun getLastSyncCheckFlow(): Flow<Long> =
+        context.prefsDataStore.data.map { it[KEY_LAST_SYNC_CHECK] ?: 0L }
+
+    suspend fun getLastPromoRefresh(): Long =
+        context.prefsDataStore.data.first()[KEY_LAST_PROMO_REFRESH] ?: 0L
+
+    suspend fun setLastPromoRefresh(value: Long) {
+        context.prefsDataStore.edit { it[KEY_LAST_PROMO_REFRESH] = value }
     }
 
     fun getSyncHistoryFlow(): Flow<List<SyncHistoryEntry>> =

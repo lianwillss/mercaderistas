@@ -5,7 +5,9 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.RawQuery
 import androidx.room.Delete
+import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -85,4 +87,9 @@ interface EanProductDao {
     // PagingSource para todos los productos (lista vacía)
     @Query("SELECT * FROM ean_products ORDER BY descripcionProducto")
     fun pagingSourceAll(): PagingSource<Int, EanProductEntity>
+
+    // Full-text FTS5 (tabla sidecar ean_product_fts). @RawQuery porque la tabla
+    // no es entidad Room; si no existe, lanza y el llamador usa solo LIKE.
+    @RawQuery(observedEntities = [EanProductEntity::class])
+    suspend fun ftsSearch(query: SupportSQLiteQuery): List<EanProductEntity>
 }

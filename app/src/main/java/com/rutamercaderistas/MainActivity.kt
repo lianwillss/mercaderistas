@@ -133,6 +133,17 @@ class MainActivity : ComponentActivity() {
                 routeViewModel.loadInitialData()
             }
 
+            // Auto-sync del rutero al abrir: una sola vez, cuando ya hay ruta
+            // seleccionada. Silencioso si no hay cambios (Idle sin snackbar).
+            var autoSyncLaunched by remember { mutableStateOf(false) }
+            LaunchedEffect(routeUiState.selectedRoute) {
+                val route = routeUiState.selectedRoute
+                if (!autoSyncLaunched && route != null) {
+                    autoSyncLaunched = true
+                    syncViewModel.autoSyncIfStale(route)
+                }
+            }
+
             MercaderistasTheme {
                 Scaffold(
                     snackbarHost = {

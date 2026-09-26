@@ -11,5 +11,8 @@ object Constants {
     const val MAX_RETRIES = 3
     const val RETRY_BACKOFF_MS = 1_000L
 
+    // Intervalo mínimo entre auto-chequeos del rutero al abrir la app.
+    const val AUTO_SYNC_MIN_INTERVAL_MS = 15 * 60 * 1000L
+
     const val UPDATE_SUPPRESS_DAYS_MS = 86_400_000L
 }

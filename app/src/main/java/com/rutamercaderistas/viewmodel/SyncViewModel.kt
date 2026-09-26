@@ -12,6 +12,7 @@ import androidx.lifecycle.viewModelScope
 import com.rutamercaderistas.Constants
 import com.rutamercaderistas.R
 import com.rutamercaderistas.data.network.downloadBytes
+import com.rutamercaderistas.data.network.sha256Hex
 import com.rutamercaderistas.services.PromotionRepository
 import timber.log.Timber
 import com.rutamercaderistas.data.result.SyncResult
@@ -286,17 +287,14 @@ class SyncViewModel @Inject constructor(
         return ruteroManager.withSyncLock {
             withContext(Dispatchers.IO) {
             try {
+                // Marcar la revisión (haya cambios o no) para "Última revisión" en Ajustes.
+                try { preferencesRepository.setLastSyncCheck(System.currentTimeMillis()) } catch (_: Exception) {}
                 val oldEntries = ruteroManager.loadAllEntries()
                 val activeRoute = repository.getActiveRuteroName()
-                // Incremental: si el ETag no cambió, no hay nada que hacer
-                val lastETag = try { preferencesRepository.getLastSyncETag() } catch (_: Exception) { null }
-                if (lastETag != null) {
-                    val currentETag = try { com.rutamercaderistas.data.network.headForETag(Constants.DRIVE_EXPORT_URL) } catch (_: Exception) { null }
-                    if (currentETag != null && currentETag == lastETag) {
-                        _state.value = _state.value.copy(state = SyncState.Idle)
-                        return@withContext SyncResult.NoChange
-                    }
-                }
+                // Nota: antes había un gate por ETag vía HEAD, pero el export de
+                // Google no garantiza ETag fresco (el HEAD no sigue redirects ni
+                // lleva cache-buster) y producía falsos "sin cambios" sin llegar
+                // al hash. La única compuerta confiable es el SHA-256 post-descarga.
                 _state.value = _state.value.copy(state = SyncState.Syncing(phase = getApplication<Application>().getString(R.string.sync_descargando)))
                 val cacheBustedUrl = "${Constants.DRIVE_EXPORT_URL}&ts=${System.currentTimeMillis()}"
                 val bytes = downloadWithRetries(cacheBustedUrl)
@@ -310,11 +308,7 @@ class SyncViewModel @Inject constructor(
                 _state.value = _state.value.copy(state = SyncState.Syncing(phase = getApplication<Application>().getString(R.string.sync_procesando)))
                 // Hash incremental: si el contenido no cambió, no re-procesar
                 val lastHash = try { preferencesRepository.getLastSyncHash() } catch (_: Exception) { null }
-                val currentHash = try {
-                    val md = java.security.MessageDigest.getInstance("SHA-256")
-                    md.update(bytes)
-                    md.digest().joinToString("") { "%02x".format(it) }
-                } catch (_: Exception) { null }
+                val currentHash = sha256Hex(bytes)
                 if (lastHash != null && currentHash != null && lastHash == currentHash) {
                     _state.value = _state.value.copy(state = SyncState.Idle)
                     return@withContext SyncResult.NoChange
@@ -346,12 +340,9 @@ class SyncViewModel @Inject constructor(
         try { preferencesRepository.setLastSyncTime(System.currentTimeMillis()) } catch (_: Exception) {}
 
         // Only mark the source as committed after the file and Room index are valid.
+        // Se guarda solo el hash: el ETag vía HEAD ya no se usa (ver performDriveSync).
         if (currentHash != null) {
             try { preferencesRepository.setLastSyncHash(currentHash) } catch (_: Exception) {}
-            try {
-                val etag = com.rutamercaderistas.data.network.headForETag(Constants.DRIVE_EXPORT_URL)
-                if (etag != null) preferencesRepository.setLastSyncETag(etag)
-            } catch (_: Exception) {}
         }
 
         _state.value = _state.value.copy(state = SyncState.Syncing(phase = getApplication<Application>().getString(R.string.sync_actualizando_promos)))
@@ -382,41 +373,77 @@ class SyncViewModel @Inject constructor(
         _state.value = _state.value.copy(state = SyncState.Syncing(), syncError = null, syncChanges = null)
         syncJob = viewModelScope.launch {
             val result = performDriveSync()
-            when (result) {
-                is SyncResult.Success -> {
-                    val index = ruteroManager.loadIndex()
-                    val routeToLoad = if (currentRoute != null && index.contains(currentRoute)) {
-                        currentRoute
-                    } else {
-                        index.firstOrNull()
+            applyDriveSyncResult(result, currentRoute)
+        }
+    }
+
+    /**
+     * Chequeo automático silencioso al abrir la app: si pasó el intervalo mínimo
+     * desde el último sync y hay conexión, corre el mismo flujo manual. Sin
+     * cambios reales queda en Idle sin snackbar; con cambios muestra el aviso
+     * habitual y recarga la ruta activa.
+     */
+    fun autoSyncIfStale(currentRoute: String?) {
+        if (currentRoute.isNullOrBlank() || !_state.value.isOnline) return
+        if (syncJob?.isActive == true) return
+        syncJob = viewModelScope.launch {
+            val last = try { preferencesRepository.getLastSyncTime() } catch (_: Exception) { 0L }
+            if (!shouldAutoSync(last, System.currentTimeMillis())) return@launch
+            _state.value = _state.value.copy(state = SyncState.Syncing(), syncError = null, syncChanges = null)
+            val result = performDriveSync()
+            applyDriveSyncResult(result, currentRoute)
+        }
+    }
+
+    /**
+     * Decisión pura del throttle de auto-sync, testeable en JVM.
+     * Solo corre si alguna vez hubo un sync previo y venció el intervalo.
+     */
+    internal fun shouldAutoSync(
+        lastSyncTime: Long,
+        now: Long = System.currentTimeMillis(),
+        minIntervalMs: Long = Constants.AUTO_SYNC_MIN_INTERVAL_MS,
+    ): Boolean {
+        if (lastSyncTime <= 0L) return false
+        if (now < lastSyncTime) return false
+        return now - lastSyncTime >= minIntervalMs
+    }
+
+    private suspend fun applyDriveSyncResult(result: SyncResult<Boolean>, currentRoute: String?) {
+        when (result) {
+            is SyncResult.Success -> {
+                val index = ruteroManager.loadIndex()
+                val routeToLoad = if (currentRoute != null && index.contains(currentRoute)) {
+                    currentRoute
+                } else {
+                    index.firstOrNull()
+                }
+                if (routeToLoad != null) {
+                    val entries = ruteroManager.loadRoute(routeToLoad)
+                    if (entries.isNotEmpty()) {
+                        repository.clear()
+                        repository.setEntries(entries, routeToLoad)
                     }
-                    if (routeToLoad != null) {
-                        val entries = ruteroManager.loadRoute(routeToLoad)
-                        if (entries.isNotEmpty()) {
-                            repository.clear()
-                            repository.setEntries(entries, routeToLoad)
-                        }
-                    }
-                    _state.value = _state.value.copy(
-                        state = SyncState.Idle,
-                        snackbarMessage = getApplication<Application>().getString(R.string.sync_datos_actualizados),
-                    )
                 }
-                is SyncResult.Error -> {
-                    _state.value = _state.value.copy(
-                        state = SyncState.Idle,
-                        syncError = result.message,
-                    )
-                }
-                is SyncResult.NoChange -> {
-                    _state.value = _state.value.copy(state = SyncState.Idle)
-                }
-                is SyncResult.Offline -> {
-                    _state.value = _state.value.copy(
-                        state = SyncState.Idle,
-                        syncError = getApplication<Application>().getString(R.string.sync_sin_conexion),
-                    )
-                }
+                _state.value = _state.value.copy(
+                    state = SyncState.Idle,
+                    snackbarMessage = getApplication<Application>().getString(R.string.sync_datos_actualizados),
+                )
+            }
+            is SyncResult.Error -> {
+                _state.value = _state.value.copy(
+                    state = SyncState.Idle,
+                    syncError = result.message,
+                )
+            }
+            is SyncResult.NoChange -> {
+                _state.value = _state.value.copy(state = SyncState.Idle)
+            }
+            is SyncResult.Offline -> {
+                _state.value = _state.value.copy(
+                    state = SyncState.Idle,
+                    syncError = getApplication<Application>().getString(R.string.sync_sin_conexion),
+                )
             }
         }
     }

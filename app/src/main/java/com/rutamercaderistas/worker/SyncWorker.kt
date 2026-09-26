@@ -6,6 +6,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.rutamercaderistas.Constants
 import com.rutamercaderistas.data.network.downloadBytes
+import com.rutamercaderistas.data.network.sha256Hex
 import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.services.RuteroManager
 import com.rutamercaderistas.services.RuteroRepository
@@ -25,6 +26,7 @@ class SyncWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         return ruteroManager.withSyncLock {
             try {
+                try { preferencesRepository.setLastSyncCheck(System.currentTimeMillis()) } catch (_: Exception) {}
                 val activeRoute = repository.getActiveRuteroName()
                 val ts = System.currentTimeMillis()
                 val url = "${Constants.DRIVE_EXPORT_URL}&ts=$ts"
@@ -38,15 +40,31 @@ class SyncWorker @AssistedInject constructor(
                     return@withSyncLock if (runAttemptCount < 3) Result.retry() else Result.failure()
                 }
 
+                // Hash incremental (igual que el flujo manual): sin cambios no se
+                // reescribe el maestro ni se reindexa Room.
+                val currentHash = sha256Hex(bytes)
+                val lastHash = try { preferencesRepository.getLastSyncHash() } catch (_: Exception) { null }
+                if (lastHash != null && currentHash != null && lastHash == currentHash) {
+                    Timber.d("SyncWorker: sin cambios (hash igual), no se reindexa")
+                    return@withSyncLock Result.success()
+                }
+
                 val changed = ruteroManager.saveMasterExcel(bytes)
                 if (!changed) {
+                    // Contenido inválido: reintentar no ayuda (el archivo no va a
+                    // cambiar solo), falla rápido para no gastar datos/batería.
                     Timber.w("El Excel descargado no pasó la validación")
-                    return@withSyncLock if (runAttemptCount < 3) Result.retry() else Result.failure()
+                    return@withSyncLock Result.failure()
                 }
 
                 val ok = ruteroManager.createIndex()
                 if (ok) {
                     preferencesRepository.setLastSyncTime(System.currentTimeMillis())
+                    // Persistir la misma marca que el flujo manual (solo hash)
+                    // para no divergir.
+                    if (currentHash != null) {
+                        try { preferencesRepository.setLastSyncHash(currentHash) } catch (_: Exception) {}
+                    }
                     val routes = ruteroManager.loadIndex()
                         val routeToReload = activeRoute?.takeIf { it in routes } ?: routes.firstOrNull()
                         if (routeToReload != null) {

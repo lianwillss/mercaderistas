@@ -94,4 +94,18 @@ class PreferencesRepositoryTest {
         repository.setLastNotifiedUpdateCode(12002)
         assertEquals(12002, repository.getLastNotifiedUpdateCode())
     }
+
+    @Test
+    fun `lastSyncCheck defaults to 0 and roundtrips`() = runTest {
+        assertEquals(0L, repository.getLastSyncCheck())
+        repository.setLastSyncCheck(987654321L)
+        assertEquals(987654321L, repository.getLastSyncCheck())
+    }
+
+    @Test
+    fun `lastPromoRefresh defaults to 0 and roundtrips`() = runTest {
+        assertEquals(0L, repository.getLastPromoRefresh())
+        repository.setLastPromoRefresh(555L)
+        assertEquals(555L, repository.getLastPromoRefresh())
+    }
 }

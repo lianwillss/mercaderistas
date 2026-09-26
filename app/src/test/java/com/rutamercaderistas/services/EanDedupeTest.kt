@@ -13,6 +13,7 @@ class EanDedupeTest {
     private val parser = EanExcelParser(
         context = mockk<Context>(relaxed = true),
         eanProductDao = mockk<EanProductDao>(relaxed = true),
+        eanFts = mockk(relaxed = true),
     )
 
     @Test

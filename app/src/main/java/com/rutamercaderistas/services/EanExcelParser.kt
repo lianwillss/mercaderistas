@@ -2,6 +2,7 @@ package com.rutamercaderistas.services
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import com.rutamercaderistas.data.local.EanFtsManager
 import com.rutamercaderistas.data.local.EanProductDao
 import com.rutamercaderistas.data.local.EanProductEntity
 import org.apache.poi.ss.usermodel.Cell
@@ -93,6 +94,7 @@ fun compactNorm(text: String): String =
 class EanExcelParser @Inject constructor(
     @ApplicationContext private val context: Context,
     private val eanProductDao: EanProductDao,
+    private val eanFts: EanFtsManager,
 ) {
 
     private var lastDiagnostics: EanDiagnostics = EanDiagnostics()
@@ -123,6 +125,7 @@ class EanExcelParser @Inject constructor(
             if (deduped.isNotEmpty()) {
                 eanProductDao.clearAll()
                 eanProductDao.insertAll(deduped)
+                eanFts.ensureAndRebuild()
             }
             Result.success(deduped.size)
         } catch (e: Exception) {
@@ -447,6 +450,7 @@ class EanExcelParser @Inject constructor(
             if (deduped.isNotEmpty()) {
                 eanProductDao.clearAll()
                 eanProductDao.insertAll(deduped)
+                eanFts.ensureAndRebuild()
             }
             Result.success(deduped.size)
         } catch (e: Exception) {

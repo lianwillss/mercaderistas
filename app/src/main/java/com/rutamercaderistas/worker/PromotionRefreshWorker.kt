@@ -16,6 +16,6 @@ class PromotionRefreshWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        return if (promotionRepository.refresh()) Result.success() else Result.retry()
+        return if (promotionRepository.refreshIfStale()) Result.success() else Result.retry()
     }
 }

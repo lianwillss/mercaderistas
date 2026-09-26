@@ -52,6 +52,10 @@ class SettingsViewModel @Inject constructor(
     val syncHistory: StateFlow<List<SyncHistoryEntry>> = preferencesRepository.getSyncHistoryFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    /** 0 = aún nunca se revisó el Excel. */
+    val lastSyncCheck: StateFlow<Long> = preferencesRepository.getLastSyncCheckFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
     fun clearSyncHistory() {
         viewModelScope.launch { preferencesRepository.clearSyncHistory() }
     }

@@ -18,30 +18,16 @@ class HttpStatusException(val statusCode: Int) : IOException("HTTP $statusCode")
 class DownloadSizeLimitException(val maxBytes: Long) :
     IOException("Descarga excede el límite de $maxBytes bytes")
 
-suspend fun headForETag(
-    url: String,
-    connectTimeout: Int = 10_000,
-    readTimeout: Int = 10_000,
-): String? = withContext(Dispatchers.IO) {
-    var conn: HttpURLConnection? = null
-    try {
-        conn = URL(url).openConnection() as HttpURLConnection
-        conn.requestMethod = "HEAD"
-        conn.connectTimeout = connectTimeout
-        conn.readTimeout = readTimeout
-        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
-        conn.connect()
-        if (conn.responseCode in 200..299) {
-            return@withContext conn.getHeaderField("ETag") ?: conn.getHeaderField("etag")
-                ?: conn.getHeaderField("Last-Modified")
-        }
-        null
-    } catch (_: Exception) {
-        null
-    } finally {
-        conn?.disconnect()
-    }
-}
+/**
+ * SHA-256 en hex del contenido descargado. Es la única compuerta confiable
+ * para detectar cambios del Excel (el ETag vía HEAD de Google no es fresco).
+ * Pura y testeable en JVM.
+ */
+fun sha256Hex(bytes: ByteArray): String? = try {
+    val md = java.security.MessageDigest.getInstance("SHA-256")
+    md.update(bytes)
+    md.digest().joinToString("") { "%02x".format(it) }
+} catch (_: Exception) { null }
 
 suspend fun downloadBytes(
     url: String,

@@ -286,7 +286,8 @@ class RouteViewModel @Inject constructor(
                 } else {
                     _uiState.update { it.copy(promotions = PromotionsState.Loading) }
                 }
-                val ok = promotionRepository.refresh()
+                // Arranque frío: throttle para no descargar el CSV en cada apertura.
+                val ok = promotionRepository.refreshIfStale()
                 val all = promotionRepository.getAllPromotions()
                 updatePromotionState(groupPromotions(all))
                 _uiState.update { it.copy(

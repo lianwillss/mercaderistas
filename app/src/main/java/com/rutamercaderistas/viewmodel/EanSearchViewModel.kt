@@ -8,8 +8,11 @@ import androidx.paging.PagingData
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import androidx.paging.cachedIn
+import androidx.sqlite.db.SimpleSQLiteQuery
+import com.rutamercaderistas.data.local.EAN_FTS_MATCH_QUERY
 import com.rutamercaderistas.data.local.EanProductDao
 import com.rutamercaderistas.data.local.EanProductEntity
+import com.rutamercaderistas.data.local.buildFtsMatch
 import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.services.EAN_DATA_VERSION
 import com.rutamercaderistas.services.EanExcelParser
@@ -258,7 +261,12 @@ private class MultiTokenPagingSource(
         return try {
             val page = params.key ?: 1
             val firstToken = tokens.first()
-            val candidates = dao.searchCandidates(firstToken).first()
+            // Candidatos LIKE (cubre códigos con ceros y Levenshtein) + FTS5
+            // (prefijos y tokenización en descripciones/marcas). El ranking
+            // final sigue siendo el mismo in-memory de abajo.
+            val like = dao.searchCandidates(firstToken).first()
+            val fts = ftsCandidates()
+            val candidates = if (fts.isEmpty()) like else (like + fts).distinctBy { it.id }
 
             // Filtrar por AND de todos los tokens
             val filtered = candidates
@@ -326,5 +334,15 @@ private class MultiTokenPagingSource(
         return state.anchorPosition?.let { anchorPosition ->
             (anchorPosition / 50) + 1
         } ?: 1
+    }
+
+    /** Candidatos FTS5; vacío si la tabla sidecar aún no existe. Nunca lanza. */
+    private suspend fun ftsCandidates(): List<EanProductEntity> {
+        val match = buildFtsMatch(tokens) ?: return emptyList()
+        return try {
+            dao.ftsSearch(SimpleSQLiteQuery(EAN_FTS_MATCH_QUERY, arrayOf(match)))
+        } catch (_: Exception) {
+            emptyList()
+        }
     }
 }

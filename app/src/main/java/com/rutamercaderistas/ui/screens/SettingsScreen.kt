@@ -206,6 +206,16 @@ fun SettingsScreen(
 
             SettingsCard(title = stringResource(R.string.sync_historial_titulo)) {
                 val syncHistory by viewModel.syncHistory.collectAsStateWithLifecycle()
+                val lastCheck by viewModel.lastSyncCheck.collectAsStateWithLifecycle()
+                Text(
+                    text = if (lastCheck > 0L) stringResource(
+                        R.string.sync_ultima_revision,
+                        formatSyncHistoryDate(lastCheck),
+                    ) else stringResource(R.string.sync_sin_revision),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
                 if (syncHistory.isEmpty()) {
                     Text(
                         text = stringResource(R.string.sync_historial_vacio),

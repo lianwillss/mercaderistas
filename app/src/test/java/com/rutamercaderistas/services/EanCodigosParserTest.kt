@@ -19,7 +19,7 @@ class EanCodigosParserTest {
         coEvery { dao.insertAll(any()) } returns Unit
         val context = mockk<Context>(relaxed = true)
 
-        val parser = EanExcelParser(context, dao)
+        val parser = EanExcelParser(context, dao, mockk(relaxed = true))
         val path = "src/main/assets/ean_codigos.xlsx"
         val result = parser.loadFromFile(path)
 
@@ -42,7 +42,7 @@ class EanCodigosParserTest {
         val dao = mockk<EanProductDao>(relaxed = true)
         coEvery { dao.clearAll() } returns Unit
         coEvery { dao.insertAll(any()) } returns Unit
-        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao, mockk(relaxed = true))
 
         val result = parser.loadFromFile("src/main/assets/ean_asmode.xlsx")
 
@@ -55,7 +55,7 @@ class EanCodigosParserTest {
         val dao = mockk<EanProductDao>(relaxed = true)
         coEvery { dao.clearAll() } returns Unit
         coEvery { dao.insertAll(any()) } returns Unit
-        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao, mockk(relaxed = true))
 
         val result = parser.loadFromFile("src/main/assets/ean_bwild.xlsx")
 
@@ -69,7 +69,7 @@ class EanCodigosParserTest {
         coEvery { dao.clearAll() } returns Unit
         val slot = io.mockk.slot<List<com.rutamercaderistas.data.local.EanProductEntity>>()
         coEvery { dao.insertAll(capture(slot)) } returns Unit
-        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao, mockk(relaxed = true))
 
         val result = parser.loadFromFile("src/main/assets/ean_bwild.xlsx")
 
@@ -87,7 +87,7 @@ class EanCodigosParserTest {
         val dao = mockk<EanProductDao>(relaxed = true)
         coEvery { dao.clearAll() } returns Unit
         coEvery { dao.insertAll(any()) } returns Unit
-        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao, mockk(relaxed = true))
 
         val result = parser.loadFromFile("src/main/assets/ean_super.xlsx")
 

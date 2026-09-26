@@ -3,6 +3,7 @@ package com.rutamercaderistas.data.network
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.Closeable
@@ -94,5 +95,28 @@ class HttpDownloaderTest {
             "HTTP/1.1 $status $reason\r\n" +
                 "Content-Length: ${body.toByteArray().size}\r\n" +
                 "Connection: close\r\n\r\n$body"
+    }
+
+    @Test
+    fun `sha256Hex matches known vectors`() {
+        assertEquals(
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            sha256Hex("abc".toByteArray()),
+        )
+        assertEquals(
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            sha256Hex(ByteArray(0)),
+        )
+    }
+
+    @Test
+    fun `sha256Hex is stable and sensitive to content`() {
+        val a = sha256Hex("rutero-v1".toByteArray())
+        val b = sha256Hex("rutero-v1".toByteArray())
+        val c = sha256Hex("rutero-v2".toByteArray())
+        assertNotNull(a)
+        assertEquals(a, b)
+        assertTrue(a != c)
+        assertEquals(64, a!!.length)
     }
 }

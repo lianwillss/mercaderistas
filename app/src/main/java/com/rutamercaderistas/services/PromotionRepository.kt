@@ -11,6 +11,7 @@ import com.rutamercaderistas.Constants
 import com.rutamercaderistas.data.local.PromotionDao
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.data.network.downloadBytes
+import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.data.network.parseCsvLine
 import com.rutamercaderistas.data.network.parseDate
 import com.rutamercaderistas.worker.PromotionRefreshWorker
@@ -26,9 +27,38 @@ import javax.inject.Singleton
 @Singleton
 class PromotionRepository @Inject constructor(
     private val promotionDao: PromotionDao,
+    private val preferencesRepository: PreferencesRepository,
     @ApplicationContext private val context: Context,
 ) {
     private val refreshing = AtomicBoolean(false)
+
+    /**
+     * Refresh con throttle para el arranque frío: si hubo un refresh reciente
+     * (manual, auto o worker) se usa el caché sin descargar. El pull-to-refresh
+     * y el post-sync del rutero siguen usando refresh() forzado.
+     */
+    suspend fun refreshIfStale(): Boolean {
+        val last = try { preferencesRepository.getLastPromoRefresh() } catch (_: Exception) { 0L }
+        if (!shouldRefreshPromos(last, System.currentTimeMillis())) {
+            Timber.d("Promociones: refresh reciente — usando caché")
+            return true
+        }
+        val ok = refresh()
+        if (ok) {
+            try { preferencesRepository.setLastPromoRefresh(System.currentTimeMillis()) } catch (_: Exception) {}
+        }
+        return ok
+    }
+
+    internal fun shouldRefreshPromos(
+        lastRefresh: Long,
+        now: Long = System.currentTimeMillis(),
+        minIntervalMs: Long = Constants.PROMOTION_REFRESH_INTERVAL_HOURS * 3_600_000L,
+    ): Boolean {
+        if (lastRefresh <= 0L) return true
+        if (now < lastRefresh) return true
+        return now - lastRefresh >= minIntervalMs
+    }
 
     suspend fun refresh(): Boolean {
         if (!refreshing.compareAndSet(false, true)) {

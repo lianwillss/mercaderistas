@@ -43,6 +43,7 @@ App Android de rutas para mercaderistas: Kotlin, Compose, Hilt, Room y WorkManag
 - Todos los assets `app/src/main/assets/ean*.xlsx` se combinan automáticamente; si el nombre no es obvio, agregarlo a `EAN_FILE_BRANDS` en `EanExcelParser.kt`.
 - Al agregar/cambiar un asset EAN, incrementar `EAN_DATA_VERSION` para forzar la reimportación en instalaciones existentes y agregar una prueba del archivo/mapeo.
 - Deduplicación: clave EAN, fallback SKU Cencosud; conserva la fila más completa y fusiona campos no vacíos. No perder ceros iniciales de códigos.
+- Búsqueda full-text FTS5 en tabla sidecar `ean_product_fts` (NO es entidad Room: sin bump de versión ni migración). `EanFtsManager.ensureAndRebuild()` se llama tras cada importación; `buildFtsMatch()` arma el MATCH (AND de prefijos, tokens ya `[a-z0-9]`); el DAO usa `@RawQuery` y el PagingSource cae a LIKE si la tabla falta.
 - Catálogos actuales incluyen ASMODE, DIX y CUK; los Excel originales de la raíz son fuentes locales y no se deben commitear salvo petición explícita.
 
 ## PDF de marcas
