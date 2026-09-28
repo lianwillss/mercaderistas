@@ -76,35 +76,54 @@ class EanSearchViewModel @Inject constructor(
         debounceJob?.cancel()
         viewModelScope.launch {
             _uiState.value = EanSearchUiState.Loading("Cargando base de datos EAN...")
+            val hasData = eanProductDao.count() > 0
+            if (hasData) {
+                // Caché primero: la pantalla se muestra al instante y la
+                // importación (lenta en catálogos grandes) corre en fondo.
+                _catalogMeta.value = EAN_DATA_VERSION to eanProductDao.count()
+                refreshBrandCounts()
+                observeSearch("")
+            }
             val currentHash = eanExcelParser.computeAssetsHash()
             val storedHash = eanExcelParser.getEanAssetsHash()
             // La versión fuerza reimportación en instalados: sin este chequeo,
             // cambios de alias/marca (p. ej. B.TAN → BWILD) nunca llegaban a
             // equipos que ya habían importado.
             val storedVersion = try { eanExcelParser.getEanDataVersion() } catch (_: Exception) { 0 }
-            val needsImport = eanProductDao.count() == 0 ||
+            val needsImport = !hasData ||
                 storedVersion < EAN_DATA_VERSION ||
                 (currentHash.isNotBlank() && storedHash != currentHash) ||
                 eanProductDao.hasUnnormalized() > 0
 
             if (needsImport) {
-                _uiState.value = EanSearchUiState.Loading("Importando base de datos EAN...")
+                if (!hasData) {
+                    _uiState.value = EanSearchUiState.Loading("Importando base de datos EAN...")
+                }
                 val result = eanExcelParser.loadFromAssets()
                 result.onSuccess { count ->
                     eanExcelParser.setEanDataVersion(EAN_DATA_VERSION)
                     if (currentHash.isNotBlank()) eanExcelParser.setEanAssetsHash(currentHash)
                     _catalogMeta.value = EAN_DATA_VERSION to count
                     refreshBrandCounts()
-                    _uiState.value = EanSearchUiState.Loading("Base de datos lista ($count productos)")
+                    if (!hasData) {
+                        _uiState.value = EanSearchUiState.Loading("Base de datos lista ($count productos)")
+                    }
                 }.onFailure { e ->
-                    _uiState.value = EanSearchUiState.Error("Error cargando base de datos: ${e.message}")
-                    return@launch
+                    // Con caché visible no se pisa con Error; sin datos no hay
+                    // nada que mostrar.
+                    if (!hasData) {
+                        _uiState.value = EanSearchUiState.Error("Error cargando base de datos: ${e.message}")
+                        return@launch
+                    }
                 }
-            } else {
+            } else if (!hasData) {
                 _catalogMeta.value = EAN_DATA_VERSION to eanProductDao.count()
                 refreshBrandCounts()
             }
-            observeSearch("")
+            // Re-observar con el query actual (el usuario pudo escribir
+            // mientras importaba en fondo): refresca la lista con lo nuevo.
+            val currentQuery = (_uiState.value as? EanSearchUiState.Ready)?.query.orEmpty()
+            observeSearch(currentQuery)
         }
     }
 

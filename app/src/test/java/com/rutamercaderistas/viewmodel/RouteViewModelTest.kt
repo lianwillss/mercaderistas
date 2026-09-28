@@ -90,7 +90,8 @@ class RouteViewModelTest {
     }
 
     private fun awaitOnMain(condition: () -> Boolean) {
-        val deadline = System.currentTimeMillis() + 5000
+        // 10s: en suite completa el Main global se congestiona y 5s expiraba en flake.
+        val deadline = System.currentTimeMillis() + 10000
         while (System.currentTimeMillis() < deadline) {
             testDispatcher.scheduler.advanceUntilIdle()
             if (condition()) return

@@ -37,6 +37,7 @@ class EanSearchViewModelTest {
     private lateinit var dao: EanProductDao
     private lateinit var parser: EanExcelParser
     private lateinit var prefs: PreferencesRepository
+    private val createdViewModels = mutableListOf<EanSearchViewModel>()
 
     private class FakePagingSource(
         private val items: List<EanProductEntity>,
@@ -63,8 +64,19 @@ class EanSearchViewModelTest {
 
     @After
     fun tearDown() {
+        // Cancelar SIEMPRE (aunque el test falle antes de su cancel local):
+        // un scope vivo con Paging deja hilos reales que envenenan la clase
+        // siguiente con UncaughtExceptionsBeforeTest. Recién después, unmock.
+        createdViewModels.forEach { it.viewModelScope.cancel() }
+        createdViewModels.clear()
+        testDispatcher.scheduler.advanceUntilIdle()
         unmockkStatic(Log::class)
         Dispatchers.resetMain()
+    }
+
+    private fun track(vm: EanSearchViewModel): EanSearchViewModel {
+        createdViewModels.add(vm)
+        return vm
     }
 
     @Test
@@ -82,7 +94,7 @@ class EanSearchViewModelTest {
         coEvery { parser.getEanDataVersion() } returns 0
         coEvery { parser.setEanDataVersion(any()) } returns Unit
 
-        val vm = EanSearchViewModel(dao, parser, prefs)
+        val vm = track(EanSearchViewModel(dao, parser, prefs))
         testDispatcher.scheduler.advanceUntilIdle()
 
         val state = vm.uiState.value
@@ -94,7 +106,6 @@ class EanSearchViewModelTest {
         // La importación debió ejecutarse al iniciar (count() == 0)
         coVerify(exactly = 1) { parser.loadFromAssets() }
         coVerify(exactly = 1) { parser.setEanDataVersion(EAN_DATA_VERSION) }
-        vm.viewModelScope.cancel()
     }
 
     @Test
@@ -110,7 +121,7 @@ class EanSearchViewModelTest {
         coEvery { parser.loadFromAssets() } returns Result.success(5)
         coEvery { parser.getEanDataVersion() } returns EAN_DATA_VERSION
 
-        val vm = EanSearchViewModel(dao, parser, prefs)
+        val vm = track(EanSearchViewModel(dao, parser, prefs))
         testDispatcher.scheduler.advanceUntilIdle()
         vm.onQueryChange("FINDME")
         testDispatcher.scheduler.advanceUntilIdle()
@@ -118,7 +129,6 @@ class EanSearchViewModelTest {
         val state = vm.uiState.value as EanSearchUiState.Ready
         assertEquals("FINDME", state.query)
         assertEquals(1, state.pagingFlow.asSnapshot().size)
-        vm.viewModelScope.cancel()
     }
 
     @Test
@@ -135,13 +145,12 @@ class EanSearchViewModelTest {
         every { parser.getEanDataVersion() } returns EAN_DATA_VERSION - 1
         coEvery { parser.loadFromAssets() } returns Result.success(33)
 
-        val vm = EanSearchViewModel(dao, parser, prefs)
+        val vm = track(EanSearchViewModel(dao, parser, prefs))
         testDispatcher.scheduler.advanceUntilIdle()
 
         coVerify(exactly = 1) { parser.loadFromAssets() }
         coVerify(exactly = 1) { parser.setEanDataVersion(EAN_DATA_VERSION) }
         assertTrue(vm.uiState.value is EanSearchUiState.Ready)
-        vm.viewModelScope.cancel()
     }
 
     @Test
@@ -165,7 +174,7 @@ class EanSearchViewModelTest {
         coEvery { parser.loadFromAssets() } returns Result.success(5)
         coEvery { parser.getEanDataVersion() } returns EAN_DATA_VERSION
 
-        val vm = EanSearchViewModel(dao, parser, prefs)
+        val vm = track(EanSearchViewModel(dao, parser, prefs))
         testDispatcher.scheduler.advanceUntilIdle()
         vm.onQueryChange("pistacho nat")
         testDispatcher.scheduler.advanceUntilIdle()
@@ -174,6 +183,5 @@ class EanSearchViewModelTest {
         val snapshot = state.pagingFlow.asSnapshot()
         assertEquals(1, snapshot.size)
         assertEquals("NAT ROMERO PISTACHO", snapshot.first().descripcionProducto)
-        vm.viewModelScope.cancel()
     }
 }

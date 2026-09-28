@@ -20,8 +20,8 @@ android {
         applicationId "com.rutamercaderistas"
         minSdk 26
         targetSdk 35
-        versionCode 12022
-        versionName "12.22"
+        versionCode 12023
+        versionName "12.23"
         resConfigs "es"
         def sentryDsn = keystoreProperties['SENTRY_DSN']?.toString()?.trim() ?: ""
         buildConfigField "String", "SENTRY_DSN", "\"$sentryDsn\""
@@ -122,6 +122,15 @@ tasks.configureEach { task ->
     }
 }
 
+// Tests JVM: un fork por clase. Paging 3 usa hilos reales y mockkStatic(Log)
+// deja residuos entre clases en la misma JVM, lo que envenenaba
+// UpdateViewModelTest con UncaughtExceptionsBeforeTest/timeouts en flake.
+// Sin esto, ni --no-parallel alcanza.
+tasks.withType(Test).configureEach {
+    maxParallelForks = 1
+    forkEvery = 1
+}
+
 dependencies {
     // ── AndroidX Core ─────────────────────────────────────
     implementation libs.androidx.core.ktx
@@ -204,4 +213,37 @@ dependencies {
     androidTestImplementation libs.test.ext.junit
     androidTestImplementation libs.compose.ui.test.junit4
     debugImplementation libs.compose.ui.test.manifest
+}
+
+// Bump de versión X.Y -> X.Y+1 con validación del esquema
+// versionCode == major * 1000 + minor (el que usa UpdateChecker y Play).
+// No commitea ni taguea (regla del repo): imprime el siguiente paso.
+tasks.register("bumpVersion") {
+    group = "release"
+    description = "Sube versionName minor y valida el esquema versionCode."
+    doLast {
+        def buildFile = project.file("build.gradle")
+        def text = buildFile.getText("UTF-8")
+        def codeMatcher = (text =~ /versionCode (\d+)/)
+        def nameMatcher = (text =~ /versionName "([\d.]+)"/)
+        def code = codeMatcher[0][1] as int
+        def name = nameMatcher[0][1]
+        def parts = name.split("\\.").collect { it as int }
+        if (parts.size() != 2) {
+            throw new GradleException("bumpVersion solo maneja X.Y (patch como 12.20.1 se versiona manual)")
+        }
+        def major = parts[0]
+        def minor = parts[1]
+        def expected = major * 1000 + minor
+        if (code != expected) {
+            throw new GradleException("versionCode $code no coincide con $name (esperado $expected); arreglar a mano")
+        }
+        def newName = "$major.${minor + 1}"
+        def newCode = major * 1000 + minor + 1
+        text = text.replace("versionCode $code", "versionCode $newCode")
+        text = text.replace("versionName \"$name\"", "versionName \"$newName\"")
+        buildFile.write(text, "UTF-8")
+        println("Versión: $name ($code) -> $newName ($newCode)")
+        println("Siguiente: git add -A, git commit, git push, git tag v$newName && git push origin v$newName")
+    }
 }

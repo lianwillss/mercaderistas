@@ -71,13 +71,36 @@ class UpdateViewModelTest {
     }
 
     private fun awaitOnMain(condition: () -> Boolean) {
-        val deadline = System.currentTimeMillis() + 5000
+        // 10s: en suite completa el Main global se congestiona (hilos reales
+        // de Paging de otras clases) y 5s expiraba en flake.
+        val deadline = System.currentTimeMillis() + 10000
         while (System.currentTimeMillis() < deadline) {
             testDispatcher.scheduler.advanceUntilIdle()
             if (condition()) return
             Thread.sleep(10)
         }
         throw AssertionError("Condición no cumplida dentro del timeout")
+    }
+
+    /**
+     * Espera la verificación misma (no un estado proxy): varios awaits de
+     * estado se cumplen trivialmente antes de que la coroutine bajo test
+     * llegue al mock, y el coVerify directo pierde la carrera en suite.
+     */
+    private suspend fun awaitCoVerify(timeoutMs: Long = 10000, verification: suspend () -> Unit) {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        var lastError: Throwable? = null
+        while (System.currentTimeMillis() < deadline) {
+            testDispatcher.scheduler.advanceUntilIdle()
+            try {
+                verification()
+                return
+            } catch (e: Throwable) {
+                lastError = e
+                Thread.sleep(10)
+            }
+        }
+        throw lastError ?: AssertionError("coVerify no cumplido dentro del timeout")
     }
 
     private fun mockAvailableUpdate(code: Int = 12002, name: String = "12.02", tag: String = "v12.02") {
@@ -115,7 +138,7 @@ class UpdateViewModelTest {
             awaitOnMain {
                 viewModel.pendingUpdate.value == PendingUpdate("12.02", 12002, "http://x.apk", "v12.02")
             }
-            coVerify { preferencesRepository.setPendingUpdate(PendingUpdate("12.02", 12002, "http://x.apk", "v12.02")) }
+            awaitCoVerify { coVerify { preferencesRepository.setPendingUpdate(PendingUpdate("12.02", 12002, "http://x.apk", "v12.02")) } }
             awaitOnMain { viewModel.showUpdateBanner.value }
         } finally {
             unmockkObject(UpdateChecker)
@@ -136,7 +159,7 @@ class UpdateViewModelTest {
             testDispatcher.scheduler.advanceUntilIdle()
             Thread.sleep(50)
             testDispatcher.scheduler.advanceUntilIdle()
-            coVerify(exactly = 1) { preferencesRepository.setLastNotifiedUpdateTag("v12.02") }
+            awaitCoVerify { coVerify(exactly = 1) { preferencesRepository.setLastNotifiedUpdateTag("v12.02") } }
         } finally {
             unmockkObject(UpdateChecker)
         }
@@ -158,7 +181,7 @@ class UpdateViewModelTest {
             awaitOnMain {
                 viewModel.state.value is UpdateUiState.Dialog
             }
-            coVerify { preferencesRepository.setLastNotifiedUpdateTag("v12.20.1") }
+            awaitCoVerify { coVerify { preferencesRepository.setLastNotifiedUpdateTag("v12.20.1") } }
         } finally {
             unmockkObject(UpdateChecker)
         }
@@ -178,9 +201,9 @@ class UpdateViewModelTest {
         coEvery { preferencesRepository.getPendingUpdate() } returns
             PendingUpdate("11.00", 11000, "http://old.apk")
         val restored = track(UpdateViewModel(application, preferencesRepository))
+        awaitCoVerify { coVerify { preferencesRepository.clearPendingUpdate() } }
         awaitOnMain { restored.pendingUpdate.value == null }
         awaitOnMain { !restored.showUpdateBanner.value }
-        coVerify { preferencesRepository.clearPendingUpdate() }
     }
 
     @Test
