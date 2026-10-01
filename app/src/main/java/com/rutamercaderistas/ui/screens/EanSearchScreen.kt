@@ -108,6 +108,7 @@ import com.google.zxing.WriterException
 import com.journeyapps.barcodescanner.BarcodeEncoder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import com.google.zxing.integration.android.IntentIntegrator
 
@@ -126,6 +127,8 @@ import com.rutamercaderistas.ui.theme.AccentGreenSoft
 import com.rutamercaderistas.ui.theme.AccentOrange
 import com.rutamercaderistas.ui.theme.AccentOrangeSoft
 import com.rutamercaderistas.ui.theme.LocalAppDimens
+import com.rutamercaderistas.ui.theme.LocalReducedMotionEnabled
+import com.rutamercaderistas.ui.theme.MotionSprings
 import com.rutamercaderistas.ui.theme.StoreColorFuchsia
 import com.rutamercaderistas.ui.theme.StoreColorFuchsiaSoft
 import com.rutamercaderistas.ui.theme.StoreColorPurple
@@ -643,17 +646,26 @@ fun EanSearchScreen(
                                 }
                             }) { index, row ->
                                 var visible by remember { mutableStateOf(false) }
+                                // Springs (parten del valor en pantalla, interrumpibles);
+                                // el stagger vive en el disparo, no en la curva.
+                                // Reducido: solo cross-fade, sin desplazamiento.
+                                val reducedMotion = LocalReducedMotionEnabled.current
                                 val animAlpha by animateFloatAsState(
                                     targetValue = if (visible) 1f else 0f,
-                                    animationSpec = tween(250, delayMillis = minOf(index, 8) * 40),
+                                    animationSpec = if (reducedMotion) tween(150)
+                                    else MotionSprings.default(),
                                     label = "eanRowAlpha",
                                 )
                                 val animOffsetY by animateDpAsState(
                                     targetValue = if (visible) 0.dp else 12.dp,
-                                    animationSpec = tween(250, delayMillis = minOf(index, 8) * 40),
+                                    animationSpec = if (reducedMotion) tween(150)
+                                    else MotionSprings.default(),
                                     label = "eanRowOffset",
                                 )
-                                LaunchedEffect(Unit) { visible = true }
+                                LaunchedEffect(Unit) {
+                                    if (!reducedMotion) delay(minOf(index, 8) * 40L)
+                                    visible = true
+                                }
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()

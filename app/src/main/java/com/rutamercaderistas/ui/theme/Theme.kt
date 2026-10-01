@@ -85,9 +85,11 @@ fun MercaderistasTheme(content: @Composable () -> Unit) {
     // Avoid allowing a large system display zoom to make every component oversized.
     // Touch targets keep their 48.dp semantic size; only the app's visual density is capped.
     val density = Density(compactDensity(baseDensity.density), effectiveFontScale)
+    val reducedMotion = rememberReducedMotionEnabled()
     CompositionLocalProvider(
         LocalAppDimens provides dimens,
         LocalDensity provides density,
+        LocalReducedMotionEnabled provides reducedMotion,
     ) {
         MaterialTheme(
             colorScheme = colorScheme,

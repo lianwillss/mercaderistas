@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Share
@@ -48,6 +49,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.rutamercaderistas.data.local.PromotionEntity
@@ -97,7 +99,9 @@ fun StoreCard(
             promos.isNotEmpty()
         }
     }
-    val identity = listOf(local.codigo, local.rutero, local.cadena, local.formato)
+    // El código vive en su propio chip junto al nombre; aquí solo van
+    // rutero · cadena · formato para no duplicarlo.
+    val identity = listOf(local.rutero, local.cadena, local.formato)
         .filter { it.isNotBlank() }
         .distinct()
         .joinToString(" · ")
@@ -118,7 +122,7 @@ fun StoreCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = cardPadding, vertical = cardPadding)
+                .padding(horizontal = cardPadding, vertical = dimens.spacingMd)
                 .animateContentSize(animationSpec = tween(250))
         ) {
             // ── Header row ──
@@ -156,8 +160,14 @@ fun StoreCard(
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.semantics { heading() },
+                                modifier = Modifier
+                                    .weight(1f, fill = false)
+                                    .semantics { heading() },
                             )
+                            if (local.codigo.isNotBlank()) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                CodigoChip(codigo = local.codigo)
+                            }
                             if (hasPromos) {
                                 val promosCd = stringResource(R.string.promociones_cd)
                                 Spacer(modifier = Modifier.width(4.dp))
@@ -185,10 +195,13 @@ fun StoreCard(
                     if (local.direccion.isNotBlank() || local.comuna.isNotBlank()) {
                         Spacer(modifier = Modifier.height(3.dp))
 
+                        // Botón-pill de dirección: fondo + icono de apertura para
+                        // que se entienda que pincharla abre Maps. Mismo alto.
                         Row(
                             modifier = Modifier
+                                .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .heightIn(min = 48.dp)
+                                .background(MaterialTheme.colorScheme.primaryContainer)
                                 .clickable(
                                     onClick = { onAddressClick(local.direccion) },
                                     role = androidx.compose.ui.semantics.Role.Button,
@@ -196,22 +209,24 @@ fun StoreCard(
                                 .semantics {
                                     contentDescription = "Abrir ${local.direccion} en Maps"
                                 }
-                                .padding(vertical = 2.dp),
+                                .padding(horizontal = 10.dp, vertical = 2.dp)
+                                .heightIn(min = 48.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.LocationOn,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(13.dp)
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(16.dp)
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Column {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Column(modifier = Modifier.weight(1f)) {
                                 if (local.direccion.isNotBlank()) {
                                     Text(
                                         text = local.direccion,
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -220,12 +235,19 @@ fun StoreCard(
                                     Text(
                                         text = local.comuna,
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.primary,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(16.dp)
+                            )
                         }
                     }
                 }
@@ -367,14 +389,14 @@ fun StoreCard(
             }
 
             // ── Divider ──
-            Spacer(modifier = Modifier.height(14.dp * rs()))
+            Spacer(modifier = Modifier.height(10.dp * rs()))
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(1.dp)
                     .background(MaterialTheme.colorScheme.outlineVariant)
             )
-            Spacer(modifier = Modifier.height(14.dp * rs()))
+            Spacer(modifier = Modifier.height(10.dp * rs()))
 
             // ── Brands ──
             local.clientes.forEach { cliente ->
@@ -389,7 +411,7 @@ fun StoreCard(
                         cliente.nombre.equals(marcaResaltada, ignoreCase = true),
                     onClick = { onBrandClick(cliente.nombre) }
                 )
-                Spacer(modifier = Modifier.height(5.dp * rs()))
+                Spacer(modifier = Modifier.height(4.dp * rs()))
             }
         }
     }

@@ -24,7 +24,16 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,7 +47,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.rutamercaderistas.ui.theme.ComponentShapes
+import com.rutamercaderistas.ui.theme.Elevation
 import com.rutamercaderistas.ui.theme.LocalAppDimens
+import com.rutamercaderistas.ui.theme.LocalReducedMotionEnabled
+import com.rutamercaderistas.ui.theme.MotionSprings
 
 @Composable
 fun IosModal(
@@ -54,19 +66,45 @@ fun IosModal(
     scrimColor: Color = Color.Black.copy(alpha = 0.7f),
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    if (visible) {
+    // Estado de transición persistente: el Dialog se mantiene montado
+    // durante la salida para animarla (entrar y salir por el mismo camino).
+    val transitionState = remember { MutableTransitionState(false) }
+    transitionState.targetState = visible
+    if (transitionState.currentState || transitionState.targetState || !transitionState.isIdle) {
         val dimens = LocalAppDimens.current
+        val reducedMotion = LocalReducedMotionEnabled.current
         Dialog(
             onDismissRequest = onDismiss,
             properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
+            // El scrim se atenúa junto con la superficie (misma curva).
+            val scrimAlpha by animateFloatAsState(
+                targetValue = if (transitionState.targetState) 1f else 0f,
+                animationSpec = if (reducedMotion) tween(150) else MotionSprings.default(),
+                label = "iosModalScrim",
+            )
             Box(
                 modifier = modifier
                     .fillMaxSize()
-                    .background(scrimColor)
+                    .background(scrimColor.copy(alpha = scrimColor.alpha * scrimAlpha))
                     .clickable(onClick = onDismiss),
                 contentAlignment = Alignment.Center,
             ) {
+                AnimatedVisibility(
+                    visibleState = transitionState,
+                    enter = if (reducedMotion) {
+                        fadeIn(animationSpec = tween(150))
+                    } else {
+                        fadeIn(animationSpec = tween(200)) +
+                            scaleIn(initialScale = 0.92f, animationSpec = MotionSprings.default())
+                    },
+                    exit = if (reducedMotion) {
+                        fadeOut(animationSpec = tween(150))
+                    } else {
+                        fadeOut(animationSpec = tween(180)) +
+                            scaleOut(targetScale = 0.95f, animationSpec = MotionSprings.default())
+                    },
+                ) {
                 Card(
                     modifier = Modifier
                         .padding(horizontal = 24.dp)
@@ -77,7 +115,7 @@ fun IosModal(
                             onClick = {},
                         ),
                     shape = MaterialTheme.shapes.large,
-                    elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = Elevation.modal),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                     ),
@@ -175,6 +213,7 @@ fun IosModal(
                             }
                         }
                     }
+                }
                 }
             }
         }

@@ -70,6 +70,7 @@ import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.domain.model.normalizeChain
 import com.rutamercaderistas.models.LocalDelDia
+import com.rutamercaderistas.ui.components.CodigoChip
 import com.rutamercaderistas.ui.components.ScreenHeader
 import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.utils.cleanBrand
@@ -398,11 +399,7 @@ private fun LocaleSearchRow(local: LocalDelDia, onAddressClick: (String) -> Unit
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     if (local.codigo.isNotBlank()) {
-                        Text(
-                            text = stringResource(R.string.busqueda_codigo_label, local.codigo),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        CodigoChip(codigo = local.codigo)
                     }
                     Text(
                         text = address,

@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +34,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.History
@@ -73,6 +75,7 @@ import androidx.compose.ui.res.stringResource
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.R
 import com.rutamercaderistas.models.LocalDelDia
+import com.rutamercaderistas.ui.components.CodigoChip
 import com.rutamercaderistas.ui.components.GlobalSearchAction
 import com.rutamercaderistas.ui.components.ScreenHeader
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -602,18 +605,17 @@ private fun LocaleCardContent(
                 overflow = TextOverflow.Ellipsis
             )
             if (local.codigo.isNotBlank()) {
-                Text(
-                    text = local.codigo,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
-                )
+                Spacer(modifier = Modifier.height(4.dp))
+                CodigoChip(codigo = local.codigo)
             }
             if (local.direccion.isNotBlank() || local.comuna.isNotBlank()) {
                 Spacer(modifier = Modifier.height(2.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer)
                         .heightIn(min = 48.dp)
                         .clickable(
                             onClick = { onAddressClick(local.direccion) },
@@ -629,15 +631,15 @@ private fun LocaleCardContent(
                             }
                             contentDescription = "Abrir $addr en Maps"
                         }
-                        .padding(vertical = 2.dp),
+                        .padding(horizontal = 10.dp, vertical = 2.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.LocationOn,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(12.dp)
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(16.dp)
                     )
-                    Spacer(modifier = Modifier.width(3.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = buildString {
                             if (local.direccion.isNotBlank()) append(local.direccion)
@@ -647,9 +649,18 @@ private fun LocaleCardContent(
                             }
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
@@ -676,7 +687,7 @@ private fun LocaleDetailPane(
             color = MaterialTheme.colorScheme.onSurface,
         )
         if (local.codigo.isNotBlank()) {
-            Text(local.codigo, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            CodigoChip(codigo = local.codigo)
         }
         if (local.direccion.isNotBlank() || local.comuna.isNotBlank()) {
             Row(

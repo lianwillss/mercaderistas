@@ -78,7 +78,9 @@ val AppTypography = Typography(
         fontWeight = FontWeight.Medium,
         fontSize = 13.sp,
         lineHeight = 20.sp,
-        letterSpacing = 0.4.sp,
+        // 0.4sp era tracking de label y ensanchaba el cuerpo; 0.1sp mantiene
+        // legibilidad y deja entrar más información por línea. Tamaño intacto.
+        letterSpacing = 0.1.sp,
     ),
     labelLarge = TextStyle(
         fontFamily = InterFont,
@@ -107,14 +109,15 @@ val AppTypography = Typography(
         fontWeight = FontWeight.Bold,
         fontSize = 36.sp,
         lineHeight = 44.sp,
-        letterSpacing = 0.sp,
+        // A este tamaño las letras se ven sueltas sin tracking negativo.
+        letterSpacing = (-0.5).sp,
     ),
     displayMedium = TextStyle(
         fontFamily = InterFont,
         fontWeight = FontWeight.Bold,
         fontSize = 45.sp,
         lineHeight = 52.sp,
-        letterSpacing = 0.sp,
+        letterSpacing = (-0.5).sp,
     ),
     displayLarge = TextStyle(
         fontFamily = InterFont,

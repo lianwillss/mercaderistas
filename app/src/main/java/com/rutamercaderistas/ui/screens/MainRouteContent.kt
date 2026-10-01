@@ -1,5 +1,11 @@
 package com.rutamercaderistas.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -75,6 +81,8 @@ import com.rutamercaderistas.ui.components.ShimmerLoadingContent
 import com.rutamercaderistas.ui.components.StoreCard
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.LocalAppDimens
+import com.rutamercaderistas.ui.theme.LocalReducedMotionEnabled
+import com.rutamercaderistas.ui.theme.MotionSprings
 import com.rutamercaderistas.ui.theme.AppWindowWidth
 import com.rutamercaderistas.ui.theme.appWindowWidth
 import com.rutamercaderistas.ui.theme.rs
@@ -204,7 +212,20 @@ fun MainRouteContent(
                 }
             }
 
-            if (showUpdateBanner) {
+            // El banner anima su tamaño para no saltar el layout al aparecer.
+            AnimatedVisibility(
+                visible = showUpdateBanner,
+                enter = if (LocalReducedMotionEnabled.current) {
+                    fadeIn(animationSpec = tween(150))
+                } else {
+                    expandVertically(animationSpec = MotionSprings.default()) + fadeIn()
+                },
+                exit = if (LocalReducedMotionEnabled.current) {
+                    fadeOut(animationSpec = tween(150))
+                } else {
+                    shrinkVertically(animationSpec = MotionSprings.default()) + fadeOut()
+                },
+            ) {
                 UpdateBanner(
                     versionName = pendingVersionName,
                     onUpdateNow = onUpdateNow,
