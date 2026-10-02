@@ -439,12 +439,17 @@ fun EanSearchScreen(
                             }
                             Spacer(modifier = Modifier.width(dimens.spacingSm))
                             // Botón Flejes — entre buscador y scanner, con efecto iluminado 2026
-                            val flejesInfinite = rememberInfiniteTransition(label = "flejesGlow")
-                            val flejesGlow by flejesInfinite.animateFloat(
-                                initialValue = 0.45f, targetValue = 1f,
-                                animationSpec = infiniteRepeatable(tween(1400), RepeatMode.Reverse),
-                                label = "flejesGlow",
-                            )
+                            // (estático si hay movimiento reducido).
+                            val flejesGlow: Float = if (LocalReducedMotionEnabled.current) {
+                                0.7f
+                            } else {
+                                val flejesInfinite = rememberInfiniteTransition(label = "flejesGlow")
+                                flejesInfinite.animateFloat(
+                                    initialValue = 0.45f, targetValue = 1f,
+                                    animationSpec = infiniteRepeatable(tween(1400), RepeatMode.Reverse),
+                                    label = "flejesGlow",
+                                ).value
+                            }
                             Box(
                                 modifier = Modifier
                                     .size(48.dp)
@@ -831,11 +836,15 @@ fun EanSearchScreen(
                 window.attributes = window.attributes.apply { screenBrightness = previous }
             }
         }
-        val flejesGlow2 by rememberInfiniteTransition(label = "flejesBarcodeGlow").animateFloat(
-            initialValue = 0.35f, targetValue = 1f,
-            animationSpec = infiniteRepeatable(tween(1600), RepeatMode.Reverse),
-            label = "flejesBarcodeGlow",
-        )
+        val flejesGlow2: Float = if (LocalReducedMotionEnabled.current) {
+            0.65f
+        } else {
+            rememberInfiniteTransition(label = "flejesBarcodeGlow").animateFloat(
+                initialValue = 0.35f, targetValue = 1f,
+                animationSpec = infiniteRepeatable(tween(1600), RepeatMode.Reverse),
+                label = "flejesBarcodeGlow",
+            ).value
+        }
         IosModal(
             visible = true,
             onDismiss = { showFlejes = false },

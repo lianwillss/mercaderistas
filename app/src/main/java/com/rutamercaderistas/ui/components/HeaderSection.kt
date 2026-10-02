@@ -82,6 +82,7 @@ import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.HeaderDeepBlue
 import com.rutamercaderistas.ui.theme.HeaderLightBlue
 import com.rutamercaderistas.ui.theme.HeaderMidBlue
+import com.rutamercaderistas.ui.theme.LocalReducedMotionEnabled
 import com.rutamercaderistas.ui.theme.HeaderMidDarkBlue
 import com.rutamercaderistas.ui.theme.AccentGreen
 import com.rutamercaderistas.ui.theme.OfflineRed
@@ -133,15 +134,20 @@ fun HeaderSection(
         .collectAsStateWithLifecycle(initialValue = 1f)
     val themeBackground = MaterialTheme.colorScheme.background
 
-    val infiniteTransition = rememberInfiniteTransition()
-    val phase by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = TWO_PI,
-        animationSpec = infiniteRepeatable(
-            animation = tween(8000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-    )
+    // Onda de fondo quieta si hay movimiento reducido.
+    val phase: Float = if (LocalReducedMotionEnabled.current) {
+        0f
+    } else {
+        val infiniteTransition = rememberInfiniteTransition()
+        infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = TWO_PI,
+            animationSpec = infiniteRepeatable(
+                animation = tween(8000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+        ).value
+    }
 
     Box(
         modifier = modifier.fillMaxWidth(),
@@ -266,17 +272,22 @@ fun HeaderSection(
                         }
                         if (promosExpiringSoon.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(6.dp))
-                            val infinitePorVencer = rememberInfiniteTransition(label = "porVencer")
-                            val bgPulse by infinitePorVencer.animateFloat(
+                            // Pulsos quietos si hay movimiento reducido (el pop
+                            // único de conteo se mantiene: es feedback causal).
+                            val reducedMotion = LocalReducedMotionEnabled.current
+                            val porVencerTransition =
+                                if (reducedMotion) null
+                                else rememberInfiniteTransition(label = "porVencer")
+                            val bgPulse: Float = porVencerTransition?.animateFloat(
                                 initialValue = 0.90f, targetValue = 0.62f,
                                 animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
                                 label = "bgPulse"
-                            )
-                            val iconScale by infinitePorVencer.animateFloat(
+                            )?.value ?: 0.76f
+                            val iconScale: Float = porVencerTransition?.animateFloat(
                                 initialValue = 1f, targetValue = 1.18f,
                                 animationSpec = infiniteRepeatable(tween(650), RepeatMode.Reverse),
                                 label = "iconScale"
-                            )
+                            )?.value ?: 1f
                             var countPopTarget by remember { mutableStateOf(1f) }
                             val countScale by animateFloatAsState(
                                 targetValue = countPopTarget,

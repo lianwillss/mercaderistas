@@ -81,6 +81,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.github.barteksc.pdfviewer.PDFView
 import com.rutamercaderistas.R
 import com.rutamercaderistas.ui.components.PdfGridModal
+import com.rutamercaderistas.ui.theme.LocalReducedMotionEnabled
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -291,15 +292,20 @@ fun PdfViewerScreen(
                     }
 
                     if (isLoading) {
-                        val shimmerTransition = rememberInfiniteTransition()
-                        val shimmerAlpha by shimmerTransition.animateFloat(
-                            initialValue = 0.3f,
-                            targetValue = 1.0f,
-                            animationSpec = infiniteRepeatable(
-                                animation = tween(800),
-                                repeatMode = RepeatMode.Reverse,
-                            ),
-                        )
+                        // Carga quieta si hay movimiento reducido.
+                        val shimmerAlpha: Float = if (LocalReducedMotionEnabled.current) {
+                            0.65f
+                        } else {
+                            val shimmerTransition = rememberInfiniteTransition()
+                            shimmerTransition.animateFloat(
+                                initialValue = 0.3f,
+                                targetValue = 1.0f,
+                                animationSpec = infiniteRepeatable(
+                                    animation = tween(800),
+                                    repeatMode = RepeatMode.Reverse,
+                                ),
+                            ).value
+                        }
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()

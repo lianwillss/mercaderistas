@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import com.rutamercaderistas.ui.theme.LocalReducedMotionEnabled
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,16 +33,21 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 private fun shimmerBrush(): Brush {
-    val transition = rememberInfiniteTransition(label = "shimmer")
-    val translateX by transition.animateFloat(
-        initialValue = -200f,
-        targetValue = 900f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "shimmerX"
-    )
+    // Sin movimiento: degradado fijo (placeholder visible, quieto).
+    val translateX: Float = if (LocalReducedMotionEnabled.current) {
+        350f
+    } else {
+        val transition = rememberInfiniteTransition(label = "shimmer")
+        transition.animateFloat(
+            initialValue = -200f,
+            targetValue = 900f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+            label = "shimmerX"
+        ).value
+    }
     val base = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
     val highlight = Color.White.copy(alpha = 0.6f)
     return Brush.linearGradient(

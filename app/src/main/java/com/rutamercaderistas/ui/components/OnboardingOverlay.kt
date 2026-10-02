@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.rutamercaderistas.ui.theme.LocalReducedMotionEnabled
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.Search
@@ -115,11 +116,16 @@ fun OnboardingOverlay(
         } else {
             syncTargetCenter ?: Offset(maxWpx - with(density) { 164.dp.toPx() }, with(density) { 62.dp.toPx() })
         }
-        val infinite = rememberInfiniteTransition()
-        val pulse by infinite.animateFloat(
-            initialValue = 0f, targetValue = 1f,
-            animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse)
-        )
+        // Pulso del foco quieto si hay movimiento reducido.
+        val pulse: Float = if (LocalReducedMotionEnabled.current) {
+            0.5f
+        } else {
+            val infinite = rememberInfiniteTransition()
+            infinite.animateFloat(
+                initialValue = 0f, targetValue = 1f,
+                animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse)
+            ).value
+        }
 
         // Scrim with hole
         Box(
