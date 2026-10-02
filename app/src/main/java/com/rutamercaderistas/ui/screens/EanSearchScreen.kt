@@ -18,6 +18,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -129,6 +130,8 @@ import com.rutamercaderistas.ui.theme.AccentOrangeSoft
 import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.ui.theme.LocalReducedMotionEnabled
 import com.rutamercaderistas.ui.theme.MotionSprings
+import com.rutamercaderistas.ui.theme.pressScale
+import com.rutamercaderistas.ui.theme.rememberPressInteractionSource
 import com.rutamercaderistas.ui.theme.StoreColorFuchsia
 import com.rutamercaderistas.ui.theme.StoreColorFuchsiaSoft
 import com.rutamercaderistas.ui.theme.StoreColorPurple
@@ -450,6 +453,7 @@ fun EanSearchScreen(
                                     label = "flejesGlow",
                                 ).value
                             }
+                            val flejesPress = rememberPressInteractionSource()
                             Box(
                                 modifier = Modifier
                                     .size(48.dp)
@@ -457,7 +461,10 @@ fun EanSearchScreen(
                                     .clip(CircleShape)
                                     .background(MaterialTheme.colorScheme.primaryContainer)
                                     .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f + 0.25f * flejesGlow), CircleShape)
+                                    .pressScale(flejesPress)
                                     .clickable(
+                                        interactionSource = flejesPress,
+                                        indication = LocalIndication.current,
                                         onClick = { showFlejes = true },
                                         role = Role.Button,
                                         onClickLabel = flejesCd,
@@ -478,6 +485,7 @@ fun EanSearchScreen(
                                 )
                             }
                             Spacer(modifier = Modifier.width(dimens.spacingSm))
+                            val scanPress = rememberPressInteractionSource()
                             Box(
                                 modifier = Modifier
                                     .size(52.dp)
@@ -491,7 +499,10 @@ fun EanSearchScreen(
                                             )
                                         )
                                     )
+                                    .pressScale(scanPress)
                                     .clickable(
+                                        interactionSource = scanPress,
+                                        indication = LocalIndication.current,
                                         onClick = launchScanner,
                                         role = Role.Button,
                                         onClickLabel = scanCd,

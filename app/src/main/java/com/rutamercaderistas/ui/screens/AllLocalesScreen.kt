@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.clickable
@@ -77,6 +78,8 @@ import com.rutamercaderistas.R
 import com.rutamercaderistas.models.LocalDelDia
 import com.rutamercaderistas.ui.components.CodigoChip
 import com.rutamercaderistas.ui.components.GlobalSearchAction
+import com.rutamercaderistas.ui.theme.pressScale
+import com.rutamercaderistas.ui.theme.rememberPressInteractionSource
 import com.rutamercaderistas.ui.components.ScreenHeader
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TopAppBarDefaults
@@ -610,6 +613,7 @@ private fun LocaleCardContent(
             }
             if (local.direccion.isNotBlank() || local.comuna.isNotBlank()) {
                 Spacer(modifier = Modifier.height(2.dp))
+                val addressPress = rememberPressInteractionSource()
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -617,7 +621,10 @@ private fun LocaleCardContent(
                         .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.primaryContainer)
                         .heightIn(min = 48.dp)
+                        .pressScale(addressPress)
                         .clickable(
+                            interactionSource = addressPress,
+                            indication = LocalIndication.current,
                             onClick = { onAddressClick(local.direccion) },
                             role = Role.Button,
                         )

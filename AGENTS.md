@@ -66,7 +66,7 @@ App Android de rutas para mercaderistas: Kotlin, Compose, Hilt, Room y WorkManag
 - `touchMin = 48.dp`; no reducir targets interactivos para compactar la interfaz.
 - La densidad visual se limita al equivalente lógico de 480dpi y la escala de fuente a 1.3x para conservar información en teléfonos con zoom alto.
 - Scroll: aplicar insets una sola vez; el `Scaffold` reserva barra/sistema, las listas usan `scrollBottomPadding`, keys estables y `contentType`. No añadir `paddingBottom` arbitrario ni cambiar la altura del viewport durante el gesto.
-- Motion: lo tocable/interrumpible usa springs de `MotionSprings` (default críticamente amortiguado; `bouncy()` solo con momentum de gesto); tweens solo para fades. Entrada y salida por el mismo camino (`IosModal`, banners con expand/shrink). Ninguna animación en loop sin gate de `LocalReducedMotionEnabled`.
+- Motion: lo tocable/interrumpible usa springs de `MotionSprings` (default críticamente amortiguado; `bouncy()` solo con momentum de gesto); tweens solo para fades. Entrada y salida por el mismo camino (`IosModal`, banners con expand/shrink). Ninguna animación en loop sin gate de `LocalReducedMotionEnabled`. Feedback en press: `pressScale` + ripple por defecto (al pasar `interactionSource` a `clickable` hay que pasar también `indication = LocalIndication.current`).
 - Si se modifica una lista, probar último elemento, texto largo, zoom alto, navegación gestual y navegación de tres botones.
 
 ## Actualizador de versiones

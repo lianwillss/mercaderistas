@@ -1,5 +1,6 @@
 package com.rutamercaderistas.ui.components
 
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -49,6 +50,8 @@ import androidx.compose.ui.window.DialogProperties
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.Elevation
 import com.rutamercaderistas.ui.theme.LocalAppDimens
+import com.rutamercaderistas.ui.theme.pressScale
+import com.rutamercaderistas.ui.theme.rememberPressInteractionSource
 import com.rutamercaderistas.ui.theme.LocalReducedMotionEnabled
 import com.rutamercaderistas.ui.theme.MotionSprings
 
@@ -148,12 +151,18 @@ fun IosModal(
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
                                 val cerrarCd = stringResource(R.string.cerrar_cd)
+                                val closePress = rememberPressInteractionSource()
                                 Box(
                                     modifier = Modifier
                                         .size(dimens.touchMin)
                                         .clip(CircleShape)
                                         .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                                        .clickable(onClick = onDismiss),
+                                        .pressScale(closePress)
+                                        .clickable(
+                                            interactionSource = closePress,
+                                            indication = LocalIndication.current,
+                                            onClick = onDismiss,
+                                        ),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Icon(
@@ -177,12 +186,18 @@ fun IosModal(
                             ) {
                                 if (dismissText != null) {
                                     val onClickDismiss = onDismissAction ?: onDismiss
+                                    val dismissPress = rememberPressInteractionSource()
                                     Box(
                                         modifier = Modifier
                                             .weight(1f)
                                             .clip(ComponentShapes.button)
                                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
-                                            .clickable(onClick = onClickDismiss)
+                                            .pressScale(dismissPress)
+                                            .clickable(
+                                                interactionSource = dismissPress,
+                                                indication = LocalIndication.current,
+                                                onClick = onClickDismiss,
+                                            )
                                             .padding(vertical = 14.dp),
                                         contentAlignment = Alignment.Center,
                                     ) {
@@ -194,12 +209,18 @@ fun IosModal(
                                     }
                                 }
                                 if (confirmText != null) {
+                                    val confirmPress = rememberPressInteractionSource()
                                     Box(
                                         modifier = Modifier
                                             .weight(if (dismissText != null) 1f else 0f)
                                             .clip(ComponentShapes.button)
                                             .background(MaterialTheme.colorScheme.primary)
-                                            .clickable(onClick = onConfirm ?: onDismiss)
+                                            .pressScale(confirmPress)
+                                            .clickable(
+                                                interactionSource = confirmPress,
+                                                indication = LocalIndication.current,
+                                                onClick = onConfirm ?: onDismiss,
+                                            )
                                             .padding(vertical = 14.dp),
                                         contentAlignment = Alignment.Center,
                                     ) {

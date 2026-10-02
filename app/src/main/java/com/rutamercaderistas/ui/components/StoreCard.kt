@@ -4,6 +4,7 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import com.rutamercaderistas.BuildConfig
 import androidx.compose.foundation.clickable
@@ -58,6 +59,8 @@ import com.rutamercaderistas.models.LocalDelDia
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.ui.theme.PriceBlue
+import com.rutamercaderistas.ui.theme.pressScale
+import com.rutamercaderistas.ui.theme.rememberPressInteractionSource
 import com.rutamercaderistas.ui.theme.rs
 import com.rutamercaderistas.domain.model.matchesChain
 import com.rutamercaderistas.ui.theme.storeColor
@@ -197,12 +200,16 @@ fun StoreCard(
 
                         // Botón-pill de dirección: fondo + icono de apertura para
                         // que se entienda que pincharla abre Maps. Mismo alto.
+                        val addressPress = rememberPressInteractionSource()
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(MaterialTheme.colorScheme.primaryContainer)
+                                .pressScale(addressPress)
                                 .clickable(
+                                    interactionSource = addressPress,
+                                    indication = LocalIndication.current,
                                     onClick = { onAddressClick(local.direccion) },
                                     role = androidx.compose.ui.semantics.Role.Button,
                                 )
@@ -260,11 +267,15 @@ fun StoreCard(
                     shareContext.resources.getQuantityString(R.plurals.promos_count_plural, count, count)
                 }
                 var showShareSheet by remember { mutableStateOf(false) }
+                val sharePress = rememberPressInteractionSource()
                 Box(
                     modifier = Modifier
                         .size(dimens.touchMin)
                         .clip(CircleShape)
+                        .pressScale(sharePress)
                         .clickable(
+                            interactionSource = sharePress,
+                            indication = LocalIndication.current,
                             onClick = { showShareSheet = true },
                             role = androidx.compose.ui.semantics.Role.Button,
                         )
