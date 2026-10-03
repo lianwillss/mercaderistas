@@ -37,6 +37,7 @@ import com.rutamercaderistas.R
 import com.rutamercaderistas.ui.components.CodProvItems
 import com.rutamercaderistas.ui.components.ScreenHeader
 import com.rutamercaderistas.ui.theme.AccentBlue
+import com.rutamercaderistas.ui.theme.AccentGreenText
 import com.rutamercaderistas.ui.theme.AccentGreen
 import com.rutamercaderistas.ui.theme.AccentOrange
 import com.rutamercaderistas.ui.theme.LocalAppDimens
@@ -129,7 +130,8 @@ fun CodProvScreen(
 
 private val avatarColors = listOf(
     AccentBlue,
-    AccentGreen,
+    // Texto/icono sobre claro: variante legible (fondo al 15% + tint pleno).
+    AccentGreenText,
     AccentOrange,
     StoreColorFuchsia,
     StoreColorPurple,

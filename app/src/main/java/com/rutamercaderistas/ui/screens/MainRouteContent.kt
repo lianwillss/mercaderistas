@@ -79,6 +79,7 @@ import com.rutamercaderistas.ui.components.RouteSearchBar
 import com.rutamercaderistas.ui.components.ShimmerDaySelector
 import com.rutamercaderistas.ui.components.ShimmerLoadingContent
 import com.rutamercaderistas.ui.components.StoreCard
+import com.rutamercaderistas.ui.components.DropletToast
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.ui.theme.LocalReducedMotionEnabled
@@ -706,7 +707,14 @@ private fun DayContent(
         }
     }
     val showScrollProgress = routeState.currentDayLocales.size > 4
+    // Toast-gota de "dirección copiada" (lo dispara StoreCard por long-press).
+    var copyToast by remember { mutableStateOf<String?>(null) }
+    val copiedMessage = stringResource(R.string.direccion_copiada)
 
+    // El toast-gota flota SOBRE la lista: va como hermano del contenido
+    // (hijo directo de este Box), nunca dentro del Column — un fillMaxSize
+    // dentro del Column le robaba todo el alto a la grilla (lista en blanco).
+    Box(modifier = Modifier.fillMaxSize()) {
     PullToRefreshBox(
         isRefreshing = isSyncing,
         onRefresh = onPullRefresh,
@@ -793,12 +801,18 @@ private fun DayContent(
                         onBrandClick = onBrandClick,
                         onAddressClick = onAddressClick,
                         onShareLocal = onShareLocal,
+                        onCopyAddress = { copyToast = copiedMessage },
                         modifier = Modifier.animateItem().padding(horizontal = dimens.cardPaddingH),
                     )
                 }
-            }
+                }
             }
         }
+    }
+    DropletToast(
+        message = copyToast,
+        onTimeout = { copyToast = null },
+    )
     }
 }
 

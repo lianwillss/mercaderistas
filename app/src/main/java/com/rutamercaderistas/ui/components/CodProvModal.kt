@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.rutamercaderistas.R
 import com.rutamercaderistas.ui.theme.AccentBlue
+import com.rutamercaderistas.ui.theme.AccentGreenText
 import com.rutamercaderistas.ui.theme.AccentGreen
 import com.rutamercaderistas.ui.theme.AccentOrange
 import com.rutamercaderistas.ui.theme.LocalAppDimens
@@ -56,7 +57,8 @@ val CodProvItems = listOf(
 
 private val avatarColors = listOf(
     AccentBlue,
-    AccentGreen,
+    // Texto/icono sobre claro: variante legible (fondo al 15% + tint pleno).
+    AccentGreenText,
     AccentOrange,
     StoreColorFuchsia,
     StoreColorPurple,

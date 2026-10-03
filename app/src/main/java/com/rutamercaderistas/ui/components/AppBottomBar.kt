@@ -65,8 +65,8 @@ import com.rutamercaderistas.R
 import com.rutamercaderistas.services.RuteroRepository
 import com.rutamercaderistas.ui.theme.AccentBlue
 import com.rutamercaderistas.ui.theme.AccentBlueSoft
-import com.rutamercaderistas.ui.theme.AccentGreen
 import com.rutamercaderistas.ui.theme.AccentGreenSoft
+import com.rutamercaderistas.ui.theme.AccentGreenText
 import com.rutamercaderistas.ui.theme.AccentOrange
 import com.rutamercaderistas.ui.theme.AccentOrangeSoft
 import com.rutamercaderistas.ui.theme.StoreColorPurple
@@ -98,7 +98,7 @@ fun AppBottomBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
-                .padding(horizontal = 4.dp, vertical = 6.dp),
+                .padding(horizontal = 4.dp, vertical = 4.dp),
         ) {
             val slotWidthDp = (constraints.maxWidth / items.size) / density.density * 1f * 1f
             val slotDp = ((constraints.maxWidth.toFloat() / items.size) / density.density).dp
@@ -113,12 +113,13 @@ fun AppBottomBar(
                 targetValue = items[selectedIndex].accentSoft,
                 label = "bottomBarPillColor",
             )
-            val pillHeightDp = ((barHeightPx.toFloat() / density.density).dp - 12.dp).coerceAtLeast(28.dp)
+            // Márgenes simétricos al padding vertical del contenedor (4dp).
+            val pillHeightDp = ((barHeightPx.toFloat() / density.density).dp - 8.dp).coerceAtLeast(28.dp)
 
             if (barHeightPx > 0) {
                 Box(
                     modifier = Modifier
-                        .offset(x = slideOffsetDp + 8.dp, y = 6.dp)
+                        .offset(x = slideOffsetDp + 8.dp, y = 4.dp)
                         .size(width = slotDp - 16.dp, height = pillHeightDp)
                         .clip(RoundedCornerShape(16.dp))
                         .background(pillColor),
@@ -222,7 +223,9 @@ private fun appNavItems(
             if (selected) Icon(Icons.Filled.ShoppingBag, contentDescription = null, tint = tint)
             else Icon(Icons.Outlined.ShoppingBag, contentDescription = null, tint = tint)
         },
-        accent = AccentGreen,
+        // Icono + label seleccionados sobre surface: variante legible.
+        // El pill de fondo sigue con AccentGreenSoft.
+        accent = AccentGreenText,
         accentSoft = AccentGreenSoft,
         badge = if (marcasConPromo > 0) marcasConPromo.toString() else null,
     ),
@@ -296,7 +299,7 @@ private fun BottomBarItem(
                 this.selected = selected
                 if (selected) stateDescription = "Seleccionada"
             }
-            .padding(vertical = 8.dp, horizontal = 4.dp),
+            .padding(vertical = 6.dp, horizontal = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {

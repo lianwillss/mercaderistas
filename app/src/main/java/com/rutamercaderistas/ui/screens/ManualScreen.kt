@@ -48,6 +48,7 @@ import com.rutamercaderistas.ui.theme.AccentBlue
 import com.rutamercaderistas.ui.theme.AccentBlueSoft
 import com.rutamercaderistas.ui.theme.AccentGreen
 import com.rutamercaderistas.ui.theme.AccentGreenSoft
+import com.rutamercaderistas.ui.theme.AccentGreenText
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.StoreColorFuchsia
 import com.rutamercaderistas.ui.theme.StoreColorFuchsiaSoft
@@ -110,7 +111,7 @@ fun ManualScreen(
             SectionCard(
                 title = stringResource(R.string.manual_sincronizar),
                 icon = Icons.Outlined.Refresh,
-                color = MaterialTheme.colorScheme.secondary
+                color = AccentGreenText
             ) {
                 NumberedStep(stringResource(R.string.manual_sync_step1))
                 NumberedStep(stringResource(R.string.manual_sync_step2))

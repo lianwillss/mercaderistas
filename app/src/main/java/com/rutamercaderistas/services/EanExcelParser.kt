@@ -14,6 +14,7 @@ import timber.log.Timber
 import java.io.InputStream
 import java.text.Normalizer
 import javax.inject.Inject
+import kotlinx.coroutines.sync.Mutex
 
 const val EAN_DATA_VERSION = 32
 
@@ -101,6 +102,19 @@ class EanExcelParser @Inject constructor(
 
     private var lastDiagnostics: EanDiagnostics = EanDiagnostics()
 
+    // Serializa clearAll + insertAll + rebuild FTS: dos imports encima
+    // (auto + manual) se intercalaban y dejaban tabla e índice inconsistentes.
+    private val importMutex = Mutex()
+
+    suspend fun <T> withImportLock(block: suspend () -> T): T {
+        importMutex.lock()
+        return try {
+            block()
+        } finally {
+            importMutex.unlock()
+        }
+    }
+
     // Mapea columnas por NOMBRE de encabezado (no por posición fija), porque
     // distintos archivos "ean*.xlsx" pueden tener distinto orden de columnas.
     private data class ColumnMap(
@@ -119,20 +133,22 @@ class EanExcelParser @Inject constructor(
     )
 
     suspend fun parseAndSave(inputStream: InputStream, defaultBrand: String? = null): Result<Int> {
-        return try {
-            val products = parse(inputStream, defaultBrand)
-            val dedupeResult = dedupeEanProducts(products)
-            logDedupe(dedupeResult)
-            val deduped = dedupeResult.products
-            if (deduped.isNotEmpty()) {
-                eanProductDao.clearAll()
-                eanProductDao.insertAll(deduped)
-                eanFts.ensureAndRebuild()
+        return withImportLock {
+            try {
+                val products = parse(inputStream, defaultBrand)
+                val dedupeResult = dedupeEanProducts(products)
+                logDedupe(dedupeResult)
+                val deduped = dedupeResult.products
+                if (deduped.isNotEmpty()) {
+                    eanProductDao.clearAll()
+                    eanProductDao.insertAll(deduped)
+                    eanFts.ensureAndRebuild()
+                }
+                Result.success(deduped.size)
+            } catch (e: Exception) {
+                Timber.e(e, "Error parsing EAN Excel file")
+                Result.failure(e)
             }
-            Result.success(deduped.size)
-        } catch (e: Exception) {
-            Timber.e(e, "Error parsing EAN Excel file")
-            Result.failure(e)
         }
     }
 
@@ -422,8 +438,9 @@ class EanExcelParser @Inject constructor(
 
     // Cargar desde assets (todos los archivos "ean_*.xlsx" se combinan)
     suspend fun loadFromAssets(): Result<Int> {
-        return try {
-            lastDiagnostics = EanDiagnostics()
+        return withImportLock {
+            try {
+                lastDiagnostics = EanDiagnostics()
             val assetFiles = (context.assets.list("") ?: emptyArray())
                 .filter {
                     it.startsWith(EAN_ASSET_PREFIX, ignoreCase = true) &&
@@ -431,7 +448,7 @@ class EanExcelParser @Inject constructor(
                 }
                 .sorted()
             if (assetFiles.isEmpty()) {
-                return Result.failure(IllegalStateException("No se encontraron archivos EAN en assets"))
+                return@withImportLock Result.failure(IllegalStateException("No se encontraron archivos EAN en assets"))
             }
             val all = mutableListOf<EanProductEntity>()
             for (file in assetFiles) {
@@ -454,10 +471,11 @@ class EanExcelParser @Inject constructor(
                 eanProductDao.insertAll(deduped)
                 eanFts.ensureAndRebuild()
             }
-            Result.success(deduped.size)
-        } catch (e: Exception) {
-            Timber.e(e, "Error loading EAN file from assets")
-            Result.failure(e)
+                Result.success(deduped.size)
+            } catch (e: Exception) {
+                Timber.e(e, "Error loading EAN file from assets")
+                Result.failure(e)
+            }
         }
     }
 

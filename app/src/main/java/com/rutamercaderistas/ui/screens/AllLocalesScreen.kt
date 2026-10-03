@@ -6,6 +6,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import com.rutamercaderistas.ui.components.DropletToast
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -157,6 +159,10 @@ fun AllLocalesScreen(
 
     val isWide = appWindowWidth(LocalConfiguration.current.screenWidthDp.dp) == AppWindowWidth.Expanded
 
+    // Toast-gota de copiado: hermano en Box (nunca hijo de un Column con peso).
+    var copyToast by remember { mutableStateOf<String?>(null) }
+    val copiedMessage = stringResource(R.string.direccion_copiada)
+    Box(modifier = Modifier.fillMaxSize()) {
     if (isWide) {
         AllLocalesTwoPane(
             locales = filteredLocales,
@@ -164,6 +170,7 @@ fun AllLocalesScreen(
             onSearchChange = { searchQuery = it },
             onClose = onClose,
             onAddressClick = onAddressClick,
+            onCopyAddress = { copyToast = copiedMessage },
             onGlobalSearch = onGlobalSearch,
             searchHistory = searchHistory,
             onHistoryClick = { searchQuery = it },
@@ -175,11 +182,17 @@ fun AllLocalesScreen(
             onSearchChange = { searchQuery = it },
             onClose = onClose,
             onAddressClick = onAddressClick,
+            onCopyAddress = { copyToast = copiedMessage },
             onGlobalSearch = onGlobalSearch,
             scrollBehavior = scrollBehavior,
             searchHistory = searchHistory,
             onHistoryClick = { searchQuery = it },
         )
+    }
+    DropletToast(
+        message = copyToast,
+        onTimeout = { copyToast = null },
+    )
     }
 }
 
@@ -191,6 +204,7 @@ private fun AllLocalesSinglePane(
     onSearchChange: (String) -> Unit,
     onClose: () -> Unit,
     onAddressClick: (String) -> Unit,
+    onCopyAddress: () -> Unit = {},
     onGlobalSearch: () -> Unit,
     scrollBehavior: androidx.compose.material3.TopAppBarScrollBehavior,
     searchHistory: List<String> = emptyList(),
@@ -221,6 +235,7 @@ private fun AllLocalesSinglePane(
             locales = locales,
             searchQuery = searchQuery,
             onAddressClick = onAddressClick,
+            onCopyAddress = onCopyAddress,
             dimens = dimens,
             modifier = Modifier.weight(1f),
         )
@@ -235,6 +250,7 @@ private fun AllLocalesTwoPane(
     onSearchChange: (String) -> Unit,
     onClose: () -> Unit,
     onAddressClick: (String) -> Unit,
+    onCopyAddress: () -> Unit = {},
     onGlobalSearch: () -> Unit,
     searchHistory: List<String> = emptyList(),
     onHistoryClick: (String) -> Unit = {},
@@ -300,6 +316,7 @@ private fun AllLocalesTwoPane(
                                 selected = selected == local,
                                 onClick = { selected = local },
                                 onAddressClick = onAddressClick,
+                                onCopyAddress = onCopyAddress,
                             )
                         }
                     }
@@ -331,7 +348,11 @@ private fun AllLocalesTwoPane(
                             .graphicsLayer(alpha = detailAlpha)
                             .offset(x = detailOffsetX),
                     ) {
-                        LocaleDetailPane(local = local, onAddressClick = onAddressClick)
+                        LocaleDetailPane(
+                            local = local,
+                            onAddressClick = onAddressClick,
+                            onCopyAddress = onCopyAddress,
+                        )
                     }
                 }
             }
@@ -447,6 +468,7 @@ private fun CountAndGrid(
     locales: List<LocalDelDia>,
     searchQuery: String,
     onAddressClick: (String) -> Unit,
+    onCopyAddress: () -> Unit = {},
     dimens: AppDimens,
     modifier: Modifier = Modifier,
 ) {
@@ -498,7 +520,11 @@ private fun CountAndGrid(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
-                    LocaleCardContent(local = local, onAddressClick = onAddressClick)
+                    LocaleCardContent(
+                        local = local,
+                        onAddressClick = onAddressClick,
+                        onCopyAddress = onCopyAddress,
+                    )
                 }
             }
             }
@@ -555,6 +581,7 @@ private fun LocaleCard(
     selected: Boolean,
     onClick: () -> Unit,
     onAddressClick: (String) -> Unit,
+    onCopyAddress: () -> Unit = {},
 ) {
     Card(
         modifier = Modifier
@@ -566,16 +593,32 @@ private fun LocaleCard(
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
-        LocaleCardContent(local = local, onAddressClick = onAddressClick)
+        LocaleCardContent(
+            local = local,
+            onAddressClick = onAddressClick,
+            onCopyAddress = onCopyAddress,
+        )
     }
+}
+
+/** Copia "dirección, comuna" al portapapeles (sin toast: lo pone el llamador). */
+private fun copyAddressToClipboard(context: android.content.Context, local: LocalDelDia) {
+    val addressText = buildString {
+        append(local.direccion)
+        if (local.comuna.isNotBlank()) append(", ${local.comuna}")
+    }
+    context.getSystemService(android.content.ClipboardManager::class.java)
+        ?.setPrimaryClip(android.content.ClipData.newPlainText("Dirección", addressText))
 }
 
 @Composable
 private fun LocaleCardContent(
     local: LocalDelDia,
     onAddressClick: (String) -> Unit,
+    onCopyAddress: () -> Unit = {},
 ) {
     val dimens = LocalAppDimens.current
+    val context = LocalContext.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -622,11 +665,17 @@ private fun LocaleCardContent(
                         .background(MaterialTheme.colorScheme.primaryContainer)
                         .heightIn(min = 48.dp)
                         .pressScale(addressPress)
-                        .clickable(
+                        .combinedClickable(
                             interactionSource = addressPress,
                             indication = LocalIndication.current,
-                            onClick = { onAddressClick(local.direccion) },
                             role = Role.Button,
+                            onClickLabel = "Abrir ${local.direccion} en Maps",
+                            onLongClickLabel = stringResource(R.string.compartir_copiar_direccion),
+                            onLongClick = {
+                                copyAddressToClipboard(context, local)
+                                onCopyAddress()
+                            },
+                            onClick = { onAddressClick(local.direccion) },
                         )
                         .semantics {
                             val addr = buildString {
@@ -679,8 +728,11 @@ private fun LocaleCardContent(
 private fun LocaleDetailPane(
     local: LocalDelDia,
     onAddressClick: (String) -> Unit,
+    onCopyAddress: () -> Unit = {},
 ) {
     val dimens = LocalAppDimens.current
+    val context = LocalContext.current
+    val detailPress = rememberPressInteractionSource()
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -701,9 +753,18 @@ private fun LocaleDetailPane(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .heightIn(min = 48.dp)
-                    .clickable(
-                        onClick = { onAddressClick(local.direccion) },
+                    .pressScale(detailPress)
+                    .combinedClickable(
+                        interactionSource = detailPress,
+                        indication = LocalIndication.current,
                         role = Role.Button,
+                        onClickLabel = "Abrir ${local.direccion} en Maps",
+                        onLongClickLabel = stringResource(R.string.compartir_copiar_direccion),
+                        onLongClick = {
+                            copyAddressToClipboard(context, local)
+                            onCopyAddress()
+                        },
+                        onClick = { onAddressClick(local.direccion) },
                     )
                     .semantics {
                         val addr = buildString {

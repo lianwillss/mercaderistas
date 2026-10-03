@@ -11,7 +11,9 @@ object Elevation {
     val level4: Dp = 8.dp
     val level5: Dp = 12.dp
 
-    val card: Dp = level2
+    // Las tarjetas usan 1.dp en código (look actual): el token lo refleja
+    // en vez de imponer 3.dp. Superficies nuevas usan estos alias.
+    val card: Dp = level1
     val dialog: Dp = level3
     val dropdown: Dp = level4
     val modal: Dp = level5

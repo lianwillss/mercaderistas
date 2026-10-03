@@ -38,7 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.models.DiaSemana
-import com.rutamercaderistas.ui.theme.AccentGreen
+import com.rutamercaderistas.ui.theme.AccentGreenText
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.LocalAppDimens
 import java.time.DayOfWeek
@@ -163,7 +163,7 @@ fun DaySelector(
                                     .padding(top = 2.dp)
                                     .size(4.8.dp)
                                     .clip(CircleShape)
-                                    .background(AccentGreen),
+                                    .background(AccentGreenText),
                             )
                         }
                     }

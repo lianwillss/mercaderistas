@@ -63,9 +63,11 @@ App Android de rutas para mercaderistas: Kotlin, Compose, Hilt, Room y WorkManag
 
 - Solo tema claro; Inter está empaquetada. Usar `MaterialTheme.colorScheme`, `.typography`, `.shapes` y `AppDimens`; no introducir `fontSize`/`fontWeight` ni colores crudos en nuevos composables.
 - Densidad primero: la interfaz debe mostrar mucha información; nunca agrandar tipografía para "mejorar diseño" (tracking más cerrado sí, tamaño no). Elevaciones nuevas usan tokens de `Elevation`.
+- Contraste: `AccentGreen` como texto/icono sobre claro falla AA (2.2:1); para foreground usar `AccentGreenText` (≥4.5:1, verificado en `ContrastTest`). Los rellenos de marca siguen verdes.
 - `touchMin = 48.dp`; no reducir targets interactivos para compactar la interfaz.
 - La densidad visual se limita al equivalente lógico de 480dpi y la escala de fuente a 1.3x para conservar información en teléfonos con zoom alto.
 - Scroll: aplicar insets una sola vez; el `Scaffold` reserva barra/sistema, las listas usan `scrollBottomPadding`, keys estables y `contentType`. No añadir `paddingBottom` arbitrario ni cambiar la altura del viewport durante el gesto.
+- Overlays (`DropletToast`, badges flotantes): siempre hermanos en un `Box`, nunca hijos de un `Column` — un `fillMaxSize` dentro del `Column` le roba todo el alto a la lista con `weight` (lista en blanco sin crash).
 - Motion: lo tocable/interrumpible usa springs de `MotionSprings` (default críticamente amortiguado; `bouncy()` solo con momentum de gesto); tweens solo para fades. Entrada y salida por el mismo camino (`IosModal`, banners con expand/shrink). Ninguna animación en loop sin gate de `LocalReducedMotionEnabled`. Feedback en press: `pressScale` + ripple por defecto (al pasar `interactionSource` a `clickable` hay que pasar también `indication = LocalIndication.current`).
 - Si se modifica una lista, probar último elemento, texto largo, zoom alto, navegación gestual y navegación de tres botones.
 

@@ -17,6 +17,10 @@ val AccentBlue = Color(0xFF007AFF)
 val AccentBlueSoft = Color(0xFFE8F0FE)
 val AccentGreen = Color(0xFF34C759)
 val AccentGreenSoft = Color(0xFFE6F9EA)
+// Verde SOLO para texto/iconos sobre fondos claros. AccentGreen como
+// foreground da 2.2:1 (falla AA); este da 5.2/4.8/4.7 sobre
+// blanco/surfaceContainerLow/AccentGreenSoft. Rellenos siguen con AccentGreen.
+val AccentGreenText = Color(0xFF1E7D32)
 val AccentOrange = Color(0xFFFF9500)
 val AccentOrangeSoft = Color(0xFFFFF3E0)
 
@@ -35,7 +39,8 @@ val StoreColorPurpleSoft = Color(0xFFF3E5F5)
 
 fun storeColor(name: String): Color {
     return when (normalizeChain(name)) {
-        "JUMBO" -> AccentGreen
+        // Se usa como tint de iconos sobre claro: variante legible.
+        "JUMBO" -> AccentGreenText
         "LIDER" -> AccentBlue
         "SANTA ISABEL" -> StoreColorFuchsia
         "UNIMARC" -> StoreColorRed

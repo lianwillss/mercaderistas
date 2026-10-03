@@ -84,7 +84,7 @@ import com.rutamercaderistas.ui.theme.HeaderLightBlue
 import com.rutamercaderistas.ui.theme.HeaderMidBlue
 import com.rutamercaderistas.ui.theme.LocalReducedMotionEnabled
 import com.rutamercaderistas.ui.theme.HeaderMidDarkBlue
-import com.rutamercaderistas.ui.theme.AccentGreen
+import com.rutamercaderistas.ui.theme.AccentGreenText
 import com.rutamercaderistas.ui.theme.OfflineRed
 import com.rutamercaderistas.ui.theme.UrgencyOrange
 import com.rutamercaderistas.ui.theme.UrgencyOrangeSoft
@@ -224,7 +224,7 @@ fun HeaderSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(start = dimens.spacingSection, end = dimens.spacingSection, top = 8.dp, bottom = dimens.spacingLg),
+                .padding(start = dimens.spacingSection, end = dimens.spacingSection, top = 6.dp, bottom = 10.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -243,10 +243,10 @@ fun HeaderSection(
                             modifier = Modifier
                                 .size(8.dp)
                                 .clip(CircleShape)
-                                .background(if (isOnline) AccentGreen else OfflineRed)
+                                .background(if (isOnline) AccentGreenText else OfflineRed)
                         )
                     }
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(

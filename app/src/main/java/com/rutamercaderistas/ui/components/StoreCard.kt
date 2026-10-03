@@ -8,6 +8,7 @@ import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import com.rutamercaderistas.BuildConfig
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import com.rutamercaderistas.R
@@ -74,12 +75,15 @@ fun StoreCard(
     onBrandClick: (String) -> Unit,
     onAddressClick: (String) -> Unit,
     onShareLocal: (String) -> Unit = {},
+    onCopyAddress: () -> Unit = {},
     promotionsByBrand: Map<String, List<PromotionEntity>> = emptyMap(),
     index: Int = 0,
     modifier: Modifier = Modifier
 ) {
     val dimens = LocalAppDimens.current
+    val context = LocalContext.current
     val cardPadding = if (dimens.isCompact) dimens.spacingMd else dimens.spacingLg
+    val copyAddressLabel = stringResource(R.string.compartir_copiar_direccion)
     var visible by remember { mutableStateOf(false) }
     val animAlpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
@@ -198,8 +202,8 @@ fun StoreCard(
                     if (local.direccion.isNotBlank() || local.comuna.isNotBlank()) {
                         Spacer(modifier = Modifier.height(3.dp))
 
-                        // Botón-pill de dirección: fondo + icono de apertura para
-                        // que se entienda que pincharla abre Maps. Mismo alto.
+                        // Botón-pill de dirección: tap abre Maps, long-press copia
+                        // al portapapeles con toast. Mismo alto.
                         val addressPress = rememberPressInteractionSource()
                         Row(
                             modifier = Modifier
@@ -207,11 +211,31 @@ fun StoreCard(
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(MaterialTheme.colorScheme.primaryContainer)
                                 .pressScale(addressPress)
-                                .clickable(
+                                .combinedClickable(
                                     interactionSource = addressPress,
                                     indication = LocalIndication.current,
-                                    onClick = { onAddressClick(local.direccion) },
                                     role = androidx.compose.ui.semantics.Role.Button,
+                                    onClickLabel = "Abrir ${local.direccion} en Maps",
+                                    onLongClickLabel = copyAddressLabel,
+                                    onLongClick = {
+                                        val addressText = buildString {
+                                            append(local.direccion)
+                                            if (local.comuna.isNotBlank()) append(", ${local.comuna}")
+                                        }
+                                        val cm = context.getSystemService(
+                                            android.content.ClipboardManager::class.java
+                                        )
+                                        cm?.setPrimaryClip(
+                                            android.content.ClipData.newPlainText(
+                                                "Dirección",
+                                                addressText,
+                                            )
+                                        )
+                                        // La confirmación visual la dibuja el
+                                        // DropletToast del padre (misma funcionalidad).
+                                        onCopyAddress()
+                                    },
+                                    onClick = { onAddressClick(local.direccion) },
                                 )
                                 .semantics {
                                     contentDescription = "Abrir ${local.direccion} en Maps"
@@ -318,41 +342,6 @@ fun StoreCard(
                                         includeMapsLink = includeMaps,
                                     )
                                     onShareLocal(text)
-                                }
-                                ShareMode.CON_MAPA -> {
-                                    val promosMap = if (includeMaps) promotionsByBrand else emptyMap()
-                                    val file = com.rutamercaderistas.util.ShareImageGenerator.generateForLocal(
-                                        context = shareContext,
-                                        localName = local.local,
-                                        address = local.direccion,
-                                        comuna = local.comuna,
-                                        marcas = local.clientes.map { it.nombre },
-                                        promosByBrand = local.clientes.associate { c ->
-                                            val clean = brandCleanCache[c.nombre] ?: c.nombre.cleanBrand()
-                                            val count = promotionsByBrand[clean].orEmpty()
-                                                .filter { matchesChain(it.chain, local.local, local.cadena, local.formato) }.size
-                                            c.nombre to count
-                                        },
-                                    )
-                                    val uri = androidx.core.content.FileProvider.getUriForFile(
-                                        shareContext, "${shareContext.packageName}.fileprovider", file
-                                    )
-                                    val shareText = buildStoreShareText(
-                                        local = local,
-                                        promotionsByBrand = promotionsByBrand,
-                                        brandCleanCache = brandCleanCache,
-                                        marcasLabel = shareMarcasLabel,
-                                        promosPlural = sharePromosPlural,
-                                        includePromos = true,
-                                        includeMapsLink = includeMaps,
-                                    )
-                                    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                        type = "image/png"
-                                        putExtra(android.content.Intent.EXTRA_STREAM, uri)
-                                        putExtra(android.content.Intent.EXTRA_TEXT, shareText)
-                                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    }
-                                    shareContext.startActivity(android.content.Intent.createChooser(intent, shareContext.getString(R.string.compartir)))
                                 }
                             }
                         }

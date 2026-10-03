@@ -398,7 +398,8 @@
     <string name="compartir_titulo">Compartir</string>
     <string name="compartir_solo_marcas">Solo marcas</string>
     <string name="compartir_con_promos">Con promociones</string>
-    <string name="compartir_con_mapa">Con mapa (imagen)</string>
+    <string name="compartir_copiar_direccion">Copiar dirección</string>
+    <string name="direccion_copiada">Dirección copiada al portapapeles</string>
     <string name="compartir_incluir_maps">Incluir link de Maps</string>
     <string name="compartir_cancelar">Cancelar</string>
 </resources>

@@ -28,8 +28,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.History
+import com.rutamercaderistas.ui.components.DropletToast
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -177,7 +179,11 @@ fun GlobalSearchScreen(
         else searchHistory.filter { it.contains(searchQuery, ignoreCase = true) }
     }
 
-    Column(modifier = modifier.fillMaxSize()) {
+    // Toast-gota de copiado: hermano en Box (nunca hijo del Column).
+    var copyToast by remember { mutableStateOf<String?>(null) }
+    val copiedMessage = stringResource(R.string.direccion_copiada)
+    Box(modifier = modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize()) {
         ScreenHeader(
             title = stringResource(R.string.busqueda_titulo),
             onBack = onBack,
@@ -328,6 +334,15 @@ fun GlobalSearchScreen(
                         LocaleSearchRow(
                             local = local,
                             onAddressClick = onAddressClick,
+                            onCopyAddress = { text ->
+                                val cm = context.getSystemService(
+                                    android.content.ClipboardManager::class.java
+                                )
+                                cm?.setPrimaryClip(
+                                    android.content.ClipData.newPlainText("Dirección", text)
+                                )
+                                copyToast = copiedMessage
+                            },
                         )
                     }
                 }
@@ -355,6 +370,11 @@ fun GlobalSearchScreen(
             }
         }
     }
+        DropletToast(
+            message = copyToast,
+            onTimeout = { copyToast = null },
+        )
+    }
 }
 
 @Composable
@@ -372,7 +392,11 @@ private fun SectionTitle(text: String) {
 }
 
 @Composable
-private fun LocaleSearchRow(local: LocalDelDia, onAddressClick: (String) -> Unit) {
+private fun LocaleSearchRow(
+    local: LocalDelDia,
+    onAddressClick: (String) -> Unit,
+    onCopyAddress: (String) -> Unit = {},
+) {
     val dimens = LocalAppDimens.current
     val address = local.direccion.ifBlank { stringResource(R.string.sin_direccion) }
     val navigateCd = stringResource(R.string.como_llegar_a, local.local)
@@ -461,11 +485,37 @@ private fun LocaleSearchRow(local: LocalDelDia, onAddressClick: (String) -> Unit
                             }
                         }
                     }
-                    TextButton(
-                        onClick = { onAddressClick(address) },
-                        modifier = Modifier.semantics { contentDescription = navigateCd },
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(text = stringResource(R.string.como_llegar))
+                        TextButton(
+                            onClick = { onAddressClick(address) },
+                            modifier = Modifier.semantics { contentDescription = navigateCd },
+                        ) {
+                            Text(text = stringResource(R.string.como_llegar))
+                        }
+                        if (local.direccion.isNotBlank()) {
+                            TextButton(
+                                onClick = {
+                                    onCopyAddress(
+                                        buildString {
+                                            append(local.direccion)
+                                            if (local.comuna.isNotBlank()) append(", ${local.comuna}")
+                                        }
+                                    )
+                                },
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.ContentCopy,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(text = stringResource(R.string.compartir_copiar_direccion))
+                            }
+                        }
                     }
                 }
             }

@@ -125,6 +125,7 @@ import com.rutamercaderistas.ui.theme.AccentBlue
 import com.rutamercaderistas.ui.theme.AccentBlueSoft
 import com.rutamercaderistas.ui.theme.AccentGreen
 import com.rutamercaderistas.ui.theme.AccentGreenSoft
+import com.rutamercaderistas.ui.theme.AccentGreenText
 import com.rutamercaderistas.ui.theme.AccentOrange
 import com.rutamercaderistas.ui.theme.AccentOrangeSoft
 import com.rutamercaderistas.ui.theme.LocalAppDimens
@@ -963,7 +964,7 @@ private fun EanProductCard(
                             label = "SKU",
                             value = product.codCencosud,
                             query = query,
-                            color = MaterialTheme.colorScheme.secondary,
+                            color = AccentGreenText,
                         )
                     }
                     if (product.conversion.isNotBlank()) {

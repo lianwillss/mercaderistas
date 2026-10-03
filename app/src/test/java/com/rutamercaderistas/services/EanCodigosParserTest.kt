@@ -5,6 +5,8 @@ import com.rutamercaderistas.data.local.EanProductDao
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -130,6 +132,32 @@ class EanCodigosParserTest {
             inserted.map { it.eanPrincipal }.containsAll(
                 listOf("0739802463521", "0739802463514", "0739802463538")
             ),
+        )
+    }
+
+    @Test
+    fun `concurrent imports do not interleave`() = runTest {
+        val parser = EanExcelParser(
+            mockk<Context>(relaxed = true),
+            mockk<EanProductDao>(relaxed = true),
+            mockk(relaxed = true),
+        )
+        val events = mutableListOf<String>()
+        suspend fun guarded(name: String) = parser.withImportLock {
+            events.add("$name-start")
+            delay(50)
+            events.add("$name-end")
+        }
+        val a = async { guarded("a") }
+        val b = async { guarded("b") }
+        a.await()
+        b.await()
+        // Uno termina antes de que empiece el otro (orden cualquiera).
+        val aSpan = events.indexOf("a-start")..events.indexOf("a-end")
+        val bSpan = events.indexOf("b-start")..events.indexOf("b-end")
+        assertTrue(
+            "intercalado: $events",
+            aSpan.last < bSpan.first || bSpan.last < aSpan.first,
         )
     }
 

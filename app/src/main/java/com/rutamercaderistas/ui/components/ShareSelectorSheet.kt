@@ -29,7 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.rutamercaderistas.R
 
-enum class ShareMode { SOLO_MARCAS, CON_PROMOS, CON_MAPA }
+enum class ShareMode { SOLO_MARCAS, CON_PROMOS }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,12 +68,6 @@ fun ShareSelectorSheet(
                 selected = selectedMode == ShareMode.CON_PROMOS,
                 onClick = { selectedMode = ShareMode.CON_PROMOS },
             )
-            ShareOption(
-                label = stringResource(R.string.compartir_con_mapa),
-                selected = selectedMode == ShareMode.CON_MAPA,
-                onClick = { selectedMode = ShareMode.CON_MAPA },
-            )
-
             Spacer(modifier = Modifier.height(12.dp))
             HorizontalDivider()
             Spacer(modifier = Modifier.height(12.dp))
