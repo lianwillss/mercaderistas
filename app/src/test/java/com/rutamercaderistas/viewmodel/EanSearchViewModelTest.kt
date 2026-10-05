@@ -60,6 +60,11 @@ class EanSearchViewModelTest {
         parser = mockk(relaxed = true)
         prefs = mockk(relaxed = true)
         every { prefs.getSearchHistoryFlow() } returns flowOf(emptyList())
+        // New DAO methods for brand counts and cajas filters
+        every { dao.getAllBrandCounts() } returns flowOf(emptyList())
+        every { dao.getAllCajas() } returns flowOf(emptyList())
+        every { dao.getBrandCountsForToken(any()) } returns flowOf(emptyList())
+        every { dao.getCajasForToken(any()) } returns flowOf(emptyList())
     }
 
     @After

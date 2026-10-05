@@ -18,6 +18,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
+import com.rutamercaderistas.ui.theme.LocalReducedMotionEnabled
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -66,6 +70,7 @@ import com.rutamercaderistas.ui.theme.rs
 import com.rutamercaderistas.domain.model.matchesChain
 import com.rutamercaderistas.ui.theme.storeColor
 import com.rutamercaderistas.ui.theme.storeSoftColor
+import com.rutamercaderistas.ui.theme.MotionSprings
 import com.rutamercaderistas.utils.cleanBrand
 
 @Composable
@@ -85,13 +90,16 @@ fun StoreCard(
     val cardPadding = if (dimens.isCompact) dimens.spacingMd else dimens.spacingLg
     val copyAddressLabel = stringResource(R.string.compartir_copiar_direccion)
     var visible by remember { mutableStateOf(false) }
+    val reducedMotion = LocalReducedMotionEnabled.current
     val animAlpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
-        animationSpec = tween(250, delayMillis = minOf(index, 8) * 40)
+        animationSpec = if (reducedMotion) tween(150) else MotionSprings.default(),
+        label = "storeCardAlpha",
     )
     val animOffsetY by animateDpAsState(
         targetValue = if (visible) 0.dp else 12.dp,
-        animationSpec = tween(250, delayMillis = minOf(index, 8) * 40)
+        animationSpec = if (reducedMotion) tween(150) else MotionSprings.default(),
+        label = "storeCardOffset",
     )
 
     val brandCleanCache = remember(local) {
@@ -113,13 +121,19 @@ fun StoreCard(
         .distinct()
         .joinToString(" · ")
 
-    LaunchedEffect(Unit) { visible = true }
+    LaunchedEffect(Unit) {
+        if (!reducedMotion) delay(minOf(index, 8) * 40L)
+        visible = true
+    }
 
+    val density = LocalDensity.current
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .graphicsLayer(alpha = animAlpha)
-            .offset(y = animOffsetY),
+            .graphicsLayer {
+                alpha = animAlpha
+                translationY = animOffsetY.value * density.density
+            },
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow

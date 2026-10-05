@@ -10,11 +10,10 @@ import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.domain.usecase.ComputeChainToLocalesUseCase
 import com.rutamercaderistas.domain.usecase.ComputeRouteBrandsUseCase
 import com.rutamercaderistas.domain.usecase.GroupPromotionsUseCase
+import com.rutamercaderistas.domain.usecase.MapEntriesToLocalesUseCase
 import com.rutamercaderistas.domain.usecase.GroupedPromotions
-import com.rutamercaderistas.models.ClienteInfo
 import com.rutamercaderistas.models.DiaSemana
 import com.rutamercaderistas.models.EntradaRuta
-import com.rutamercaderistas.models.toNaturalCase
 import com.rutamercaderistas.models.LocalDelDia
 import com.rutamercaderistas.R
 import com.rutamercaderistas.services.PromotionRepository
@@ -24,7 +23,6 @@ import com.rutamercaderistas.services.RuteroRepository
 import com.rutamercaderistas.domain.model.effectiveChain
 import com.rutamercaderistas.domain.model.normalizeChain
 import com.rutamercaderistas.di.DefaultDispatcher
-import com.rutamercaderistas.utils.cleanBrand
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
@@ -114,6 +112,7 @@ class RouteViewModel @Inject constructor(
     private val groupPromotions: GroupPromotionsUseCase,
     private val computeChainToLocales: ComputeChainToLocalesUseCase,
     private val computeRouteBrands: ComputeRouteBrandsUseCase,
+    private val mapEntriesToLocales: MapEntriesToLocalesUseCase,
     @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
@@ -147,31 +146,12 @@ class RouteViewModel @Inject constructor(
         }
     }
 
-    private fun toLocales(entries: List<EntradaRuta>): List<LocalDelDia> {
-        if (entries.isEmpty()) return emptyList()
-        return entries.groupBy { it.codigo.uppercase() + it.local.uppercase() }
-            .map { (_, ents) ->
-                val first = ents.first()
-                LocalDelDia(
-                    codigo = first.codigo,
-                    local = first.local.toNaturalCase(),
-                    direccion = first.direccion.toNaturalCase(),
-                    rutero = ents.map { it.rutero }.filter { it.isNotBlank() }.distinct().sorted().joinToString(" · "),
-                    cadena = first.cadena,
-                    formato = first.formato,
-                    region = first.region,
-                    comuna = first.comuna,
-                    clientes = ents.map { e -> ClienteInfo(e.cliente, e.esPrioritaria, e.frecuencia) }.sortedByDescending { it.esPrioritaria }
-                )
-            }
-    }
-
     private fun observeAllRuteroLocales() {
         viewModelScope.launch {
-            val initial = withContext(defaultDispatcher) { toLocales(ruteroManager.loadAllEntries()) }
+            val initial = withContext(defaultDispatcher) { mapEntriesToLocales(ruteroManager.loadAllEntries()) }
             _uiState.update { it.copy(allRuteroLocales = initial) }
             ruteroManager.ruterosFlow.collect {
-                val updated = withContext(defaultDispatcher) { toLocales(ruteroManager.loadAllEntries()) }
+                val updated = withContext(defaultDispatcher) { mapEntriesToLocales(ruteroManager.loadAllEntries()) }
                 _uiState.update { it.copy(allRuteroLocales = updated) }
             }
         }

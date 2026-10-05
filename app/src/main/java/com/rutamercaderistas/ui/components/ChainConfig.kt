@@ -16,5 +16,5 @@ fun chainColor(chain: String): Color {
 @Composable
 fun chainTextColor(chain: String): Color {
     val hex = chainTextColorsHex[normalizeChain(chain)]
-    return if (hex != null) Color(hex) else MaterialTheme.colorScheme.secondary
+    return if (hex != null) Color(hex) else MaterialTheme.colorScheme.onSecondaryContainer
 }

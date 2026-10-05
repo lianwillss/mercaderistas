@@ -71,7 +71,9 @@ data class LocalDelDia(
     val modalidad: String = "",
     val equipo: String = "",
     val reponedor: String = "",
-    val clientes: List<ClienteInfo>
+    val     clientes: List<ClienteInfo>,
+    /** Por marca, días en que se visita en este local (para búsqueda por marca). */
+    val marcasDias: Map<String, Set<DiaSemana>> = emptyMap(),
 ) {
     val totalClientes: Int get() = clientes.size
 }
@@ -93,6 +95,26 @@ data class ClienteInfo(
         else -> ""
     }
 }
+
+/** Días en que se visita una entrada (de sus booleanos lunes..domingo). */
+fun diasDeVisita(e: EntradaRuta): Set<DiaSemana> = buildSet {
+    if (e.lunes) add(DiaSemana.LUNES)
+    if (e.martes) add(DiaSemana.MARTES)
+    if (e.miercoles) add(DiaSemana.MIERCOLES)
+    if (e.jueves) add(DiaSemana.JUEVES)
+    if (e.viernes) add(DiaSemana.VIERNES)
+    if (e.sabado) add(DiaSemana.SABADO)
+    if (e.domingo) add(DiaSemana.DOMINGO)
+}
+
+/** Por cada marca, la unión de días en que aparece en estas entradas. */
+fun brandVisitDays(entries: List<EntradaRuta>): Map<String, Set<DiaSemana>> =
+    entries.groupBy { it.cliente }
+        .mapValues { (_, es) -> es.flatMapTo(mutableSetOf()) { diasDeVisita(it) } }
+
+/** Etiqueta "LUN, MIÉ, VIE" ordenada de lunes a domingo. */
+fun diasLabel(dias: Set<DiaSemana>): String =
+    DiaSemana.todos().filter { it in dias }.joinToString(", ") { it.abreviacion }
 
 // ── Enum de días de la semana ───────────────────────────────────────
 enum class DiaSemana(val abreviacion: String, val nombreCompleto: String) {

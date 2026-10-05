@@ -3,6 +3,7 @@ package com.rutamercaderistas.services
 import com.rutamercaderistas.data.local.EanProductDao
 import com.rutamercaderistas.models.ClienteInfo
 import timber.log.Timber
+import com.rutamercaderistas.models.brandVisitDays
 import com.rutamercaderistas.models.DiaSemana
 import com.rutamercaderistas.models.EntradaRuta
 import com.rutamercaderistas.models.LocalDelDia
@@ -75,7 +76,8 @@ class RuteroRepository @Inject constructor(
                             esPrioritaria = entry.esPrioritaria,
                             frecuencia = entry.frecuencia
                         )
-                    }.sortedByDescending { it.esPrioritaria }
+                    }.sortedByDescending { it.esPrioritaria },
+                    marcasDias = brandVisitDays(entries),
                 )
             }
     }
@@ -123,6 +125,7 @@ class RuteroRepository @Inject constructor(
                             frecuencia = entry.frecuencia,
                         )
                     }.sortedByDescending { it.esPrioritaria },
+                    marcasDias = brandVisitDays(entries),
                 )
             }
     }

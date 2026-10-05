@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.math.min
 import javax.inject.Inject
@@ -71,6 +72,12 @@ class EanSearchViewModel @Inject constructor(
 
     private val _brandCounts = MutableStateFlow<Map<String, Int>>(emptyMap())
     val brandCounts: StateFlow<Map<String, Int>> = _brandCounts
+
+    private val _searchBrandCounts = MutableStateFlow<Map<String, Int>>(emptyMap())
+    val searchBrandCounts: StateFlow<Map<String, Int>> = _searchBrandCounts
+
+    private val _searchCajas = MutableStateFlow<List<String>>(emptyList())
+    val searchCajas: StateFlow<List<String>> = _searchCajas
 
     private fun loadDatabase() {
         debounceJob?.cancel()
@@ -158,6 +165,25 @@ class EanSearchViewModel @Inject constructor(
                     }
                 }
             ).flow.cachedIn(viewModelScope)
+
+            // Obtener marcas y cajas para filtros (en paralelo, no bloquea UI)
+            viewModelScope.launch {
+                if (query.isBlank() || tokens.isEmpty()) {
+                    eanProductDao.getAllBrandCounts()
+                        .collect { list ->
+                            _searchBrandCounts.value = list.associate { it.marca to it.count }.toMutableMap()
+                        }
+                    _searchCajas.value = eanProductDao.getAllCajas().first()
+                } else {
+                    // Usar el primer token como aproximación; la UI filtra further
+                    val firstToken = tokens.first()
+                    eanProductDao.getBrandCountsForToken(firstToken)
+                        .collect { list ->
+                            _searchBrandCounts.value = list.associate { it.marca to it.count }.toMutableMap()
+                        }
+                    _searchCajas.value = eanProductDao.getCajasForToken(firstToken).first()
+                }
+            }
 
             if (query.isNotBlank()) {
                 preferencesRepository.addSearchQuery(query.trim())

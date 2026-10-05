@@ -51,8 +51,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -92,17 +91,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.core.content.FileProvider
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+
 import androidx.compose.material3.FilterChip
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
+
 import androidx.compose.ui.text.TextStyle
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.WriterException
@@ -116,11 +114,12 @@ import com.google.zxing.integration.android.IntentIntegrator
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.EanProductEntity
+import com.rutamercaderistas.ui.components.HighlightedText
 import com.rutamercaderistas.ui.components.IosModal
 import com.rutamercaderistas.services.brandNote
-import com.rutamercaderistas.services.compactNorm
 import com.rutamercaderistas.services.normalizeSearch
 import com.rutamercaderistas.util.ShareImageGenerator
+import com.rutamercaderistas.util.buildEanListShareText
 import com.rutamercaderistas.ui.theme.AccentBlue
 import com.rutamercaderistas.ui.theme.AccentBlueSoft
 import com.rutamercaderistas.ui.theme.AccentGreen
@@ -179,7 +178,6 @@ fun EanSearchScreen(
     val dimens = LocalAppDimens.current
     val context = LocalContext.current
     val catalogMeta by viewModel.catalogMeta.collectAsStateWithLifecycle()
-    val searchHistory by viewModel.searchHistory.collectAsStateWithLifecycle()
 
     var zoomProduct by remember { mutableStateOf<EanProductEntity?>(null) }
     var showFlejes by remember { mutableStateOf(false) }
@@ -340,11 +338,6 @@ fun EanSearchScreen(
                         )
                         val scanCd = stringResource(R.string.escanear_codigo_barras)
                         val flejesCd = stringResource(R.string.flejes_button_cd)
-                        var historyExpanded by remember { mutableStateOf(false) }
-                        val matchingHistory = remember(searchHistory, value.query) {
-                            if (value.query.isBlank()) searchHistory
-                            else searchHistory.filter { it.contains(value.query, ignoreCase = true) }
-                        }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
@@ -393,53 +386,10 @@ fun EanSearchScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .heightIn(min = dimens.touchMin)
-                                    .onFocusChanged {
-                                        searchFocused = it.isFocused
-                                        historyExpanded = it.isFocused
-                                    }
+                                    .onFocusChanged { searchFocused = it.isFocused }
                                     .shadow(searchElevation, searchPill)
                                     .border(1.5.dp, searchBorder, searchPill),
                             )
-                            DropdownMenu(
-                                expanded = historyExpanded && matchingHistory.isNotEmpty(),
-                                onDismissRequest = { historyExpanded = false },
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                matchingHistory.take(5).forEach { h ->
-                                    DropdownMenuItem(
-                                        text = { Text(h, maxLines = 1) },
-                                        leadingIcon = {
-                                            Icon(
-                                                imageVector = Icons.Outlined.History,
-                                                contentDescription = null,
-                                            )
-                                        },
-                                        onClick = {
-                                            viewModel.onHistoryClick(h)
-                                            historyExpanded = false
-                                        },
-                                    )
-                                }
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            text = stringResource(R.string.ean_clear_history),
-                                            color = MaterialTheme.colorScheme.primary,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Outlined.Delete,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                        )
-                                    },
-                                    onClick = {
-                                        viewModel.clearSearchHistory()
-                                        historyExpanded = false
-                                    },
-                                )
-                            }
                             }
                             Spacer(modifier = Modifier.width(dimens.spacingSm))
                             // Botón Flejes — entre buscador y scanner, con efecto iluminado 2026
@@ -520,9 +470,12 @@ fun EanSearchScreen(
                             }
                             }
 
-                        if (value.query.isNotEmpty() || lazyItems.itemCount > 0) {
+                        // Con resultados, el conteo + compartir viven junto a la
+                        // lista (ahí están los filtros aplicados); aquí solo el
+                        // caso "0 resultados" para no duplicar.
+                        if (value.query.isNotEmpty() && lazyItems.itemCount == 0) {
                             Text(
-                                text = stringResource(R.string.ean_results_count, lazyItems.itemCount),
+                                text = stringResource(R.string.ean_results_count, 0),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier
@@ -561,16 +514,19 @@ fun EanSearchScreen(
                             }
                         }
                     } else {
-                        // Productos cargados por Paging (sin snapshot(): acceso por índice,
-                        // API estable en paging-compose 3.3).
-                        val loadedProducts = remember(lazyItems.itemCount) {
-                            (0 until lazyItems.itemCount).mapNotNull { lazyItems[it] }
+                        // Marcas y cajas desde ViewModel (evita snapshot O(n) en UI).
+                        val searchBrandCounts by viewModel.searchBrandCounts.collectAsStateWithLifecycle()
+                        val searchCajas by viewModel.searchCajas.collectAsStateWithLifecycle()
+                        val brandCountsInResults = remember(searchBrandCounts) {
+                            searchBrandCounts.mapValues { (_, v) -> v }
                         }
-                        val brandsInResults = remember(loadedProducts) {
-                            loadedProducts.map { it.marca.ifBlank { NO_BRAND_KEY } }.distinct()
+                        val brandsInResults = remember(brandCountsInResults) {
+                            brandCountsInResults.keys.sortedWith(
+                                compareBy({ it == "Sin marca" || it == "\u0000" }, { it.lowercase() })
+                            )
                         }
-                        val cajasInResults = remember(loadedProducts) {
-                            loadedProducts.mapNotNull { it.conversion.trim().takeIf { c -> c.isNotBlank() } }.distinct().sortedBy { it.toIntOrNull() ?: Int.MAX_VALUE }
+                        val cajasInResults = remember(searchCajas) {
+                            searchCajas.sortedBy { it.toIntOrNull() ?: Int.MAX_VALUE }
                         }
                         var brandFilter by remember(value.query) { mutableStateOf<String?>(null) }
                         var cajaFilter by remember(value.query) { mutableStateOf<String?>(null) }
@@ -598,7 +554,7 @@ fun EanSearchScreen(
                                                 label = {
                                                     Text(
                                                         if (brandKey == NO_BRAND_KEY) stringResource(R.string.ean_sin_marca)
-                                                        else brandKey
+                                                        else "$brandKey · ${brandCountsInResults[brandKey] ?: 0}"
                                                     )
                                                 },
                                             )
@@ -627,16 +583,64 @@ fun EanSearchScreen(
                                 }
                             }
                         }
-                        val rows = remember(loadedProducts, brandFilter, cajaFilter) {
+                        val rows = remember(lazyItems, brandFilter, cajaFilter) {
+                            // Usar itemSnapshotList en lugar de iterar lazyItems[it] (O(n) por frame)
+                            val products = lazyItems.itemSnapshotList.mapNotNull { it }
+                                .filter { cajaFilter == null || it.conversion.trim() == cajaFilter }
+                            val grouped = products.groupBy { it.marca.ifBlank { "\u0000" } }
                             buildList<EanResultRow> {
-                                val filtered = loadedProducts
-                                    .filter { cajaFilter == null || it.conversion.trim() == cajaFilter }
-                                val grouped: Map<String, List<EanProductEntity>> = filtered.groupBy { it.marca.ifBlank { "\u0000" } }
-                                for ((brandKey, products) in grouped) {
+                                for ((brandKey, ps) in grouped) {
                                     if (brandFilter != null && brandKey != brandFilter) continue
                                     add(EanBrandRow(brandKey))
-                                    products.forEach { add(EanProductRow(it)) }
+                                    ps.forEach { add(EanProductRow(it)) }
                                 }
+                            }
+                        }
+                        val shareCd = stringResource(R.string.ean_share_list_cd)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.ean_results_count, lazyItems.itemCount),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(vertical = dimens.spacingXs)
+                                    .semantics { liveRegion = LiveRegionMode.Polite },
+                            )
+                            IconButton(
+                                onClick = {
+                                    val products = rows.filterIsInstance<EanProductRow>()
+                                        .map { it.product }
+                                    val q = value.query.trim()
+                                    val title = if (q.isBlank()) {
+                                        context.getString(R.string.ean_share_catalog_title, products.size)
+                                    } else {
+                                        context.getString(R.string.ean_share_list_title, q, products.size)
+                                    }
+                                    val text = buildEanListShareText(
+                                        title = title,
+                                        products = products,
+                                    ) { n ->
+                                        context.getString(R.string.ean_share_more, n)
+                                    }
+                                    val intent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_TEXT, text)
+                                    }
+                                    context.startActivity(
+                                        Intent.createChooser(intent, context.getString(R.string.compartir))
+                                    )
+                                },
+                                modifier = Modifier.size(dimens.touchMin),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Share,
+                                    contentDescription = shareCd,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
                         }
                         LazyColumn(
@@ -649,7 +653,7 @@ fun EanSearchScreen(
                                 top = dimens.spacingSm,
                                 bottom = dimens.scrollBottomPadding,
                             ),
-                            verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+                            verticalArrangement = Arrangement.spacedBy(6.dp * rs()),
                         ) {
                             itemsIndexed(rows, key = { _, it ->
                                 when (it) {
@@ -683,12 +687,15 @@ fun EanSearchScreen(
                                     if (!reducedMotion) delay(minOf(index, 8) * 40L)
                                     visible = true
                                 }
+val density = LocalDensity.current
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .graphicsLayer(alpha = animAlpha)
-                                        .offset(y = animOffsetY),
-                                ) {
+                                        .graphicsLayer {
+                                            alpha = animAlpha
+                                            translationY = animOffsetY.value * density.density
+                                        },
+                                    ) {
                                 when (row) {
                                     is EanBrandRow -> EanBrandHeader(
                                         title = if (row.brand == "\u0000")
@@ -709,25 +716,42 @@ fun EanSearchScreen(
 
                     val brandCounts by viewModel.brandCounts.collectAsStateWithLifecycle()
                     catalogMeta?.let { (version, count) ->
-                        val breakdown = brandCounts.entries.sortedByDescending { it.value }
-                            .take(6).joinToString(" · ") { "${it.key} ${it.value}" }
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(top = dimens.spacingXs),
-                            horizontalAlignment = Alignment.CenterHorizontally,
+                        // Marcas del catálogo como atajos: tocan y buscan.
+                        // "Sin marca" no se ofrece (no matchearía nada útil).
+                        val brandShortcuts = remember(brandCounts) {
+                            brandCounts.entries
+                                .filter { it.key.isNotBlank() && it.key != "Sin marca" }
+                                .sortedByDescending { it.value }
+                                .take(8)
+                        }
+                        // Meta + atajos en un solo renglón con scroll (ahorra
+                        // una línea completa de chrome inferior).
+                        LazyRow(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = dimens.spacingXs),
+                            contentPadding = PaddingValues(horizontal = dimens.spacingMd),
+                            horizontalArrangement = Arrangement.spacedBy(
+                                dimens.spacingSm,
+                                Alignment.CenterHorizontally,
+                            ),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(
-                                text = stringResource(R.string.ean_catalog_meta, version, count),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center,
-                            )
-                            if (breakdown.isNotBlank()) {
+                            item(key = "ean_meta") {
                                 Text(
-                                    text = breakdown,
+                                    text = stringResource(R.string.ean_catalog_meta, version, count),
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                    textAlign = TextAlign.Center,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
                                 )
+                            }
+                            if (brandShortcuts.size > 1) {
+                                items(brandShortcuts, key = { it.key }) { (brand, n) ->
+                                    AssistChip(
+                                        onClick = { viewModel.onQueryChange(brand) },
+                                        label = { Text("$brand · $n") },
+                                    )
+                                }
                             }
                         }
                     }
@@ -925,7 +949,7 @@ private fun EanProductCard(
                     ean = product.eanPrincipal,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 96.dp)
+                        .heightIn(min = 80.dp)
                         .clip(MaterialTheme.shapes.small)
                         .clickable(
                             role = Role.Button,
@@ -938,15 +962,6 @@ private fun EanProductCard(
             Spacer(modifier = Modifier.height(4.dp))
 
             Column {
-                if (product.eanPrincipal.isNotBlank()) {
-                    Text(
-                        text = stringResource(R.string.ean_codigo_label, product.eanPrincipal),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                }
-
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
@@ -1235,78 +1250,6 @@ private fun EanEmptyState(query: String, onClear: () -> Unit = {}) {
     }
 }
 
-@Composable
-private fun HighlightedText(
-    text: String,
-    query: String,
-    style: TextStyle,
-    color: Color,
-    modifier: Modifier = Modifier,
-    maxLines: Int = Int.MAX_VALUE,
-    overflow: TextOverflow = TextOverflow.Clip,
-) {
-    val tokens = remember(query) {
-        compactNorm(query).split(Regex("[^a-z0-9]+")).filter { it.isNotBlank() }
-    }
-    if (tokens.isEmpty() || text.isBlank()) {
-        Text(text = text, style = style, color = color, modifier = modifier, maxLines = maxLines, overflow = overflow)
-        return
-    }
-    val ranges = remember(text, query) { computeHighlightRanges(text, tokens) }
-    val annotated = buildAnnotatedString {
-        if (ranges.isEmpty()) {
-            append(text)
-        } else {
-            var cursor = 0
-            for (r in ranges) {
-                if (r.first > cursor) append(text.substring(cursor, r.first))
-                pushStyle(SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary))
-                append(text.substring(r.first, r.last + 1))
-                pop()
-                cursor = r.last + 1
-            }
-            if (cursor < text.length) append(text.substring(cursor))
-        }
-    }
-    Text(text = annotated, style = style, color = color, modifier = modifier, maxLines = maxLines, overflow = overflow)
-}
-
-private fun computeHighlightRanges(text: String, tokens: List<String>): List<IntRange> {
-    val normBuilder = StringBuilder()
-    val map = mutableListOf<IntRange>()
-    text.forEachIndexed { i, c ->
-        val n = compactNorm(c.toString())
-        if (n.isNotEmpty()) {
-            map.add(i..i)
-            normBuilder.append(n)
-        }
-    }
-    val norm = normBuilder.toString()
-    val found = mutableListOf<IntRange>()
-    for (tok in tokens) {
-        if (tok.isBlank()) continue
-        var from = 0
-        while (from <= norm.length - tok.length) {
-            val idx = norm.indexOf(tok, from)
-            if (idx < 0) break
-            val startOrig = map[idx].first
-            val endOrig = map[idx + tok.length - 1].last
-            found.add(startOrig..endOrig)
-            from = idx + tok.length
-        }
-    }
-    found.sortBy { it.first }
-    val merged = mutableListOf<IntRange>()
-    for (r in found) {
-        val last = merged.lastOrNull()
-        if (last != null && r.first <= last.last + 1) {
-            merged[merged.lastIndex] = last.first..maxOf(last.last, r.last)
-        } else {
-            merged.add(r)
-        }
-    }
-    return merged
-}
 
 @Preview(showBackground = true)
 @Composable

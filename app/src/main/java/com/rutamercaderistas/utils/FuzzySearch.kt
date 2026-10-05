@@ -2,6 +2,8 @@ package com.rutamercaderistas.utils
 
 import com.rutamercaderistas.domain.model.effectiveChain
 import com.rutamercaderistas.domain.model.normalizeChain
+import com.rutamercaderistas.models.ClienteInfo
+import com.rutamercaderistas.models.DiaSemana
 import com.rutamercaderistas.models.LocalDelDia
 import com.rutamercaderistas.services.compactNorm
 import com.rutamercaderistas.services.normalizeSearch
@@ -99,6 +101,54 @@ fun rankLocales(query: String, locales: List<LocalDelDia>): List<LocalDelDia> {
 /** Cadena normalizada de un local para filtros (Jumbo, Lider, ...). */
 fun localeChain(local: LocalDelDia): String =
     normalizeChain(effectiveChain(local.cadena, local.formato))
+
+/**
+ * Marcas de un local que coinciden con la query (misma lógica difusa del
+ * buscador). Máximo [limit], en orden de aparición. Puro y testeable.
+ */
+fun matchedBrands(
+    local: LocalDelDia,
+    query: String,
+    limit: Int = 2,
+): List<ClienteInfo> {
+    val q = query.trim()
+    if (q.length < 2) return emptyList()
+    return local.clientes
+        .distinctBy { it.nombre }
+        .filter { fuzzyMatches(q, it.nombre) }
+        .take(limit)
+}
+
+/** Una marca coincidente y los locales que la llevan (ya filtrados por día). */
+data class BrandSection(
+    val brand: String,
+    val locales: List<LocalDelDia>,
+)
+
+/**
+ * Agrupa los resultados por marca coincidente para mostrarlos en secciones.
+ * Solo marcas (no nombres de local); orden por cantidad desc y nombre.
+ * Con [day], cada sección conserva los locales que llevan la marca ese día.
+ * Vacío si la query no pega en ninguna marca → la UI muestra lista plana.
+ * Puro y testeable.
+ */
+fun brandSections(
+    query: String,
+    locales: List<LocalDelDia>,
+    day: DiaSemana? = null,
+): List<BrandSection> {
+    if (query.trim().length < 2) return emptyList()
+    val byBrand = linkedMapOf<String, MutableList<LocalDelDia>>()
+    for (local in locales) {
+        for (b in matchedBrands(local, query, limit = Int.MAX_VALUE)) {
+            if (day != null && local.marcasDias[b.nombre]?.contains(day) != true) continue
+            byBrand.getOrPut(b.nombre) { mutableListOf() }.add(local)
+        }
+    }
+    return byBrand.entries
+        .sortedWith(compareByDescending<Map.Entry<String, List<LocalDelDia>>> { it.value.size }.thenBy { it.key })
+        .map { (brand, ls) -> BrandSection(brand, ls.sortedBy { it.codigo }) }
+}
 
 /** Filtra por cadena y/o solo-con-promos. Función pura, testeable. */
 fun filterLocales(

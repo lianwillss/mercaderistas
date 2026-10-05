@@ -32,6 +32,9 @@ import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.History
 import com.rutamercaderistas.ui.components.DropletToast
+import com.rutamercaderistas.ui.components.MatchedBrandLine
+import com.rutamercaderistas.models.diasLabel
+import com.rutamercaderistas.utils.matchedBrands
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -334,6 +337,8 @@ fun GlobalSearchScreen(
                         LocaleSearchRow(
                             local = local,
                             onAddressClick = onAddressClick,
+                            query = debouncedQuery,
+                            onBrandSearch = { searchQuery = it },
                             onCopyAddress = { text ->
                                 val cm = context.getSystemService(
                                     android.content.ClipboardManager::class.java
@@ -396,6 +401,8 @@ private fun LocaleSearchRow(
     local: LocalDelDia,
     onAddressClick: (String) -> Unit,
     onCopyAddress: (String) -> Unit = {},
+    query: String = "",
+    onBrandSearch: (String) -> Unit = {},
 ) {
     val dimens = LocalAppDimens.current
     val address = local.direccion.ifBlank { stringResource(R.string.sin_direccion) }
@@ -424,6 +431,15 @@ private fun LocaleSearchRow(
                     )
                     if (local.codigo.isNotBlank()) {
                         CodigoChip(codigo = local.codigo)
+                    }
+                    val matched = remember(local, query) { matchedBrands(local, query) }
+                    matched.forEach { cliente ->
+                        MatchedBrandLine(
+                            cliente = cliente,
+                            daysLabel = diasLabel(local.marcasDias[cliente.nombre].orEmpty()),
+                            query = query,
+                            onBrandSearch = onBrandSearch,
+                        )
                     }
                     Text(
                         text = address,

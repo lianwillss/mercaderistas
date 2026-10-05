@@ -11,6 +11,7 @@ import com.rutamercaderistas.domain.usecase.ComputeChainToLocalesUseCase
 import com.rutamercaderistas.domain.usecase.ComputeRouteBrandsUseCase
 import com.rutamercaderistas.domain.usecase.CountExpiringPromotionsUseCase
 import com.rutamercaderistas.domain.usecase.GroupPromotionsUseCase
+import com.rutamercaderistas.domain.usecase.MapEntriesToLocalesUseCase
 import com.rutamercaderistas.models.DiaSemana
 import com.rutamercaderistas.models.EntradaRuta
 import com.rutamercaderistas.services.PromotionRepository
@@ -48,6 +49,7 @@ class RouteViewModelTest {
     private lateinit var groupPromotions: GroupPromotionsUseCase
     private lateinit var computeChainToLocales: ComputeChainToLocalesUseCase
     private lateinit var computeRouteBrands: ComputeRouteBrandsUseCase
+    private lateinit var mapEntriesToLocales: MapEntriesToLocalesUseCase
     private var createdViewModels = mutableListOf<RouteViewModel>()
 
     @Before
@@ -80,6 +82,7 @@ class RouteViewModelTest {
         groupPromotions = GroupPromotionsUseCase(CountExpiringPromotionsUseCase())
         computeChainToLocales = ComputeChainToLocalesUseCase()
         computeRouteBrands = ComputeRouteBrandsUseCase()
+        mapEntriesToLocales = MapEntriesToLocalesUseCase()
     }
 
     @After
@@ -129,6 +132,7 @@ class RouteViewModelTest {
             groupPromotions = groupPromotions,
             computeChainToLocales = computeChainToLocales,
             computeRouteBrands = computeRouteBrands,
+            mapEntriesToLocales = mapEntriesToLocales,
             defaultDispatcher = testDispatcher,
         )
         createdViewModels.add(vm)

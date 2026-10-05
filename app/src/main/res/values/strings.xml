@@ -122,7 +122,7 @@
     <string name="buscar_ruta">Buscar ruta…</string>
     <string name="sin_rutas">No se encontraron rutas</string>
     <string name="buscar_marca_producto">Buscar marca, producto…</string>
-    <string name="buscar_local_placeholder">Buscar local…</string>
+    <string name="buscar_local_placeholder">Buscar marca…</string>
 
     <!-- Promotions -->
     <string name="promociones_title">Promociones</string>
@@ -313,6 +313,7 @@
     <string name="volver_cd">Volver</string>
     <string name="buscar_cd">Buscar</string>
     <string name="limpiar_cd">Limpiar</string>
+    <string name="limpiar_busqueda_cd">Limpiar búsqueda</string>
     <string name="descartar_cd">Descartar</string>
     <string name="marca_cd">Marca</string>
     <string name="direccion_cd">Dirección</string>
@@ -322,6 +323,14 @@
     <string name="cerrar_cd">Cerrar</string>
     <string name="sin_conexion_cd">Sin conexión</string>
     <string name="todas_cd">Todas</string>
+    <string name="buscar_locales_cd">Buscar marca por nombre. Escribe para filtrar la lista.</string>
+    <string name="filtrar_por_dia_cd">Filtrar locales por día de visita</string>
+    <string name="dia_seleccionado_cd">Día seleccionado: %s</string>
+    <string name="todas_los_dias_cd">Todos los días seleccionados</string>
+    <string name="marca_seleccionada_cd">Filtrando por marca %s</string>
+    <string name="local_seleccionado_cd">Local seleccionado, %s</string>
+    <string name="abrir_direccion_maps_cd">Abrir %s en Maps</string>
+    <string name="copiar_direccion_cd">Copiar dirección al portapapeles</string>
 
     <!-- EAN Search -->
     <string name="ean_search_title">Buscar EAN / Código de Barras</string>
@@ -333,7 +342,6 @@
     <string name="ean_sin_marca">Sin marca</string>
     <string name="escanear_codigo_barras">Escanear código de barras</string>
     <string name="reintentar_carga">Reintentar carga</string>
-    <string name="ean_codigo_label">Código EAN: %s</string>
     <string name="ean_barcode_title">Código de barras</string>
     <string name="ean_barcode_cd">Código de barras del producto %s</string>
     <string name="ean_barcode_zoom_hint">Toca para ampliar y verificar el código</string>
@@ -349,12 +357,15 @@
     <string name="ean_scanning_cd">Iniciando escáner</string>
     <string name="ean_search_label">Buscar producto por nombre, EAN o SKU</string>
     <string name="ean_catalog_meta">Catálogo v%1$d · %2$d productos</string>
+    <string name="ean_share_list_cd">Compartir lista de resultados</string>
+    <string name="ean_share_list_title">Búsqueda EAN: %1$s (%2$d)</string>
+    <string name="ean_share_catalog_title">Catálogo EAN (%1$d)</string>
+    <string name="ean_share_more">…y %1$d más</string>
     <string name="ean_empty_catalog">Catálogo vacío — toca para recargar</string>
     <string name="ean_reload_catalog">Recargar catálogo</string>
     <string name="ean_no_results_hint">Revisa la ortografía o prueba con menos palabras.</string>
     <string name="ean_clear_search">Limpiar búsqueda</string>
     <string name="ean_recent_searches">Búsquedas recientes</string>
-    <string name="ean_clear_history">Limpiar historial</string>
     <string name="limpiar_historial">Limpiar historial</string>
     <string name="ean_recent_chip_cd">Buscar %s</string>
     <string name="header_ajustes">Ajustes</string>

@@ -1,6 +1,7 @@
 package com.rutamercaderistas.utils
 
 import com.rutamercaderistas.models.ClienteInfo
+import com.rutamercaderistas.models.DiaSemana
 import com.rutamercaderistas.models.LocalDelDia
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -236,5 +237,155 @@ class FuzzySearchTest {
     fun localeChain_blankIsBlank() {
         assertEquals("", localeChain(local("1", "A")))
         assertEquals("JUMBO", localeChain(local("1", "A", cadena = "CENCOSUD", formato = "JUMBO")))
+    }
+
+    // ── matchedBrands ──
+
+    @Test
+    fun matchedBrands_exactMatch() {
+        val local = local("1", "Local").copy(clientes = listOf(ClienteInfo("BIGU", false, 1)))
+        assertEquals(1, matchedBrands(local, "BIGU").size)
+        assertEquals("BIGU", matchedBrands(local, "BIGU")[0].nombre)
+    }
+
+    @Test
+    fun matchedBrands_blankQueryReturnsEmpty() {
+        val local = local("1", "Local").copy(clientes = listOf(ClienteInfo("BIGU", false, 1)))
+        assertTrue(matchedBrands(local, "").isEmpty())
+    }
+
+    @Test
+    fun matchedBrands_shortQueryReturnsEmpty() {
+        val local = local("1", "Local").copy(clientes = listOf(ClienteInfo("BIGU", false, 1)))
+        assertTrue(matchedBrands(local, "B").isEmpty())
+    }
+
+    @Test
+    fun matchedBrands_caseInsensitive() {
+        val local = local("1", "Local").copy(clientes = listOf(ClienteInfo("BIGU", false, 1)))
+        assertEquals(1, matchedBrands(local, "bigu").size)
+    }
+
+    @Test
+    fun matchedBrands_accentsTolerant() {
+        val local = local("1", "Local").copy(clientes = listOf(ClienteInfo("JOSE", false, 1)))
+        assertEquals(1, matchedBrands(local, "jose").size)
+    }
+
+    @Test
+    fun matchedBrands_multipleClientsFiltersCorrectly() {
+        val local = local("1", "Local").copy(clientes = listOf(
+            ClienteInfo("BIGU", false, 1),
+            ClienteInfo("NAT", false, 1),
+            ClienteInfo("OTRA", false, 1),
+        ))
+        val matches = matchedBrands(local, "NAT", limit = 5)
+        assertEquals(1, matches.size)
+        assertEquals("NAT", matches[0].nombre)
+    }
+
+    @Test
+    fun matchedBrands_respectsLimit() {
+        val local = local("1", "Local").copy(clientes = listOf(
+            ClienteInfo("BIGU", false, 1),
+            ClienteInfo("NATURAL", false, 1),
+            ClienteInfo("NATURA", false, 1),
+            ClienteInfo("OTRA", false, 1),
+        ))
+        val matches = matchedBrands(local, "NAT", limit = 2)
+        assertEquals(2, matches.size)
+    }
+
+    // ── brandSections ──
+
+    @Test
+    fun brandSections_blankQueryReturnsEmpty() {
+        val locales = listOf(local("1", "A").copy(clientes = listOf(ClienteInfo("BIGU", false, 1))))
+        assertTrue(brandSections("", locales).isEmpty())
+    }
+
+    @Test
+    fun brandSections_shortQueryReturnsEmpty() {
+        val locales = listOf(local("1", "A").copy(clientes = listOf(ClienteInfo("BIGU", false, 1))))
+        assertTrue(brandSections("B", locales).isEmpty())
+    }
+
+    @Test
+    fun brandSections_groupsByBrandAndCountsLocales() {
+        val locales = listOf(
+            local("1", "Local A").copy(clientes = listOf(ClienteInfo("BIGU", false, 1))),
+            local("2", "Local B").copy(clientes = listOf(ClienteInfo("BIGU", false, 1))),
+            local("3", "Local C").copy(clientes = listOf(ClienteInfo("NAT", false, 1))),
+        )
+        val sections = brandSections("BIGU", locales)
+        assertEquals(1, sections.size)
+        assertEquals("BIGU", sections[0].brand)
+        assertEquals(2, sections[0].locales.size)
+        assertEquals(listOf("1", "2"), sections[0].locales.map { it.codigo })
+    }
+
+    @Test
+    fun brandSections_multipleBrandsSortedByCountDesc() {
+        val locales = listOf(
+            local("1", "A").copy(clientes = listOf(ClienteInfo("BIGU", false, 1))),
+            local("2", "B").copy(clientes = listOf(ClienteInfo("BIGU", false, 1))),
+            local("3", "C").copy(clientes = listOf(ClienteInfo("BIGU", false, 1))),
+            local("4", "D").copy(clientes = listOf(ClienteInfo("BIV", false, 1))),
+            local("5", "E").copy(clientes = listOf(ClienteInfo("BIV", false, 1))),
+        )
+        val sections = brandSections("BI", locales) // matches BIGU and BIV
+        assertEquals(2, sections.size)
+        assertEquals("BIGU", sections[0].brand)
+        assertEquals(3, sections[0].locales.size)
+        assertEquals("BIV", sections[1].brand)
+        assertEquals(2, sections[1].locales.size)
+    }
+
+    @Test
+    fun brandSections_tieBreaksByBrandName() {
+        val locales = listOf(
+            local("1", "A").copy(clientes = listOf(ClienteInfo("AAA", false, 1))),
+            local("2", "B").copy(clientes = listOf(ClienteInfo("AAB", false, 1))),
+        )
+        val sections = brandSections("AA", locales) // matches both AAA and AAB
+        assertEquals(2, sections.size)
+        assertEquals("AAA", sections[0].brand)
+        assertEquals("AAB", sections[1].brand)
+    }
+
+    @Test
+    fun brandSections_filtersByDay() {
+        // brandVisitDays se computa desde EntradaRuta; simulamos el resultado
+        // poniendo marcasDias directamente en el LocalDelDia.
+        val lunes = setOf(DiaSemana.LUNES)
+        val martes = setOf(DiaSemana.MARTES)
+        val locales = listOf(
+            local("1", "A").copy(
+                clientes = listOf(ClienteInfo("BIGU", false, 1)),
+                marcasDias = mapOf("BIGU" to lunes)
+            ),
+            local("2", "B").copy(
+                clientes = listOf(ClienteInfo("BIV", false, 1)),
+                marcasDias = mapOf("BIV" to martes)
+            ),
+        )
+        // BIGU solo LUNES, BIV solo MARTES (query "BI" matchea ambas)
+        val sectionsLunes = brandSections("BI", locales, day = DiaSemana.LUNES)
+        val sectionsMartes = brandSections("BI", locales, day = DiaSemana.MARTES)
+        assertEquals(1, sectionsLunes.size)
+        assertEquals("BIGU", sectionsLunes[0].brand)
+        assertEquals(1, sectionsMartes.size)
+        assertEquals("BIV", sectionsMartes[0].brand)
+    }
+
+    @Test
+    fun brandSections_localesSortedByCodigoWithinSection() {
+        val locales = listOf(
+            local("3", "C").copy(clientes = listOf(ClienteInfo("BIGU", false, 1))),
+            local("1", "A").copy(clientes = listOf(ClienteInfo("BIGU", false, 1))),
+            local("2", "B").copy(clientes = listOf(ClienteInfo("BIGU", false, 1))),
+        )
+        val sections = brandSections("BIGU", locales)
+        assertEquals(listOf("1", "2", "3"), sections[0].locales.map { it.codigo })
     }
 }

@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import com.rutamercaderistas.ui.theme.MotionSprings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -100,13 +101,14 @@ fun AppBottomBar(
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
                 .padding(horizontal = 4.dp, vertical = 4.dp),
         ) {
-            val slotWidthDp = (constraints.maxWidth / items.size) / density.density * 1f * 1f
-            val slotDp = ((constraints.maxWidth.toFloat() / items.size) / density.density).dp
+            val slotDp = remember(constraints.maxWidth, items.size) {
+                ((constraints.maxWidth.toFloat() / items.size) / density.density).dp
+            }
             var barHeightPx by remember { mutableIntStateOf(0) }
 
             val slideOffsetDp by animateDpAsState(
                 targetValue = slotDp * selectedIndex,
-                animationSpec = spring(dampingRatio = 0.8f, stiffness = 400f),
+                animationSpec = MotionSprings.bouncy(),
                 label = "bottomBarSlide",
             )
             val pillColor by animateColorAsState(

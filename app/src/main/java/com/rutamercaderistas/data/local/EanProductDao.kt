@@ -92,4 +92,49 @@ interface EanProductDao {
     // no es entidad Room; si no existe, lanza y el llamador usa solo LIKE.
     @RawQuery(observedEntities = [EanProductEntity::class])
     suspend fun ftsSearch(query: SupportSQLiteQuery): List<EanProductEntity>
+
+    // Marcas y conteo para filtros (se usa en la UI para chips de marca)
+    @Query("""
+        SELECT marca, COUNT(*) as count FROM ean_products
+        WHERE eanPrincipal LIKE '%' || :token || '%'
+           OR codCencosud LIKE '%' || :token || '%'
+           OR codProveedor LIKE '%' || :token || '%'
+           OR codigoBarra LIKE '%' || :token || '%'
+           OR descripcion_norm LIKE '%' || :token || '%'
+           OR marca_norm LIKE '%' || :token || '%'
+           OR descripcion_norm_nospace LIKE '%' || :token || '%'
+           OR marca_norm_nospace LIKE '%' || :token || '%'
+        GROUP BY marca
+        ORDER BY count DESC
+    """)
+    fun getBrandCountsForToken(token: String): Flow<List<BrandCountResult>>
+
+    // Cajas distintas para filtros
+    @Query("""
+        SELECT DISTINCT conversion FROM ean_products
+        WHERE conversion IS NOT NULL AND conversion != ''
+           AND (eanPrincipal LIKE '%' || :token || '%'
+             OR codCencosud LIKE '%' || :token || '%'
+             OR codProveedor LIKE '%' || :token || '%'
+             OR codigoBarra LIKE '%' || :token || '%'
+             OR descripcion_norm LIKE '%' || :token || '%'
+             OR marca_norm LIKE '%' || :token || '%'
+             OR descripcion_norm_nospace LIKE '%' || :token || '%'
+             OR marca_norm_nospace LIKE '%' || :token || '%')
+        ORDER BY CAST(conversion AS INTEGER)
+    """)
+    fun getCajasForToken(token: String): Flow<List<String>>
+
+    // Para query vacía: todas las marcas y cajas
+    @Query("SELECT marca, COUNT(*) as count FROM ean_products GROUP BY marca ORDER BY count DESC")
+    fun getAllBrandCounts(): Flow<List<BrandCountResult>>
+
+    @Query("SELECT DISTINCT conversion FROM ean_products WHERE conversion IS NOT NULL AND conversion != '' ORDER BY CAST(conversion AS INTEGER)")
+    fun getAllCajas(): Flow<List<String>>
 }
+
+// Resultado de conteo por marca para Room
+data class BrandCountResult(
+    val marca: String,
+    val count: Int
+)
