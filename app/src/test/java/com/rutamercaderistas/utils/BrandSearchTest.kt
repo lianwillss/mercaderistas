@@ -7,6 +7,7 @@ import com.rutamercaderistas.models.LocalDelDia
 import com.rutamercaderistas.models.brandVisitDays
 import com.rutamercaderistas.models.diasDeVisita
 import com.rutamercaderistas.models.diasLabel
+import com.rutamercaderistas.models.diasVisita
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -64,6 +65,30 @@ class BrandSearchTest {
             "LUN, MIE, VIE",
             diasLabel(setOf(DiaSemana.VIERNES, DiaSemana.LUNES, DiaSemana.MIERCOLES)),
         )
+    }
+
+    @Test
+    fun `diasVisita une dias de todas las marcas`() {
+        val local = LocalDelDia(
+            codigo = "1",
+            local = "Local",
+            direccion = "Dir",
+            clientes = listOf(ClienteInfo("BIGU", false, 2), ClienteInfo("CUK", false, 1)),
+            marcasDias = mapOf(
+                "BIGU" to setOf(DiaSemana.LUNES, DiaSemana.MIERCOLES),
+                "CUK" to setOf(DiaSemana.MIERCOLES, DiaSemana.VIERNES),
+            ),
+        )
+        assertEquals(
+            setOf(DiaSemana.LUNES, DiaSemana.MIERCOLES, DiaSemana.VIERNES),
+            local.diasVisita(),
+        )
+        assertEquals("LUN, MIE, VIE", diasLabel(local.diasVisita()))
+    }
+
+    @Test
+    fun `diasVisita vacio sin marcasDias`() {
+        assertTrue(localCon("BIGU").diasVisita().isEmpty())
     }
 
     @Test

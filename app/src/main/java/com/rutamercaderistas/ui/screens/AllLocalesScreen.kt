@@ -48,6 +48,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.LocationOn
@@ -97,6 +98,7 @@ import com.rutamercaderistas.utils.BrandSection
 import com.rutamercaderistas.utils.brandSections
 import com.rutamercaderistas.utils.matchedBrands
 import com.rutamercaderistas.models.diasLabel
+import com.rutamercaderistas.models.diasVisita
 import com.rutamercaderistas.ui.components.ScreenHeader
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TopAppBarDefaults
@@ -884,6 +886,9 @@ private fun LocaleCardContent(
         if (focusBrand != null) all.filter { it.nombre == focusBrand } else all
     }
     val localTitle = local.local.ifBlank { stringResource(R.string.sin_numero) }
+    val dias = remember(local) { local.diasVisita() }
+    val diasTexto = diasLabel(dias)
+    val seVisitaCd = if (dias.isNotEmpty()) stringResource(R.string.locale_se_visita, diasTexto) else ""
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -892,6 +897,7 @@ private fun LocaleCardContent(
                 contentDescription = buildString {
                     append(localTitle)
                     if (local.codigo.isNotBlank()) append(", código ${local.codigo}")
+                    if (seVisitaCd.isNotEmpty()) append(". $seVisitaCd")
                     if (local.direccion.isNotBlank()) append(", ${local.direccion}")
                     if (local.comuna.isNotBlank()) append(", ${local.comuna}")
                     if (matched.isNotEmpty()) {
@@ -930,6 +936,27 @@ private fun LocaleCardContent(
             if (local.codigo.isNotBlank()) {
                 Spacer(modifier = Modifier.height(4.dp))
                 CodigoChip(codigo = local.codigo)
+            }
+            // Días en que se visita el local dentro de la ruta actual
+            // (unión de los días de sus marcas; vacío si no hay datos).
+            if (dias.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Outlined.CalendarMonth,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = diasTexto,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
             matched.forEach { cliente ->
                 MatchedBrandLine(
@@ -1022,6 +1049,9 @@ private fun LocaleDetailPane(
     val detailPress = rememberPressInteractionSource()
     val matched = remember(local, searchQuery) { matchedBrands(local, searchQuery) }
     val localTitle = local.local.ifBlank { stringResource(R.string.sin_numero) }
+    val dias = remember(local) { local.diasVisita() }
+    val diasTexto = diasLabel(dias)
+    val seVisitaCd = if (dias.isNotEmpty()) stringResource(R.string.locale_se_visita, diasTexto) else ""
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1032,6 +1062,7 @@ private fun LocaleDetailPane(
                     append("Detalle del local ")
                     append(localTitle)
                     if (local.codigo.isNotBlank()) append(", código ${local.codigo}")
+                    if (seVisitaCd.isNotEmpty()) append(". $seVisitaCd")
                     if (matched.isNotEmpty()) {
                         append(". Marcas: ")
                         append(matched.joinToString(", ") { it.nombre })
@@ -1047,6 +1078,24 @@ private fun LocaleDetailPane(
         )
         if (local.codigo.isNotBlank()) {
             CodigoChip(codigo = local.codigo)
+        }
+        if (dias.isNotEmpty()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Outlined.CalendarMonth,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = diasTexto,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         matched.forEach { cliente ->
             MatchedBrandLine(

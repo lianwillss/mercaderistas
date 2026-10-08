@@ -96,6 +96,10 @@ data class ClienteInfo(
     }
 }
 
+/** Días en que se visita el local (unión de los días de todas sus marcas). */
+fun LocalDelDia.diasVisita(): Set<DiaSemana> =
+    marcasDias.values.flatten().toSet()
+
 /** Días en que se visita una entrada (de sus booleanos lunes..domingo). */
 fun diasDeVisita(e: EntradaRuta): Set<DiaSemana> = buildSet {
     if (e.lunes) add(DiaSemana.LUNES)

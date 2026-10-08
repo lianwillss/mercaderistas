@@ -386,6 +386,7 @@
     <string name="settings_ean_cleared">Caché del catálogo EAN borrada</string>
     <string name="settings_history_cleared">Historial de búsqueda borrado</string>
     <string name="locale_detail_placeholder">Selecciona un local para ver el detalle</string>
+    <string name="locale_se_visita">Se visita: %1$s</string>
     <string name="locale_clientes">Clientes</string>
     <string name="onboarding_rutero_title">Aquí está tu ruta</string>
     <string name="onboarding_rutero_desc">Tu ruta del día con todos los locales asignados. Cambia de día arriba y toca un local para ver sus marcas.</string>
