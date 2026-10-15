@@ -13,8 +13,8 @@ import javax.inject.Singleton
  * consultas van por @RawQuery con fallback a LIKE si la tabla no existe.
  *
  * Solo indexa las columnas normalizadas (sin diacríticos ni mayúsculas); los
- * códigos (EAN/SKU con ceros a la izquierda y fallback Levenshtein) se siguen
- * buscando por LIKE en [EanProductDao.searchCandidates].
+ * códigos (EAN/SKU con ceros a la izquierda) se siguen buscando por LIKE en
+ * [EanProductDao.rankedSearch] (ver buildRankedSearch).
  */
 const val EAN_FTS_TABLE = "ean_product_fts"
 

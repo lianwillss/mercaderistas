@@ -61,6 +61,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -384,6 +385,7 @@ fun PromotionsOverviewScreen(
                     contentPadding = PaddingValues(start = dimens.spacingLg, end = dimens.spacingLg, top = dimens.spacingXs, bottom = dimens.scrollBottomPadding),
                     verticalArrangement = Arrangement.spacedBy(dimens.spacingXxl),
                     horizontalArrangement = Arrangement.spacedBy(dimens.spacingLg),
+                    modifier = Modifier.testTag("promoBrandGrid"),
                 ) {
                     itemsIndexed(
                         items = filteredEntries,

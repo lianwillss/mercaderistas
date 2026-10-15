@@ -5,14 +5,10 @@ import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
-import androidx.paging.PagingSource
-import androidx.paging.PagingState
 import androidx.paging.cachedIn
-import androidx.sqlite.db.SimpleSQLiteQuery
-import com.rutamercaderistas.data.local.EAN_FTS_MATCH_QUERY
 import com.rutamercaderistas.data.local.EanProductDao
 import com.rutamercaderistas.data.local.EanProductEntity
-import com.rutamercaderistas.data.local.buildFtsMatch
+import com.rutamercaderistas.data.local.buildRankedSearch
 import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.services.EAN_DATA_VERSION
 import com.rutamercaderistas.services.EanExcelParser
@@ -27,7 +23,6 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlin.math.min
 import javax.inject.Inject
 
 sealed interface EanSearchUiState {
@@ -151,6 +146,9 @@ class EanSearchViewModel @Inject constructor(
 
             // Pager debe crear un PagingSource NUEVO en cada factory call (invalidación
             // y refresh de Paging 3 lo exigen); no reutilizar una instancia.
+            // Con query: ranking en SQL (buildRankedSearch) con paginación real
+            // de Room — sin tope LIMIT ni re-ordenar en memoria por página.
+            // Nulo (query vacía) → catálogo completo.
             val pagerFlow = Pager(
                 config = PagingConfig(
                     pageSize = 50,
@@ -158,11 +156,8 @@ class EanSearchViewModel @Inject constructor(
                     maxSize = 200
                 ),
                 pagingSourceFactory = {
-                    if (query.isBlank() || tokens.isEmpty()) {
-                        eanProductDao.pagingSourceAll()
-                    } else {
-                        MultiTokenPagingSource(eanProductDao, tokens, query)
-                    }
+                    buildRankedSearch(query, tokens)?.toQuery()?.let { eanProductDao.rankedSearch(it) }
+                        ?: eanProductDao.pagingSourceAll()
                 }
             ).flow.cachedIn(viewModelScope)
 
@@ -253,146 +248,5 @@ class EanSearchViewModel @Inject constructor(
     fun retryLoad() {
         observeJob?.cancel()
         loadDatabase()
-    }
-}
-
-// Coincidencia de un token (ya compacto) contra cualquier campo del producto.
-// Para los códigos se ignora el relleno de ceros a la izquierda, de modo que
-// "12" encuentre "000012" y viceversa. Incluye fallback Levenshtein <=2 para
-// EANs con 1-2 dígitos errados por lectura (caso PEPILU 06110112277 vs 0606110112277).
-private fun EanProductEntity.containsToken(t: String): Boolean {
-    val tt = t.trimStart('0')
-    fun String.codeHit(): Boolean {
-        val f = this.trimStart('0')
-        if (f.contains(tt) || this.contains(t, ignoreCase = true)) return true
-        // Fallback edit distance para códigos numéricos largos (EAN/SKU)
-        if (tt.length >= 8 && f.length >= 8 && levenshtein(f, tt) <= 2) return true
-        return false
-    }
-    return eanPrincipal.codeHit()
-        || codCencosud.codeHit()
-        || codProveedor.codeHit()
-        || codigoBarra.codeHit()
-        || descripcionProducto.contains(t, ignoreCase = true)
-        || marca.contains(t, ignoreCase = true)
-        || descripcionNorm.contains(t, ignoreCase = true)
-        || marcaNorm.contains(t, ignoreCase = true)
-        || descripcionNormNospace.contains(t, ignoreCase = true)
-        || marcaNormNospace.contains(t, ignoreCase = true)
-}
-
-private fun levenshtein(a: String, b: String): Int {
-    if (a == b) return 0
-    if (a.isEmpty()) return b.length
-    if (b.isEmpty()) return a.length
-    val dp = IntArray(b.length + 1) { it }
-    for (i in 1..a.length) {
-        var prev = dp[0]
-        dp[0] = i
-        for (j in 1..b.length) {
-            val cur = dp[j]
-            val cost = if (a[i - 1] == b[j - 1]) 0 else 1
-            dp[j] = minOf(dp[j] + 1, dp[j - 1] + 1, prev + cost)
-            prev = cur
-        }
-    }
-    return dp[b.length]
-}
-
-// PagingSource personalizado que combina múltiples tokens con lógica AND
-// y aplica ranking en memoria (ya que SQL no soporta fácilmente este ranking complejo).
-private class MultiTokenPagingSource(
-    private val dao: EanProductDao,
-    private val tokens: List<String>,
-    private val originalQuery: String,
-) : PagingSource<Int, EanProductEntity>() {
-
-    override suspend fun load(params: LoadParams<Int>): LoadResult<Int, EanProductEntity> {
-        return try {
-            val page = params.key ?: 1
-            val firstToken = tokens.first()
-            // Candidatos LIKE (cubre códigos con ceros y Levenshtein) + FTS5
-            // (prefijos y tokenización en descripciones/marcas). El ranking
-            // final sigue siendo el mismo in-memory de abajo.
-            val like = dao.searchCandidates(firstToken).first()
-            val fts = ftsCandidates()
-            val candidates = if (fts.isEmpty()) like else (like + fts).distinctBy { it.id }
-
-            // Filtrar por AND de todos los tokens
-            val filtered = candidates
-                .filter { e -> tokens.all { t -> e.containsToken(t) } }
-                .sortedWith(
-                    compareByDescending<EanProductEntity> { e ->
-                        val queryTrim = originalQuery.trim()
-                        val queryTrimZero = queryTrim.trimStart('0')
-                        val queryCompact = compactNorm(originalQuery)
-                        // 1) EAN exacto (ignorando ceros a la izquierda)
-                        val eanZero = e.eanPrincipal.trimStart('0')
-                        if (e.eanPrincipal == queryTrim || (queryTrimZero.isNotEmpty() && eanZero == queryTrimZero) || e.codigoBarra.trimStart('0') == queryTrimZero) 3 else 0
-                    }.thenByDescending { e ->
-                        // 1b) EAN prefijo (escaner parcial)
-                        val queryTrimZero = originalQuery.trim().trimStart('0')
-                        val eanZero = e.eanPrincipal.trimStart('0')
-                        val barraZero = e.codigoBarra.trimStart('0')
-                        if (eanZero.startsWith(queryTrimZero) || barraZero.startsWith(queryTrimZero)) 2 else 0
-                    }.thenByDescending { e ->
-                        // 1c) EAN contiene query (o viceversa) - caso PEPILU
-                        val queryTrimZero = originalQuery.trim().trimStart('0')
-                        val eanZero = e.eanPrincipal.trimStart('0')
-                        val barraZero = e.codigoBarra.trimStart('0')
-                        if (eanZero.contains(queryTrimZero) || queryTrimZero.contains(eanZero) || barraZero.contains(queryTrimZero) || (eanZero.isNotEmpty() && queryTrimZero.isNotEmpty() && levenshtein(eanZero, queryTrimZero) <= 2)) 1 else 0
-                    }.thenByDescending { e ->
-                        // 2) SKU exacto
-                        val queryTrim = originalQuery.trim()
-                        if (e.codCencosud == queryTrim || e.codProveedor == queryTrim) 2 else 0
-                    }.thenByDescending { e ->
-                        // 3) Marca exacta
-                        val queryCompact = compactNorm(originalQuery)
-                        if (e.marcaNorm == queryCompact || e.marcaNormNospace == queryCompact) 2 else 0
-                    }.thenByDescending { e ->
-                        // 4) Todos los tokens golpean la marca
-                        val brandHits = tokens.count { t -> e.marcaNorm.contains(t) || e.marcaNormNospace.contains(t) }
-                        when {
-                            brandHits == tokens.size && tokens.isNotEmpty() -> 1
-                            brandHits > 0 -> 0
-                            else -> -1
-                        }
-                    }.thenBy { e -> e.marca }
-                     .thenBy { e -> e.descripcionProducto }
-                )
-
-            // Paginación simple: cada página = 50 items
-            val pageSize = 50
-            val start = (page - 1) * pageSize
-            val end = min(start + pageSize, filtered.size)
-            val pageItems = if (start < filtered.size) filtered.subList(start, end) else emptyList()
-
-            val nextKey = if (end < filtered.size) page + 1 else null
-            val prevKey = if (page > 1) page - 1 else null
-
-            LoadResult.Page(
-                data = pageItems,
-                prevKey = prevKey,
-                nextKey = nextKey
-            )
-        } catch (e: Exception) {
-            LoadResult.Error(e)
-        }
-    }
-
-    override fun getRefreshKey(state: PagingState<Int, EanProductEntity>): Int? {
-        return state.anchorPosition?.let { anchorPosition ->
-            (anchorPosition / 50) + 1
-        } ?: 1
-    }
-
-    /** Candidatos FTS5; vacío si la tabla sidecar aún no existe. Nunca lanza. */
-    private suspend fun ftsCandidates(): List<EanProductEntity> {
-        val match = buildFtsMatch(tokens) ?: return emptyList()
-        return try {
-            dao.ftsSearch(SimpleSQLiteQuery(EAN_FTS_MATCH_QUERY, arrayOf(match)))
-        } catch (_: Exception) {
-            emptyList()
-        }
     }
 }

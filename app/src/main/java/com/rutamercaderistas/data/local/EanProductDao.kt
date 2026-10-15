@@ -44,24 +44,6 @@ interface EanProductDao {
     @Query("SELECT * FROM ean_products WHERE codigoBarra LIKE '%' || :query || '%' ORDER BY descripcionProducto LIMIT 50")
     fun searchByCodigoBarra(query: String): Flow<List<EanProductEntity>>
 
-    // Devuelve candidatos que contienen un único token (compacto) en cualquier
-    // columna. El ViewModel combina los candidatos de varios tokens y filtra por
-    // AND, permitiendo coincidencias en cualquier orden ("nat pistacho" →
-    // "NAT ROMERO PISTACHO"). LIMIT alto para no descartar antes del filtro.
-    @Query("""
-        SELECT * FROM ean_products
-        WHERE eanPrincipal LIKE '%' || :token || '%'
-           OR codCencosud LIKE '%' || :token || '%'
-           OR codProveedor LIKE '%' || :token || '%'
-           OR codigoBarra LIKE '%' || :token || '%'
-           OR descripcion_norm LIKE '%' || :token || '%'
-           OR marca_norm LIKE '%' || :token || '%'
-           OR descripcion_norm_nospace LIKE '%' || :token || '%'
-           OR marca_norm_nospace LIKE '%' || :token || '%'
-        LIMIT 300
-    """)
-    fun searchCandidates(token: String): Flow<List<EanProductEntity>>
-
     // Búsqueda por marca (normalizada)
     @Query("SELECT * FROM ean_products WHERE marca_norm LIKE '%' || :query || '%' ORDER BY descripcionProducto LIMIT 50")
     fun searchByMarca(query: String): Flow<List<EanProductEntity>>
@@ -70,23 +52,15 @@ interface EanProductDao {
     @Query("SELECT * FROM ean_products ORDER BY descripcionProducto")
     fun getAll(): Flow<List<EanProductEntity>>
 
-    // PagingSource para búsqueda con tokens (AND entre tokens)
-    @Query("""
-        SELECT * FROM ean_products
-        WHERE eanPrincipal LIKE '%' || :token || '%'
-           OR codCencosud LIKE '%' || :token || '%'
-           OR codProveedor LIKE '%' || :token || '%'
-           OR codigoBarra LIKE '%' || :token || '%'
-           OR descripcion_norm LIKE '%' || :token || '%'
-           OR marca_norm LIKE '%' || :token || '%'
-           OR descripcion_norm_nospace LIKE '%' || :token || '%'
-           OR marca_norm_nospace LIKE '%' || :token || '%'
-    """)
-    fun pagingSourceForToken(token: String): PagingSource<Int, EanProductEntity>
-
     // PagingSource para todos los productos (lista vacía)
     @Query("SELECT * FROM ean_products ORDER BY descripcionProducto")
     fun pagingSourceAll(): PagingSource<Int, EanProductEntity>
+
+    // Búsqueda con ranking en SQL (ver buildRankedSearch): un solo query con
+    // score CASE + AND de tokens y paginación real de Room. Room invalida el
+    // PagingSource al cambiar ean_products (observedEntities).
+    @RawQuery(observedEntities = [EanProductEntity::class])
+    fun rankedSearch(query: SupportSQLiteQuery): PagingSource<Int, EanProductEntity>
 
     // Full-text FTS5 (tabla sidecar ean_product_fts). @RawQuery porque la tabla
     // no es entidad Room; si no existe, lanza y el llamador usa solo LIKE.

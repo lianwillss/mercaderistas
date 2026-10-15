@@ -94,7 +94,6 @@ class EanSearchViewModelTest {
         coEvery { dao.hasUnnormalized() } returns 0
         every { dao.getAll() } returns flowOf(sample)
         every { dao.pagingSourceAll() } answers { FakePagingSource(sample) }
-        every { dao.searchCandidates(any()) } returns flowOf(emptyList())
         coEvery { parser.loadFromAssets() } returns Result.success(2)
         coEvery { parser.getEanDataVersion() } returns 0
         coEvery { parser.setEanDataVersion(any()) } returns Unit
@@ -114,7 +113,7 @@ class EanSearchViewModelTest {
     }
 
     @Test
-    fun `search query uses searchCandidates`() = runTest {
+    fun `search query uses rankedSearch`() = runTest {
         val found = listOf(
             EanProductEntity(eanPrincipal = "9999999999999", descripcionProducto = "FINDME", marca = "Z"),
         )
@@ -122,7 +121,7 @@ class EanSearchViewModelTest {
         coEvery { dao.hasUnnormalized() } returns 0
         every { dao.getAll() } returns flowOf(emptyList())
         every { dao.pagingSourceAll() } answers { FakePagingSource(emptyList()) }
-        every { dao.searchCandidates(any()) } returns flowOf(found)
+        every { dao.rankedSearch(any()) } answers { FakePagingSource(found) }
         coEvery { parser.loadFromAssets() } returns Result.success(5)
         coEvery { parser.getEanDataVersion() } returns EAN_DATA_VERSION
 
@@ -144,7 +143,6 @@ class EanSearchViewModelTest {
         coEvery { dao.hasUnnormalized() } returns 0
         every { dao.getAll() } returns flowOf(emptyList())
         every { dao.pagingSourceAll() } answers { FakePagingSource(emptyList()) }
-        every { dao.searchCandidates(any()) } returns flowOf(emptyList())
         every { parser.computeAssetsHash() } returns "abc123"
         every { parser.getEanAssetsHash() } returns "abc123"
         every { parser.getEanDataVersion() } returns EAN_DATA_VERSION - 1
@@ -173,9 +171,8 @@ class EanSearchViewModelTest {
         coEvery { dao.hasUnnormalized() } returns 0
         every { dao.getAll() } returns flowOf(emptyList())
         every { dao.pagingSourceAll() } answers { FakePagingSource(emptyList()) }
-        // Ambos tokens deben traer candidatos; el filtro AND los combina.
-        every { dao.searchCandidates("nat") } returns flowOf(listOf(product))
-        every { dao.searchCandidates("pistacho") } returns flowOf(listOf(product))
+        // El ranking vive en SQL (buildRankedSearch); el VM solo cablea el factory.
+        every { dao.rankedSearch(any()) } answers { FakePagingSource(listOf(product)) }
         coEvery { parser.loadFromAssets() } returns Result.success(5)
         coEvery { parser.getEanDataVersion() } returns EAN_DATA_VERSION
 

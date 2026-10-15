@@ -3,6 +3,8 @@ package com.rutamercaderistas.ui.screens
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.test.core.app.ApplicationProvider
+import android.content.Context
 import com.rutamercaderistas.R
 import org.junit.Rule
 import org.junit.Test
@@ -25,7 +27,7 @@ class PdfViewerScreenTest {
             )
         }
         composeTestRule.onNodeWithText(
-            composeTestRule.activity.getString(R.string.pdf_no_disponible)
+            appString(R.string.pdf_no_disponible)
         ).assertIsDisplayed()
     }
 
@@ -41,7 +43,7 @@ class PdfViewerScreenTest {
             )
         }
         composeTestRule.onNodeWithText(
-            composeTestRule.activity.getString(R.string.pdf_archivo_no_encontrado)
+            appString(R.string.pdf_archivo_no_encontrado)
         ).assertIsDisplayed()
     }
 
@@ -57,7 +59,10 @@ class PdfViewerScreenTest {
             )
         }
         composeTestRule.onNodeWithText(
-            composeTestRule.activity.getString(R.string.pdf_no_disponible)
+            appString(R.string.pdf_no_disponible)
         ).assertIsDisplayed()
     }
 }
+
+private fun appString(resId: Int): String =
+    ApplicationProvider.getApplicationContext<Context>().getString(resId)

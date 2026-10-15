@@ -3,9 +3,12 @@ package com.rutamercaderistas.ui.screens
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performScrollToNode
+import androidx.test.core.app.ApplicationProvider
+import android.content.Context
 import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.ui.theme.MercaderistasTheme
@@ -28,7 +31,7 @@ class PromotionsOverviewScreenTest {
             }
         }
         composeTestRule.onNodeWithText(
-            composeTestRule.activity.getString(R.string.sin_promociones_activas)
+            ApplicationProvider.getApplicationContext<Context>().getString(R.string.sin_promociones_activas)
         ).assertIsDisplayed()
     }
 
@@ -90,7 +93,7 @@ class PromotionsOverviewScreenTest {
             }
         }
 
-        composeTestRule.onRoot().performScrollToNode(hasText("BRAND_19"))
+        composeTestRule.onNodeWithTag("promoBrandGrid").performScrollToNode(hasText("BRAND_19"))
         composeTestRule.onNodeWithText("BRAND_19").assertIsDisplayed()
     }
 }
