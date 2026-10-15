@@ -37,6 +37,8 @@ fun ScreenHeader(
                 text = title,
                 style = MaterialTheme.typography.headlineLarge,
                 color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 modifier = Modifier.semantics { heading() },
             )
         },
