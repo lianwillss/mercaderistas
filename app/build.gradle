@@ -211,6 +211,11 @@ dependencies {
     testImplementation libs.mockk
     testImplementation libs.paging.testing
     androidTestImplementation libs.test.ext.junit
+    androidTestImplementation libs.test.runner
+    androidTestImplementation libs.test.rules
+    androidTestImplementation libs.test.core
+    androidTestImplementation libs.espresso.core
+    androidTestImplementation platform(libs.compose.bom)
     androidTestImplementation libs.compose.ui.test.junit4
     debugImplementation libs.compose.ui.test.manifest
 }

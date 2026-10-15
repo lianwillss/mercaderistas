@@ -1,0 +1,36 @@
+name: Check local sources
+
+# Los Excel/CSV fuente de catálogos viven en fuentes-locales/ (gitignored);
+# solo app/src/main/assets/ean*.xlsx se commitea. Este check falla si un
+# spreadsheet o keystore termina trackeado fuera de su lugar.
+on:
+  push:
+    branches: ['**']
+    tags-ignore: ['v*']
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8c # v5.0.0
+
+      - name: Fail on tracked spreadsheets outside assets
+        run: |
+          strays=$(git ls-files '*.xlsx' | grep -v '^app/src/main/assets/' || true)
+          if [ -n "$strays" ]; then
+            echo "Excel trackeados fuera de app/src/main/assets/:"
+            echo "$strays"
+            exit 1
+          fi
+          echo "OK: todos los xlsx trackeados estan en assets"
+
+      - name: Fail on tracked keystores or local sources dir
+        run: |
+          bad=$(git ls-files '*.jks' '*.keystore' 'fuentes-locales/*' || true)
+          if [ -n "$bad" ]; then
+            echo "Archivos que nunca deben commitearse:"
+            echo "$bad"
+            exit 1
+          fi
+          echo "OK: sin keystores ni fuentes-locales trackeadas"

@@ -1,18 +1,18 @@
 [versions]
-agp = "9.2.1"
+agp = "9.4.0"
 coreKtx = "1.19.0"
 lifecycleRuntimeKtx = "2.11.0"
-kotlin = "2.4.0"
-composeBom = "2025.06.00"
+kotlin = "2.4.20"
+composeBom = "2026.09.00"
 activityCompose = "1.9.3"
-hilt = "2.60"
+hilt = "2.60.1"
 hiltNavigationCompose = "1.2.0"
 navigationCompose = "2.8.5"
 workRuntimeKtx = "2.9.1"
 lifecycleViewmodelCompose = "2.8.7"
-room = "2.8.4"
+room = "2.8.5"
 ksp = "2.3.9"
-paging = "3.3.0"
+paging = "3.5.1"
 
 material = "1.14.0"
 poi = "5.5.1"
@@ -29,6 +29,10 @@ timber = "5.0.1"
 junit = "4.13.2"
 mockk = "1.13.12"
 testExtJunit = "1.2.1"
+testRunner = "1.7.0"
+testRules = "1.7.0"
+testCore = "1.7.0"
+espressoCore = "3.7.0"
 
 sentry = "8.33.0"
 
@@ -81,6 +85,10 @@ timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "tim
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "testExtJunit" }
+test-runner = { group = "androidx.test", name = "runner", version.ref = "testRunner" }
+test-rules = { group = "androidx.test", name = "rules", version.ref = "testRules" }
+test-core = { group = "androidx.test", name = "core", version.ref = "testCore" }
+espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 
 sentry-bom = { group = "io.sentry", name = "sentry-bom", version.ref = "sentry" }
 sentry-android = { group = "io.sentry", name = "sentry-android" }

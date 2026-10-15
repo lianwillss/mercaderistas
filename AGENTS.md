@@ -11,7 +11,7 @@ App Android de rutas para mercaderistas: Kotlin, Compose, Hilt, Room y WorkManag
   y luego `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleRelease`.
 - Test enfocado: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:testDebugUnitTest --tests "com.rutamercaderistas.viewmodel.RouteViewModelTest"`.
 - Tests de dispositivo Compose: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:connectedDebugAndroidTest`; requieren un dispositivo/emulador conectado.
-- Toolchain verificada: Gradle 9.6, AGP 9.2.1, Kotlin 2.4.0, Compose BOM 2025.06.00, Java 17.
+- Toolchain verificada: Gradle 9.6, AGP 9.4.0, Kotlin 2.4.20, Compose BOM 2026.09.00, Room 2.8.5, Paging 3.5.1, Hilt 2.60.1, KSP 2.3.9, Java 17.
 - Este entorno no tiene `rg`; usar `grep`/Glob para búsquedas.
 
 ## Arquitectura
@@ -51,7 +51,7 @@ App Android de rutas para mercaderistas: Kotlin, Compose, Hilt, Room y WorkManag
 - `img_flejes_barcode.png` es generado (EAN-13 `6969696969692`, JUMBO fuera de las barras): cualquier texto/logo SOBRE las barras lo vuelve ilegible para el lector. No restaurar `er.png`.
 - Deduplicación: clave EAN, fallback SKU Cencosud; conserva la fila más completa y fusiona campos no vacíos. No perder ceros iniciales de códigos.
 - Búsqueda full-text FTS5 en tabla sidecar `ean_product_fts` (NO es entidad Room: sin bump de versión ni migración). `EanFtsManager.ensureAndRebuild()` se llama tras cada importación; `buildFtsMatch()` arma el MATCH (AND de prefijos, tokens ya `[a-z0-9]`); el DAO usa `@RawQuery` y el PagingSource cae a LIKE si la tabla falta.
-- Marcas cubiertas: ver `EAN_FILE_BRANDS` + assets `ean*.xlsx` (fuente de verdad, no esta lista). Los Excel originales de la raíz son fuentes locales y no se deben commitear salvo petición explícita.
+- Marcas cubiertas: ver `EAN_FILE_BRANDS` + assets `ean*.xlsx` (fuente de verdad, no esta lista). Los Excel/CSV/PDF originales viven en `fuentes-locales/` (gitignored, con CI que lo verifica) y no se commitean salvo petición explícita.
 
 ## PDF de marcas
 

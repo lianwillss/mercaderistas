@@ -15,3 +15,6 @@ local.properties
 *.keystore
 *.jks
 /keystore.properties
+# Fuentes locales: Excel/CSV/PDF fuente de catálogos; nunca se commitean
+# (los assets trackeados viven en app/src/main/assets/ean*.xlsx).
+/fuentes-locales/
