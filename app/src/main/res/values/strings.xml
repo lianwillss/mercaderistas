@@ -103,7 +103,7 @@
     <string name="stats_cod_ean_label">Cod. EAN</string>
 
     <!-- Códigos de proveedor -->
-    <string name="cod_prov_title">Códigos de proveedor</string>
+    <string name="cod_prov_title">Cód. proveedor</string>
     <string name="cod_prov_subtitle">Códigos por marca</string>
     <string name="cod_prov_nat_natural">NAT NATURAL</string>
     <string name="cod_prov_suk">SUK</string>
@@ -117,6 +117,12 @@
     <string name="cod_prov_dusoleil">DUSOLEIL</string>
     <string name="cod_prov_olimpia">OLIMPIA</string>
     <string name="cod_prov_beshos">BESHOS</string>
+    <string name="cod_prov_cencosud_pill">Cencosud</string>
+    <string name="cod_prov_buscar">Buscar marca o código…</string>
+    <string name="cod_prov_filtradas">%1$d de %2$d marcas</string>
+    <string name="cod_prov_copiado">Código copiado al portapapeles</string>
+    <string name="cod_prov_copiar_codigo">Copiar código %1$s</string>
+    <string name="cod_prov_fila_cd">%1$s, código %2$s</string>
 
     <!-- Search -->
     <string name="buscar_ruta">Buscar ruta…</string>
