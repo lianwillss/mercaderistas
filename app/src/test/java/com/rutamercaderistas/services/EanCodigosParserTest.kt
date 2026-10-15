@@ -43,6 +43,7 @@ class EanCodigosParserTest {
         assertTrue(brandFromFilename("ean_gomitas.xlsx") == "ABEJA DORADA")
         assertTrue(brandFromFilename("ean_pet.xlsx") == "PET KITCHEN")
         assertTrue(brandFromFilename("ean_fermen.xlsx") == "FERMENTISTA")
+        assertTrue(brandFromFilename("ean_pett.xlsx") == "PET KITCHEN")
     }
 
     @Test
@@ -254,6 +255,37 @@ class EanCodigosParserTest {
         assertTrue(
             "SKU debe ser 2093322, got ${inserted.map { it.codCencosud }}",
             inserted.any { it.codCencosud == "2093322" },
+        )
+    }
+
+    @Test
+    fun `pett xlsx parses 3 PET KITCHEN products via alias`() = runTest {
+        val dao = mockk<EanProductDao>(relaxed = true)
+        coEvery { dao.clearAll() } returns Unit
+        val slot = io.mockk.slot<List<com.rutamercaderistas.data.local.EanProductEntity>>()
+        coEvery { dao.insertAll(capture(slot)) } returns Unit
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao, mockk(relaxed = true))
+
+        // La columna Marca trae "INDOMITABLE" por error: el alias lo agrupa en PET KITCHEN.
+        val result = parser.loadFromFile(
+            "src/main/assets/ean_pett.xlsx",
+            brandFromFilename("ean_pett.xlsx"),
+        )
+
+        assertTrue("parser should succeed", result.isSuccess)
+        assertTrue("debe importar 3 productos, got ${result.getOrNull()}", result.getOrNull() == 3)
+        val inserted = slot.captured
+        assertTrue("marca debe ser PET KITCHEN, got ${inserted.map { it.marca }}", inserted.all { it.marca == "PET KITCHEN" })
+        // EAN con 0 inicial se conservan tal cual y los SKU no pierden ceros.
+        assertTrue(
+            "EAN deben ser los 3 de Pet Kitchen, got ${inserted.map { it.eanPrincipal }}",
+            inserted.map { it.eanPrincipal }.containsAll(
+                listOf("7116218365596", "0628693826303", "0628693826013")
+            ),
+        )
+        assertTrue(
+            "SKU deben conservarse, got ${inserted.map { it.codCencosud }}",
+            inserted.map { it.codCencosud }.containsAll(listOf("2094107", "2094114", "2094117")),
         )
     }
 
