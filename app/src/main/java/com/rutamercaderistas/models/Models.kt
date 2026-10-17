@@ -94,7 +94,22 @@ data class ClienteInfo(
         1    -> "1 día/sem"
         else -> ""
     }
+    /** Versión corta para badges ("3×/sem"): cabe junto al nombre sin truncar. */
+    val frecuenciaCorta: String get() = when (frecuencia) {
+        7    -> "Todos los días"
+        6    -> "6×/sem"
+        5    -> "5×/sem"
+        4    -> "4×/sem"
+        3    -> "3×/sem"
+        2    -> "2×/sem"
+        1    -> "1×/sem"
+        else -> ""
+    }
 }
+
+/** Orden de marcas en UI: prioritarias primero, luego por frecuencia desc. */
+fun List<ClienteInfo>.sortedForDisplay(): List<ClienteInfo> =
+    sortedWith(compareByDescending<ClienteInfo> { it.esPrioritaria }.thenByDescending { it.frecuencia })
 
 /** Días en que se visita el local (unión de los días de todas sus marcas). */
 fun LocalDelDia.diasVisita(): Set<DiaSemana> =

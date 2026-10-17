@@ -273,6 +273,7 @@ fun MainScreen(
                         onAddressClick = onAddressClick,
                         initialSearch = args.brand,
                         onGlobalSearch = onGlobalSearch,
+                        routeName = routeUiState.selectedRoute,
                     )
                 }
                 composable<PromotionsRoute>(

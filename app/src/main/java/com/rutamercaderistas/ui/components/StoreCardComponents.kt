@@ -39,6 +39,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -46,6 +48,7 @@ import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.models.ClienteInfo
 import com.rutamercaderistas.ui.theme.ComponentShapes
+import com.rutamercaderistas.ui.theme.AccentGreen
 import com.rutamercaderistas.ui.theme.PriceGreen
 import kotlin.math.abs
 
@@ -158,7 +161,7 @@ private fun PriorityBrandCard(
 
                     if (cliente.frecuencia > 0) {
                         Spacer(modifier = Modifier.width(5.dp))
-                        FrequencyChip(text = cliente.frecuenciaTexto)
+                        FrequencyBadge(cliente = cliente)
                     }
                 }
             }
@@ -236,18 +239,7 @@ private fun NormalBrandRow(
 
             if (cliente.frecuencia > 0) {
                 Spacer(modifier = Modifier.width(5.dp))
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.secondaryContainer)
-                        .padding(horizontal = 4.dp, vertical = 1.dp)
-                ) {
-Text(
-                    text = cliente.frecuenciaTexto,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = PriceGreen
-                )
-                }
+                FrequencyBadge(cliente = cliente)
             }
         }
 
@@ -287,12 +279,32 @@ private fun initials(text: String): String {
     }
 }
 
+/**
+ * Badge de frecuencia compartido (rutero, búsqueda, detalle): texto corto
+ * ("3×/sem") con intensidad codificada — 7 días en verde sólido, 4–6 en
+ * tonal verde, 1–3 neutro. El icono es decorativo; el badge anuncia el texto
+ * largo ("3 días/sem").
+ */
 @Composable
-fun FrequencyChip(text: String) {
+fun FrequencyBadge(cliente: ClienteInfo, modifier: Modifier = Modifier) {
+    if (cliente.frecuencia <= 0) return
+    val containerColor = when {
+        cliente.frecuencia >= 7 -> AccentGreen
+        cliente.frecuencia >= 4 -> MaterialTheme.colorScheme.secondaryContainer
+        else -> MaterialTheme.colorScheme.surfaceContainerHigh
+    }
+    val contentColor = when {
+        cliente.frecuencia >= 7 -> Color.Black
+        cliente.frecuencia >= 4 -> PriceGreen
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
     Box(
-        modifier = Modifier
+        modifier = modifier
             .clip(RoundedCornerShape(50))
-            .background(MaterialTheme.colorScheme.secondaryContainer)
+            .background(containerColor)
+            .semantics(mergeDescendants = true) {
+                contentDescription = cliente.frecuenciaTexto
+            }
             .padding(horizontal = 5.dp, vertical = 2.dp)
     ) {
         Row(
@@ -300,14 +312,14 @@ fun FrequencyChip(text: String) {
             horizontalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             Text(
-                text = text,
+                text = cliente.frecuenciaCorta,
                 style = MaterialTheme.typography.labelMedium,
-                color = PriceGreen,
+                color = contentColor,
             )
             Icon(
                 imageVector = Icons.Outlined.DateRange,
-                contentDescription = stringResource(R.string.frecuencia_cd),
-                tint = PriceGreen,
+                contentDescription = null,
+                tint = contentColor,
                 modifier = Modifier.size(8.dp)
             )
         }

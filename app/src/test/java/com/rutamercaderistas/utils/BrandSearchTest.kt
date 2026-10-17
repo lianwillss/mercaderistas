@@ -8,6 +8,7 @@ import com.rutamercaderistas.models.brandVisitDays
 import com.rutamercaderistas.models.diasDeVisita
 import com.rutamercaderistas.models.diasLabel
 import com.rutamercaderistas.models.diasVisita
+import com.rutamercaderistas.models.sortedForDisplay
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -89,6 +90,26 @@ class BrandSearchTest {
     @Test
     fun `diasVisita vacio sin marcasDias`() {
         assertTrue(localCon("BIGU").diasVisita().isEmpty())
+    }
+
+    @Test
+    fun `frecuenciaCorta compacta sin perder el 7`() {
+        assertEquals("Todos los días", ClienteInfo("A", false, 7).frecuenciaCorta)
+        assertEquals("6×/sem", ClienteInfo("A", false, 6).frecuenciaCorta)
+        assertEquals("3×/sem", ClienteInfo("A", false, 3).frecuenciaCorta)
+        assertEquals("1×/sem", ClienteInfo("A", false, 1).frecuenciaCorta)
+        assertEquals("", ClienteInfo("A", false, 0).frecuenciaCorta)
+    }
+
+    @Test
+    fun `sortedForDisplay prioritarias luego frecuencia`() {
+        val ordenado = listOf(
+            ClienteInfo("rara1", false, 1),
+            ClienteInfo("diaria", false, 7),
+            ClienteInfo("prio1", true, 1),
+            ClienteInfo("media", false, 3),
+        ).sortedForDisplay().map { it.nombre }
+        assertEquals(listOf("prio1", "diaria", "media", "rara1"), ordenado)
     }
 
     @Test

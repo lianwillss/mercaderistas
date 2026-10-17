@@ -49,6 +49,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.LocationOn
@@ -85,6 +86,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.R
@@ -130,6 +132,7 @@ fun AllLocalesScreen(
     onAddressClick: (String) -> Unit,
     initialSearch: String = "",
     onGlobalSearch: () -> Unit = {},
+    routeName: String? = null,
 ) {
     var searchQuery by rememberSaveable { mutableStateOf(initialSearch) }
     val dimens = LocalAppDimens.current
@@ -193,6 +196,7 @@ fun AllLocalesScreen(
             onGlobalSearch = onGlobalSearch,
             searchHistory = searchHistory,
             onHistoryClick = { searchQuery = it },
+            routeName = routeName,
         )
     } else {
         AllLocalesSinglePane(
@@ -207,6 +211,7 @@ fun AllLocalesScreen(
             scrollBehavior = scrollBehavior,
             searchHistory = searchHistory,
             onHistoryClick = { searchQuery = it },
+            routeName = routeName,
         )
     }
     DropletToast(
@@ -230,6 +235,7 @@ private fun AllLocalesSinglePane(
     scrollBehavior: androidx.compose.material3.TopAppBarScrollBehavior,
     searchHistory: List<String> = emptyList(),
     onHistoryClick: (String) -> Unit = {},
+    routeName: String? = null,
 ) {
     val dimens = LocalAppDimens.current
     Column(
@@ -260,6 +266,7 @@ private fun AllLocalesSinglePane(
             onBrandSearch = onBrandSearch,
             dimens = dimens,
             modifier = Modifier.weight(1f),
+            routeName = routeName,
         )
     }
 }
@@ -277,6 +284,7 @@ private fun AllLocalesTwoPane(
     onGlobalSearch: () -> Unit,
     searchHistory: List<String> = emptyList(),
     onHistoryClick: (String) -> Unit = {},
+    routeName: String? = null,
 ) {
     val dimens = LocalAppDimens.current
     var selected by remember { mutableStateOf<LocalDelDia?>(null) }
@@ -300,6 +308,14 @@ private fun AllLocalesTwoPane(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = dimens.spacingLg, vertical = dimens.spacingXs)
             )
+            if (!routeName.isNullOrBlank()) {
+                Text(
+                    text = stringResource(R.string.locale_ruta_actual, routeName),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = dimens.spacingLg)
+                )
+            }
             var selectedDay by remember { mutableStateOf<DiaSemana?>(null) }
             LaunchedEffect(searchQuery) { selectedDay = null }
             val sections = remember(searchQuery, locales, selectedDay) {
@@ -456,7 +472,7 @@ private fun SearchBarContent(
         supportingText = {
             if (searchQuery.isNotEmpty() && searchQuery.length < 2) {
                 Text(
-                    text = "Escribe al menos 2 caracteres",
+                    text = stringResource(R.string.buscar_min_chars),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -537,6 +553,7 @@ private fun CountAndGrid(
     onBrandSearch: (String) -> Unit = {},
     dimens: AppDimens,
     modifier: Modifier = Modifier,
+    routeName: String? = null,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
@@ -545,6 +562,14 @@ private fun CountAndGrid(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = dimens.spacingLg, vertical = dimens.spacingXs)
         )
+        if (!routeName.isNullOrBlank()) {
+            Text(
+                text = stringResource(R.string.locale_ruta_actual, routeName),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = dimens.spacingLg)
+            )
+        }
         var selectedDay by remember { mutableStateOf<DiaSemana?>(null) }
         LaunchedEffect(searchQuery) { selectedDay = null }
         val sections = remember(searchQuery, locales, selectedDay) {
@@ -766,7 +791,11 @@ private fun LocaleCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick, role = Role.Button)
+            .clickable(
+                onClick = onClick,
+                role = Role.Button,
+                onClickLabel = stringResource(R.string.busqueda_ver_detalle, local.local.ifBlank { stringResource(R.string.sin_numero) }),
+            )
             .semantics {
                 stateDescription = localSeleccionadoCd
             },
@@ -796,7 +825,7 @@ private fun BrandSectionHeader(
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
-            text = "$brand · en $count ${if (count == 1) "local" else "locales"}",
+            text = "$brand · ${pluralStringResource(R.plurals.brand_locales_count, count, count)}",
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier
@@ -969,6 +998,15 @@ private fun LocaleCardContent(
             if (local.direccion.isNotBlank() || local.comuna.isNotBlank()) {
                 Spacer(modifier = Modifier.height(2.dp))
                 val addressPress = rememberPressInteractionSource()
+                val addressText = buildString {
+                    if (local.direccion.isNotBlank()) append(local.direccion)
+                    if (local.comuna.isNotBlank()) {
+                        if (isNotEmpty()) append(", ")
+                        append(local.comuna)
+                    }
+                }
+                val abrirMapsCd = stringResource(R.string.abrir_maps_cd, addressText)
+                val copiarDireccionCd = stringResource(R.string.copiar_direccion_cd)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -981,7 +1019,7 @@ private fun LocaleCardContent(
                             interactionSource = addressPress,
                             indication = LocalIndication.current,
                             role = Role.Button,
-                            onClickLabel = "Abrir ${local.direccion} en Maps",
+                            onClickLabel = abrirMapsCd,
                             onLongClickLabel = stringResource(R.string.compartir_copiar_direccion),
                             onLongClick = {
                                 copyAddressToClipboard(context, local)
@@ -990,14 +1028,7 @@ private fun LocaleCardContent(
                             onClick = { onAddressClick(local.direccion) },
                         )
                         .semantics {
-                            val addr = buildString {
-                                if (local.direccion.isNotBlank()) append(local.direccion)
-                                if (local.comuna.isNotBlank()) {
-                                    if (isNotEmpty()) append(", ")
-                                    append(local.comuna)
-                                }
-                            }
-                            contentDescription = "Abrir $addr en Maps"
+                            contentDescription = abrirMapsCd
                         }
                         .padding(horizontal = 10.dp, vertical = 2.dp),
                 ) {
@@ -1009,13 +1040,7 @@ private fun LocaleCardContent(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = buildString {
-                            if (local.direccion.isNotBlank()) append(local.direccion)
-                            if (local.comuna.isNotBlank()) {
-                                if (isNotEmpty()) append(", ")
-                                append(local.comuna)
-                            }
-                        },
+                        text = addressText,
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -1023,7 +1048,22 @@ private fun LocaleCardContent(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    IconButton(
+                        onClick = {
+                            copyAddressToClipboard(context, local)
+                            onCopyAddress()
+                        },
+                        modifier = Modifier
+                            .size(48.dp)
+                            .semantics { contentDescription = copiarDireccionCd },
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.ContentCopy,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                     Icon(
                         imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
                         contentDescription = null,
@@ -1052,6 +1092,7 @@ private fun LocaleDetailPane(
     val dias = remember(local) { local.diasVisita() }
     val diasTexto = diasLabel(dias)
     val seVisitaCd = if (dias.isNotEmpty()) stringResource(R.string.locale_se_visita, diasTexto) else ""
+    val detalleCd = stringResource(R.string.locale_detalle_cd, localTitle)
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1059,8 +1100,7 @@ private fun LocaleDetailPane(
             .verticalScroll(rememberScrollState())
             .semantics(mergeDescendants = true) {
                 contentDescription = buildString {
-                    append("Detalle del local ")
-                    append(localTitle)
+                    append(detalleCd)
                     if (local.codigo.isNotBlank()) append(", código ${local.codigo}")
                     if (seVisitaCd.isNotEmpty()) append(". $seVisitaCd")
                     if (matched.isNotEmpty()) {
@@ -1106,6 +1146,15 @@ private fun LocaleDetailPane(
             )
         }
         if (local.direccion.isNotBlank() || local.comuna.isNotBlank()) {
+            val addressText = buildString {
+                if (local.direccion.isNotBlank()) append(local.direccion)
+                if (local.comuna.isNotBlank()) {
+                    if (isNotEmpty()) append(", ")
+                    append(local.comuna)
+                }
+            }
+            val abrirMapsCd = stringResource(R.string.abrir_maps_cd, addressText)
+            val copiarDireccionCd = stringResource(R.string.copiar_direccion_cd)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -1115,7 +1164,7 @@ private fun LocaleDetailPane(
                         interactionSource = detailPress,
                         indication = LocalIndication.current,
                         role = Role.Button,
-                        onClickLabel = "Abrir ${local.direccion} en Maps",
+                        onClickLabel = abrirMapsCd,
                         onLongClickLabel = stringResource(R.string.compartir_copiar_direccion),
                         onLongClick = {
                             copyAddressToClipboard(context, local)
@@ -1124,14 +1173,7 @@ private fun LocaleDetailPane(
                         onClick = { onAddressClick(local.direccion) },
                     )
                     .semantics {
-                        val addr = buildString {
-                            if (local.direccion.isNotBlank()) append(local.direccion)
-                            if (local.comuna.isNotBlank()) {
-                                if (isNotEmpty()) append(", ")
-                                append(local.comuna)
-                            }
-                        }
-                        contentDescription = "Abrir $addr en Maps"
+                        contentDescription = abrirMapsCd
                     }
                     .padding(vertical = 4.dp),
             ) {
@@ -1143,16 +1185,27 @@ private fun LocaleDetailPane(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = buildString {
-                        if (local.direccion.isNotBlank()) append(local.direccion)
-                        if (local.comuna.isNotBlank()) {
-                            if (isNotEmpty()) append(", ")
-                            append(local.comuna)
-                        }
-                    },
+                    text = addressText,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f),
                 )
+                IconButton(
+                    onClick = {
+                        copyAddressToClipboard(context, local)
+                        onCopyAddress()
+                    },
+                    modifier = Modifier
+                        .size(48.dp)
+                        .semantics { contentDescription = copiarDireccionCd },
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.ContentCopy,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
         if (local.clientes.isNotEmpty()) {

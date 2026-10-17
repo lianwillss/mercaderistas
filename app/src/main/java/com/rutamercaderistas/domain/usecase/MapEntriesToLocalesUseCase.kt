@@ -4,6 +4,7 @@ import com.rutamercaderistas.models.ClienteInfo
 import com.rutamercaderistas.models.EntradaRuta
 import com.rutamercaderistas.models.LocalDelDia
 import com.rutamercaderistas.models.brandVisitDays
+import com.rutamercaderistas.models.sortedForDisplay
 import com.rutamercaderistas.models.toNaturalCase
 import javax.inject.Inject
 
@@ -23,7 +24,7 @@ class MapEntriesToLocalesUseCase @Inject constructor() {
                     formato = first.formato,
                     region = first.region,
                     comuna = first.comuna,
-                    clientes = ents.map { e -> ClienteInfo(e.cliente, e.esPrioritaria, e.frecuencia) }.sortedByDescending { it.esPrioritaria },
+                    clientes = ents.map { e -> ClienteInfo(e.cliente, e.esPrioritaria, e.frecuencia) }.sortedForDisplay(),
                     marcasDias = brandVisitDays(ents),
                 )
             }

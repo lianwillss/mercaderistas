@@ -128,7 +128,7 @@
     <string name="buscar_ruta">Buscar ruta…</string>
     <string name="sin_rutas">No se encontraron rutas</string>
     <string name="buscar_marca_producto">Buscar marca, producto…</string>
-    <string name="buscar_local_placeholder">Buscar marca…</string>
+    <string name="buscar_local_placeholder">Buscar marca, local o código…</string>
 
     <!-- Promotions -->
     <string name="promociones_title">Promociones</string>
@@ -329,7 +329,7 @@
     <string name="cerrar_cd">Cerrar</string>
     <string name="sin_conexion_cd">Sin conexión</string>
     <string name="todas_cd">Todas</string>
-    <string name="buscar_locales_cd">Buscar marca por nombre. Escribe para filtrar la lista.</string>
+    <string name="buscar_locales_cd">Buscar por marca, local, código o dirección. Escribe para filtrar la lista.</string>
     <string name="filtrar_por_dia_cd">Filtrar locales por día de visita</string>
     <string name="dia_seleccionado_cd">Día seleccionado: %s</string>
     <string name="todas_los_dias_cd">Todos los días seleccionados</string>
@@ -393,6 +393,14 @@
     <string name="settings_history_cleared">Historial de búsqueda borrado</string>
     <string name="locale_detail_placeholder">Selecciona un local para ver el detalle</string>
     <string name="locale_se_visita">Se visita: %1$s</string>
+    <string name="locale_detalle_cd">Detalle del local %1$s</string>
+    <string name="locale_ruta_actual">Ruta %1$s</string>
+    <string name="buscar_min_chars">Escribe al menos 2 caracteres</string>
+    <string name="marca_filtrar_cd">Filtrar por marca %1$s</string>
+    <plurals name="brand_locales_count">
+        <item quantity="one">%1$d local</item>
+        <item quantity="other">%1$d locales</item>
+    </plurals>
     <string name="locale_clientes">Clientes</string>
     <string name="onboarding_rutero_title">Aquí está tu ruta</string>
     <string name="onboarding_rutero_desc">Tu ruta del día con todos los locales asignados. Cambia de día arriba y toca un local para ver sus marcas.</string>
