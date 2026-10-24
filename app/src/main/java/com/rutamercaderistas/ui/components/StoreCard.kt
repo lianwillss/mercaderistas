@@ -144,7 +144,7 @@ fun StoreCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = cardPadding, vertical = dimens.spacingMd)
-                .animateContentSize(animationSpec = tween(250))
+                .animateContentSize(animationSpec = MotionSprings.default())
         ) {
             // ── Header row ──
             Row(

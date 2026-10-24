@@ -290,6 +290,62 @@ class EanCodigosParserTest {
     }
 
     @Test
+    fun `ean_pett_xlsx_parse_3_pet_kitchen_products_via_alias`() = runTest {
+        val dao = mockk<EanProductDao>(relaxed = true)
+        coEvery { dao.clearAll() } returns Unit
+        val slot = io.mockk.slot<List<com.rutamercaderistas.data.local.EanProductEntity>>()
+        coEvery { dao.insertAll(capture(slot)) } returns Unit
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao, mockk(relaxed = true))
+
+        val result = parser.loadFromFile(
+            "src/main/assets/ean_pett.xlsx",
+            brandFromFilename("ean_pett.xlsx"),
+        )
+
+        assertTrue("parser should succeed", result.isSuccess)
+        assertTrue("debe importar 3 productos, got ${result.getOrNull()}", result.getOrNull() == 3)
+        val inserted = slot.captured
+        assertTrue("marca debe ser PET KITCHEN, got ${inserted.map { it.marca }}", inserted.all { it.marca == "PET KITCHEN" })
+        assertTrue(
+            "EAN deben ser los 3 de PET KITCHEN, got ${inserted.map { it.eanPrincipal }}",
+            inserted.map { it.eanPrincipal }.containsAll(
+                listOf("7116218365596", "0628693826303", "0628693826013")
+            ),
+        )
+        assertTrue(
+            "SKU deben conservarse, got ${inserted.map { it.codCencosud }}",
+            inserted.map { it.codCencosud }.containsAll(listOf("2094107", "2094114", "2094117")),
+        )
+    }
+
+    @Test
+    fun `ean_producto_bwild_gel_pomelo_xlsx_parse_1_bwild_product_via_alias`() = runTest {
+        val dao = mockk<EanProductDao>(relaxed = true)
+        coEvery { dao.clearAll() } returns Unit
+        val slot = io.mockk.slot<List<com.rutamercaderistas.data.local.EanProductEntity>>()
+        coEvery { dao.insertAll(capture(slot)) } returns Unit
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao, mockk(relaxed = true))
+
+        val result = parser.loadFromFile(
+            "src/main/assets/ean_producto_bwild_gel_pomelo.xlsx",
+            brandFromFilename("ean_producto_bwild_gel_pomelo.xlsx"),
+        )
+
+        assertTrue("parser should succeed", result.isSuccess)
+        assertTrue("debe importar 1 producto, got ${result.getOrNull()}", result.getOrNull() == 1)
+        val inserted = slot.captured
+        assertTrue("marca debe ser BWILD, got ${inserted.map { it.marca }}", inserted.all { it.marca == "BWILD" })
+        assertTrue(
+            "EAN debe ser 9347108004655, got ${inserted.map { it.eanPrincipal }}",
+            inserted.any { it.eanPrincipal == "9347108004655" },
+        )
+        assertTrue(
+            "SKU debe ser 2036605, got ${inserted.map { it.codCencosud }}",
+            inserted.any { it.codCencosud == "2036605" },
+        )
+    }
+
+    @Test
     fun `concurrent imports do not interleave`() = runTest {
         val parser = EanExcelParser(
             mockk<Context>(relaxed = true),

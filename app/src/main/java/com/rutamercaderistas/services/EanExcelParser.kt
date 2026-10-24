@@ -16,7 +16,7 @@ import java.text.Normalizer
 import javax.inject.Inject
 import kotlinx.coroutines.sync.Mutex
 
-const val EAN_DATA_VERSION = 37
+const val EAN_DATA_VERSION = 38
 
 // Prefijo/sufijo de los archivos Excel de catálogo EAN en assets.
 // Para agregar más productos basta con soltar otro archivo "ean*.xlsx"
@@ -52,6 +52,7 @@ private val EAN_FILE_BRANDS = mapOf(
     "pet" to "PET KITCHEN",
     "fermen" to "FERMENTISTA",
     "pett" to "PET KITCHEN",
+    "producto_bwild_gel_pomelo" to "BWILD",
 )
 
 // Alias de marca: la empresa ve algunas marcas con un nombre distinto al del
