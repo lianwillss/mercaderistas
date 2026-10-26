@@ -67,9 +67,13 @@ class EanRankedSearchDeviceTest {
         db.close()
     }
 
-    private fun search(query: String): List<EanProductEntity> {
+    private fun search(
+        query: String,
+        brand: String? = null,
+        caja: String? = null,
+    ): List<EanProductEntity> {
         val tokens = query.split(Regex("\\s+")).map { compactNorm(it) }.filter { it.isNotBlank() }
-        val rq = buildRankedSearch(query, tokens) ?: error("query vacía")
+        val rq = buildRankedSearch(query, tokens, brand, caja) ?: error("query vacía")
         val result = runBlocking {
             dao.rankedSearch(rq.toQuery()).load(
                 PagingSource.LoadParams.Refresh(key = null, loadSize = 50, placeholdersEnabled = false)
@@ -128,5 +132,28 @@ class EanRankedSearchDeviceTest {
     @Test
     fun noMatch_returnsEmpty() {
         assertTrue(search("zzzznomatch").isEmpty())
+    }
+
+    @Test
+    fun brandFilter_limitsResultsToBrand() {
+        val rows = search("bacio", brand = "KEYFOOD")
+        assertEquals(2, rows.size)
+        assertTrue(rows.all { it.marca == "KEYFOOD" })
+
+        assertTrue(search("bacio", brand = "OTRA MARCA").isEmpty())
+    }
+
+    @Test
+    fun browseSearch_ordersByBrandAndKeepsBlankBrandLast() {
+        val result = runBlocking {
+            dao.browseSearch(buildBrowseSearch().toQuery()).load(
+                PagingSource.LoadParams.Refresh(key = null, loadSize = 50, placeholdersEnabled = false),
+            )
+        }
+        check(result is PagingSource.LoadResult.Page) { "se esperaba Page, fue $result" }
+        assertEquals(
+            listOf("ABEJA DORADA", "KEYFOOD", "KEYFOOD", "NAT NATURAL", "OTRA MARCA"),
+            result.data.map { it.marca },
+        )
     }
 }

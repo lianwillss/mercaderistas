@@ -16,6 +16,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
@@ -26,6 +27,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -60,11 +62,11 @@ class EanSearchViewModelTest {
         parser = mockk(relaxed = true)
         prefs = mockk(relaxed = true)
         every { prefs.getSearchHistoryFlow() } returns flowOf(emptyList())
-        // New DAO methods for brand counts and cajas filters
-        every { dao.getAllBrandCounts() } returns flowOf(emptyList())
-        every { dao.getAllCajas() } returns flowOf(emptyList())
-        every { dao.getBrandCountsForToken(any()) } returns flowOf(emptyList())
-        every { dao.getCajasForToken(any()) } returns flowOf(emptyList())
+        // Facetas y conteo: los chips y el total salen de SQL.
+        coEvery { dao.brandFacets(any()) } returns emptyList()
+        coEvery { dao.cajaFacets(any()) } returns emptyList()
+        coEvery { dao.countForQuery(any()) } returns 0
+        every { dao.browseSearch(any()) } answers { FakePagingSource(emptyList()) }
     }
 
     @After
@@ -84,16 +86,21 @@ class EanSearchViewModelTest {
         return vm
     }
 
+    private fun ready(vm: EanSearchViewModel): EanSearchUiState.Ready {
+        assertTrue("debe quedar en Ready", vm.uiState.value is EanSearchUiState.Ready)
+        return vm.uiState.value as EanSearchUiState.Ready
+    }
+
     @Test
-    fun `blank query emits Ready with catalog products and import runs`() = runTest {
+    fun `blank query browses catalog and import runs`() = runTest {
         val sample = listOf(
             EanProductEntity(eanPrincipal = "1234567890123", descripcionProducto = "A", marca = "X"),
             EanProductEntity(eanPrincipal = "2345678901234", descripcionProducto = "B", marca = "Y"),
         )
         coEvery { dao.count() } returns 0
         coEvery { dao.hasUnnormalized() } returns 0
-        every { dao.getAll() } returns flowOf(sample)
-        every { dao.pagingSourceAll() } answers { FakePagingSource(sample) }
+        every { dao.browseSearch(any()) } answers { FakePagingSource(sample) }
+        coEvery { dao.countForQuery(any()) } returns 2
         coEvery { parser.loadFromAssets() } returns Result.success(2)
         coEvery { parser.getEanDataVersion() } returns 0
         coEvery { parser.setEanDataVersion(any()) } returns Unit
@@ -101,15 +108,16 @@ class EanSearchViewModelTest {
         val vm = track(EanSearchViewModel(dao, parser, prefs))
         testDispatcher.scheduler.advanceUntilIdle()
 
-        val state = vm.uiState.value
-        assertTrue("debe quedar en Ready", state is EanSearchUiState.Ready)
-        val ready = state as EanSearchUiState.Ready
-        assertEquals("", ready.query)
-        assertEquals(2, ready.pagingFlow.asSnapshot().size)
+        val state = ready(vm)
+        assertEquals("", state.query)
+        assertEquals(2, state.pagingFlow.asSnapshot().size)
+        assertEquals(2, state.totalCount)
 
-        // La importación debió ejecutarse al iniciar (count() == 0)
+        // La importación debió ejecutarse al iniciar (count() == 0), y sin
+        // texto de búsqueda la lista sale de browseSearch.
         coVerify(exactly = 1) { parser.loadFromAssets() }
         coVerify(exactly = 1) { parser.setEanDataVersion(EAN_DATA_VERSION) }
+        verify(atLeast = 1) { dao.browseSearch(any()) }
     }
 
     @Test
@@ -119,9 +127,8 @@ class EanSearchViewModelTest {
         )
         coEvery { dao.count() } returns 5
         coEvery { dao.hasUnnormalized() } returns 0
-        every { dao.getAll() } returns flowOf(emptyList())
-        every { dao.pagingSourceAll() } answers { FakePagingSource(emptyList()) }
         every { dao.rankedSearch(any()) } answers { FakePagingSource(found) }
+        coEvery { dao.countForQuery(any()) } returns 1
         coEvery { parser.loadFromAssets() } returns Result.success(5)
         coEvery { parser.getEanDataVersion() } returns EAN_DATA_VERSION
 
@@ -130,9 +137,11 @@ class EanSearchViewModelTest {
         vm.onQueryChange("FINDME")
         testDispatcher.scheduler.advanceUntilIdle()
 
-        val state = vm.uiState.value as EanSearchUiState.Ready
+        val state = ready(vm)
         assertEquals("FINDME", state.query)
         assertEquals(1, state.pagingFlow.asSnapshot().size)
+        assertEquals(1, state.totalCount)
+        verify(atLeast = 1) { dao.rankedSearch(any()) }
     }
 
     @Test
@@ -141,8 +150,6 @@ class EanSearchViewModelTest {
         // pero con versión vieja; debe reimportar para aplicar alias/marcas.
         coEvery { dao.count() } returns 33
         coEvery { dao.hasUnnormalized() } returns 0
-        every { dao.getAll() } returns flowOf(emptyList())
-        every { dao.pagingSourceAll() } answers { FakePagingSource(emptyList()) }
         every { parser.computeAssetsHash() } returns "abc123"
         every { parser.getEanAssetsHash() } returns "abc123"
         every { parser.getEanDataVersion() } returns EAN_DATA_VERSION - 1
@@ -169,10 +176,9 @@ class EanSearchViewModelTest {
         )
         coEvery { dao.count() } returns 5
         coEvery { dao.hasUnnormalized() } returns 0
-        every { dao.getAll() } returns flowOf(emptyList())
-        every { dao.pagingSourceAll() } answers { FakePagingSource(emptyList()) }
         // El ranking vive en SQL (buildRankedSearch); el VM solo cablea el factory.
         every { dao.rankedSearch(any()) } answers { FakePagingSource(listOf(product)) }
+        coEvery { dao.countForQuery(any()) } returns 1
         coEvery { parser.loadFromAssets() } returns Result.success(5)
         coEvery { parser.getEanDataVersion() } returns EAN_DATA_VERSION
 
@@ -181,9 +187,76 @@ class EanSearchViewModelTest {
         vm.onQueryChange("pistacho nat")
         testDispatcher.scheduler.advanceUntilIdle()
 
-        val state = vm.uiState.value as EanSearchUiState.Ready
-        val snapshot = state.pagingFlow.asSnapshot()
+        val snapshot = ready(vm).pagingFlow.asSnapshot()
         assertEquals(1, snapshot.size)
         assertEquals("NAT ROMERO PISTACHO", snapshot.first().descripcionProducto)
+    }
+
+    @Test
+    fun `brand chip filters in SQL and keeps the selected value`() = runTest {
+        coEvery { dao.count() } returns 5
+        coEvery { dao.hasUnnormalized() } returns 0
+        coEvery { dao.countForQuery(any()) } returns 1
+        coEvery { parser.getEanDataVersion() } returns EAN_DATA_VERSION
+
+        val vm = track(EanSearchViewModel(dao, parser, prefs))
+        testDispatcher.scheduler.advanceUntilIdle()
+        vm.onBrandFilter("KEYFOOD")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = ready(vm)
+        assertEquals("KEYFOOD", state.brandFilter)
+        // El filtro se aplica en el WHERE del conteo (y del pager), no en la UI.
+        coVerify(atLeast = 1) { dao.countForQuery(match { it.sql.contains("p.marca = ?") }) }
+
+        // Tocar el mismo chip lo quita.
+        vm.onBrandFilter("KEYFOOD")
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertNull(ready(vm).brandFilter)
+    }
+
+    @Test
+    fun `scanning clears filters and normalizes upc a`() = runTest {
+        coEvery { dao.count() } returns 5
+        coEvery { dao.hasUnnormalized() } returns 0
+        coEvery { parser.getEanDataVersion() } returns EAN_DATA_VERSION
+
+        val vm = track(EanSearchViewModel(dao, parser, prefs))
+        testDispatcher.scheduler.advanceUntilIdle()
+        vm.onBrandFilter("KEYFOOD")
+        vm.onCajaFilter("12")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.onBarcodeScanned("658325654776")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = ready(vm)
+        assertEquals("0658325654776", state.query)
+        assertNull(state.brandFilter)
+        assertNull(state.cajaFilter)
+    }
+
+    @Test
+    fun `clearFilters resets brand and caja in one refresh`() = runTest {
+        coEvery { dao.count() } returns 5
+        coEvery { dao.hasUnnormalized() } returns 0
+        coEvery { parser.getEanDataVersion() } returns EAN_DATA_VERSION
+
+        val vm = track(EanSearchViewModel(dao, parser, prefs))
+        testDispatcher.scheduler.advanceUntilIdle()
+        vm.onBrandFilter("KEYFOOD")
+        vm.onCajaFilter("12")
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals("KEYFOOD", ready(vm).brandFilter)
+        assertEquals("12", ready(vm).cajaFilter)
+
+        vm.clearFilters()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertNull(ready(vm).brandFilter)
+        assertNull(ready(vm).cajaFilter)
+        coVerify(atLeast = 1) {
+            dao.countForQuery(match { !it.sql.contains("p.marca = ?") && !it.sql.contains("p.conversion = ?") })
+        }
     }
 }

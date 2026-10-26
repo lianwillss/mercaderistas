@@ -49,6 +49,7 @@
     <string name="sin_resultados">Sin resultados</string>
     <string name="buscar_local">Buscar local o dirección…</string>
     <string name="todas">Todas</string>
+    <string name="todas_cajas">Todas cajas</string>
     <string name="sin_direccion">Sin dirección</string>
     <string name="sin_comuna">Sin comuna</string>
     <string name="buscando_marca">Buscando \"%s\" en el manual…</string>
@@ -371,6 +372,7 @@
     <string name="ean_reload_catalog">Recargar catálogo</string>
     <string name="ean_no_results_hint">Revisa la ortografía o prueba con menos palabras.</string>
     <string name="ean_clear_search">Limpiar búsqueda</string>
+    <string name="ean_clear_filters">Limpiar filtros</string>
     <string name="ean_recent_searches">Búsquedas recientes</string>
     <string name="limpiar_historial">Limpiar historial</string>
     <string name="ean_recent_chip_cd">Buscar %s</string>

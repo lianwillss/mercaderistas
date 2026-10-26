@@ -5,12 +5,12 @@ App Android de rutas para mercaderistas: Kotlin, Compose, Hilt, Room y WorkManag
 ## Comandos
 
 - Java no está en `PATH`; anteponer siempre:
-  `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew <task>`
+  `JAVA_HOME="$HOME/.gradle/jdks/eclipse_adoptium-21-aarch64-os_x.2/jdk-21.0.7+6/Contents/Home" ./gradlew <task>`
 - Verificación estándar, en dos comandos para aislar carreras de tests:
-  `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew --no-parallel :app:testDebugUnitTest`
-  y luego `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleRelease`.
-- Test enfocado: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:testDebugUnitTest --tests "com.rutamercaderistas.viewmodel.RouteViewModelTest"`.
-- Tests de dispositivo Compose: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:connectedDebugAndroidTest`; requieren un dispositivo/emulador conectado.
+  `JAVA_HOME="$HOME/.gradle/jdks/eclipse_adoptium-21-aarch64-os_x.2/jdk-21.0.7+6/Contents/Home" ./gradlew --no-parallel :app:testDebugUnitTest`
+  y luego `JAVA_HOME="$HOME/.gradle/jdks/eclipse_adaptium-21-aarch64-os_x.2/jdk-21.0.7+6/Contents/Home" ./gradlew :app:assembleRelease`.
+- Test enfocado: `JAVA_HOME="$HOME/.gradle/jdks/eclipse_adoptium-21-aarch64-os_x.2/jdk-21.0.7+6/Contents/Home" ./gradlew :app:testDebugUnitTest --tests "com.rutamercaderistas.viewmodel.RouteViewModelTest"`.
+- Tests de dispositivo Compose: `:app:connectedDebugAndroidTest`; requieren un dispositivo/emulador conectado.
 - Toolchain verificada: Gradle 9.6, AGP 9.4.0, Kotlin 2.4.20, Compose BOM 2026.09.00, Room 2.8.5, Paging 3.5.1, Hilt 2.60.1, KSP 2.3.9, Java 17.
 - Este entorno no tiene `rg`; usar `grep`/Glob para búsquedas.
 
@@ -21,7 +21,8 @@ App Android de rutas para mercaderistas: Kotlin, Compose, Hilt, Room y WorkManag
 - Datos persistentes: Room (`AppDatabase` v6); preferencias: DataStore (`PreferencesRepository`).
 - `AppDatabase` NO tiene `fallbackToDestructiveMigration`: toda entidad o cambio de esquema exige `Migration` explícita (ver `MIGRATION_4_5` como plantilla de rebuild con copia de datos).
 - Sincronización en segundo plano: WorkManager + `SyncWorker`/`PromotionRefreshWorker`.
-- La navegación principal usa `NavigationSuiteScaffold`; `AppWindowWidth` centraliza Compact `<600dp`, Medium `<840dp` y Expanded.
+- La navegación principal usa `NavigationSuiteScaffold` (`AppBottomBar` es legacy, solo se reutiliza `BottomBarKey`); `AppWindowWidth` centraliza Compact `<600dp`, Medium `<840dp` y Expanded.
+- La barra inferior se oculta en la ruta EAN (`EanSearchRoute`) con `NavigationSuiteScaffoldState.snapTo(Hidden)` y reaparece al salir; el catálogo ocupa así todo el alto. No condicionar el `NavHost` a la visibilidad de la barra (se perdería el estado de navegación).
 
 ## Tests
 
@@ -29,8 +30,7 @@ App Android de rutas para mercaderistas: Kotlin, Compose, Hilt, Room y WorkManag
 - `RouteViewModel` calcula parte del estado en `Dispatchers.Default`; `advanceUntilIdle()` no espera esos hilos reales. Usar el helper `awaitOnMain { ... }` de `RouteViewModelTest` después de `selectRoute`, `loadInitialData` y `setCurrentDay`.
 - La suite puede producir `UncaughtExceptionsBeforeTest` por carreras globales de `Dispatchers.Main`; ejecutar con `--no-parallel` y repetir un test aislado antes de atribuirlo al cambio.
 - `app/build.gradle` fuerza `forkEvery = 1` (un JVM por clase): Paging 3 usa hilos reales y `mockkStatic(Log)` dejaba residuos que envenenaban `UpdateViewModelTest`. No quitarlo; si un test flakea en suite pero pasa aislado, sospechar contaminación entre clases, no del cambio.
-- Las pruebas instrumentadas no se ejecutan sin dispositivo; agregar cobertura de scroll ahí, no en tests JVM.
-- La búsqueda EAN usa Paging 3 (`pagingSourceAll()` + `MultiTokenPagingSource`, `Ready.pagingFlow: Flow<PagingData<...>>` con `cachedIn(viewModelScope)`). En tests JVM: mockear `android.util.Log` con `mockkStatic` (Paging loguea vía Log), usar `paging-testing` (`asSnapshot()`) y cancelar `vm.viewModelScope` al final para evitar `UncompletedCoroutinesError`. El `Pager` debe crear un `PagingSource` nuevo en cada llamada al factory.
+- La búsqueda EAN se resuelve entera en SQLite (`EanRankedSearch.kt`: `buildRankedSearch`, `buildBrowseSearch`, `buildBrandFacets`, `buildCajaFacets`, `buildCountSearch`): resultados, facetas de los chips y total comparten el mismo WHERE, y el ORDER BY termina en `p.id ASC` porque Room pagina con LIMIT/OFFSET. En la UI no se reagrupa ni se filtra en memoria: `buildEanRows` solo intercala encabezados contiguos de marca al navegar el catálogo (con texto de búsqueda la lista va plana, en el orden del ranking). En tests JVM: mockear `android.util.Log` con `mockkStatic` (Paging loguea vía Log), usar `paging-testing` (`asSnapshot()`) y cancelar `vm.viewModelScope` al final para evitar `UncompletedCoroutinesError`. El `Pager` debe crear un `PagingSource` nuevo en cada llamada al factory.
 - `UpdateViewModelTest` usa `mockkObject(UpdateChecker)` + `track(vm)` con cancel en `tearDown`, `awaitOnMain { ... }` (10s) y `awaitCoVerify { ... }` para verificaciones de mocks (los awaits de estado se cumplen trivialmente antes de que llegue al mock). Igual en `EanSearchViewModelTest` (`track` + cancel antes de `unmockkStatic`) y `RouteViewModelTest`.
 
 ## Sync del rutero
@@ -50,7 +50,8 @@ App Android de rutas para mercaderistas: Kotlin, Compose, Hilt, Room y WorkManag
 - Si la columna Marca trae un nombre distinto al visible (ej: `B FRESH`/`B.TAN` → `BWILD`), agregar alias en `BRAND_ALIASES` (se aplica al importar; sin reimport no llega a instalados).
 - `img_flejes_barcode.png` es generado (EAN-13 `6969696969692`, JUMBO fuera de las barras): cualquier texto/logo SOBRE las barras lo vuelve ilegible para el lector. No restaurar `er.png`.
 - Deduplicación: clave EAN, fallback SKU Cencosud; conserva la fila más completa y fusiona campos no vacíos. No perder ceros iniciales de códigos.
-- Búsqueda full-text FTS5 en tabla sidecar `ean_product_fts` (NO es entidad Room: sin bump de versión ni migración). `EanFtsManager.ensureAndRebuild()` se llama tras cada importación; `buildFtsMatch()` arma el MATCH (AND de prefijos, tokens ya `[a-z0-9]`); el DAO usa `@RawQuery` y el PagingSource cae a LIKE si la tabla falta.
+- Búsqueda: LIKE sobre las columnas normalizadas + ranking por tiers en SQL; no hay FTS5 (el sidecar `ean_product_fts` y su rebuild se eliminaron porque el catálogo ronda los 800 productos y el índice solo encarecía cada importación). No reintroducir FTS sin medir tamaño del catálogo y tiempo de importación.
+- Filtros de marca/caja: los chips salen de facetas SQL (marca se cuenta sin su propio filtro, caja sin el suyo) y al tocarlos se re-consulta el Pager con el filtro en el WHERE; el "%d resultados" usa `buildCountSearch` (total real), no los ítems ya paginados.
 - Marcas cubiertas: ver `EAN_FILE_BRANDS` + assets `ean*.xlsx` (fuente de verdad, no esta lista). Los Excel/CSV/PDF originales viven en `fuentes-locales/` (gitignored, con CI que lo verifica) y no se commitean salvo petición explícita.
 
 ## PDF de marcas
@@ -84,3 +85,4 @@ App Android de rutas para mercaderistas: Kotlin, Compose, Hilt, Room y WorkManag
 - Acciones CI están fijadas por SHA; no cambiar a tags flotantes. `softprops/action-gh-release` usa `overwrite_files`.
 - Firma local: `keystore.properties` (gitignored). CI: `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`, `KEYSTORE_PATH`.
 - No incluir secretos ni los Excel fuente de la raíz en commits. No hacer commit, tag o push salvo petición explícita.
+- **JAVA_HOME**: el JDK está en `~/.gradle/jdks/eclipse_adoptium-21-aarch64-os_x.2/jdk-21.0.7+6/Contents/Home` (no en `/Applications/Android Studio.app/...`). Anticipar `JAVA_HOME="..."` al ejecutar gradle.

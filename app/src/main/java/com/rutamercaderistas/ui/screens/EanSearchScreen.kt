@@ -3,8 +3,6 @@ package com.rutamercaderistas.ui.screens
 import android.app.Activity
 import android.content.ClipboardManager
 import android.content.Intent
-import android.graphics.Bitmap
-import android.util.LruCache
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -32,17 +30,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.paging.compose.collectAsLazyPagingItems
-import androidx.paging.compose.LazyPagingItems
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -52,10 +47,10 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -74,100 +69,43 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalDensity
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.core.content.FileProvider
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.material3.AssistChip
-
-import androidx.compose.material3.FilterChip
-import androidx.compose.ui.text.AnnotatedString
-
-import androidx.compose.ui.text.TextStyle
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.WriterException
-import com.journeyapps.barcodescanner.BarcodeEncoder
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.paging.LoadState
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.zxing.integration.android.IntentIntegrator
-
-import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.R
+import com.rutamercaderistas.data.local.BrandCountResult
+import com.rutamercaderistas.data.local.CajaCountResult
 import com.rutamercaderistas.data.local.EanProductEntity
-import com.rutamercaderistas.ui.components.HighlightedText
 import com.rutamercaderistas.ui.components.IosModal
-import com.rutamercaderistas.services.brandNote
-import com.rutamercaderistas.services.normalizeSearch
-import com.rutamercaderistas.util.ShareImageGenerator
-import com.rutamercaderistas.util.buildEanListShareText
-import com.rutamercaderistas.ui.theme.AccentBlue
-import com.rutamercaderistas.ui.theme.AccentBlueSoft
-import com.rutamercaderistas.ui.theme.AccentGreen
-import com.rutamercaderistas.ui.theme.AccentGreenSoft
-import com.rutamercaderistas.ui.theme.AccentGreenText
-import com.rutamercaderistas.ui.theme.AccentOrange
-import com.rutamercaderistas.ui.theme.AccentOrangeSoft
 import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.ui.theme.LocalReducedMotionEnabled
 import com.rutamercaderistas.ui.theme.MotionSprings
 import com.rutamercaderistas.ui.theme.pressScale
 import com.rutamercaderistas.ui.theme.rememberPressInteractionSource
-import com.rutamercaderistas.ui.theme.StoreColorFuchsia
-import com.rutamercaderistas.ui.theme.StoreColorFuchsiaSoft
-import com.rutamercaderistas.ui.theme.StoreColorPurple
-import com.rutamercaderistas.ui.theme.StoreColorPurpleSoft
-import com.rutamercaderistas.ui.theme.StoreColorRed
-import com.rutamercaderistas.ui.theme.StoreColorRedSoft
-import com.rutamercaderistas.ui.theme.StoreColorYellow
-import com.rutamercaderistas.ui.theme.StoreColorYellowSoft
 import com.rutamercaderistas.ui.theme.rs
+import com.rutamercaderistas.util.ShareImageGenerator
+import com.rutamercaderistas.util.buildEanListShareText
 import com.rutamercaderistas.viewmodel.EanSearchUiState
 import com.rutamercaderistas.viewmodel.EanSearchViewModel
-
-private val barcodeCache = LruCache<String, Bitmap>(64)
-
-private sealed interface EanResultRow
-private data class EanBrandRow(val brand: String) : EanResultRow
-private data class EanProductRow(val product: EanProductEntity) : EanResultRow
-private const val NO_BRAND_KEY = "\u0000"
-
-// Paleta de acentos por marca: color estable derivado del nombre para que cada
-// marca sea reconocible por color en la interfaz (punto en el encabezado y chip).
-private val BRAND_PALETTE = listOf(
-    AccentBlue to AccentBlueSoft,
-    AccentGreen to AccentGreenSoft,
-    AccentOrange to AccentOrangeSoft,
-    StoreColorPurple to StoreColorPurpleSoft,
-    StoreColorFuchsia to StoreColorFuchsiaSoft,
-    StoreColorRed to StoreColorRedSoft,
-    StoreColorYellow to StoreColorYellowSoft,
-)
-
-private fun brandPair(name: String): Pair<Color, Color> {
-    val h = normalizeSearch(name).hashCode()
-    val idx = if (h < 0) -h else h
-    return BRAND_PALETTE[idx % BRAND_PALETTE.size]
-}
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
 
 @Composable
 fun EanSearchScreen(
@@ -175,20 +113,19 @@ fun EanSearchScreen(
     onBack: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val catalogMeta by viewModel.catalogMeta.collectAsStateWithLifecycle()
+    val catalogBrands by viewModel.catalogBrands.collectAsStateWithLifecycle()
     val dimens = LocalAppDimens.current
     val context = LocalContext.current
-    val catalogMeta by viewModel.catalogMeta.collectAsStateWithLifecycle()
 
     var zoomProduct by remember { mutableStateOf<EanProductEntity?>(null) }
     var showFlejes by remember { mutableStateOf(false) }
-    // Código estático para modo impresión de flejes Jumbo — mismo para todas las tiendas
-    val flejesCode = "FLEJES"
 
     val scannerLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
         val intentResult = IntentIntegrator.parseActivityResult(
-            result.resultCode, result.data
+            result.resultCode, result.data,
         )
         if (intentResult != null && !intentResult.contents.isNullOrBlank()) {
             viewModel.onBarcodeScanned(intentResult.contents)
@@ -207,19 +144,9 @@ fun EanSearchScreen(
                 .setOrientationLocked(false)
                 .setPrompt(activity.getString(R.string.ean_scanning_cd))
                 .setBeepEnabled(true)
-            scannerLauncher.launch(
-                integrator.createScanIntent()
-            )
+            scannerLauncher.launch(integrator.createScanIntent())
         }
     }
-
-    val tfColors = TextFieldDefaults.colors(
-        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        unfocusedIndicatorColor = Color.Transparent,
-        focusedIndicatorColor = Color.Transparent,
-        cursorColor = MaterialTheme.colorScheme.primary,
-    )
 
     Box(
         modifier = Modifier
@@ -228,7 +155,7 @@ fun EanSearchScreen(
                 MaterialTheme.colorScheme.background.let { c ->
                     Color(c.red * 0.85f, c.green * 0.85f, c.blue * 0.85f, c.alpha)
                 },
-            )
+            ),
     ) {
         Column(
             modifier = Modifier
@@ -260,958 +187,63 @@ fun EanSearchScreen(
             }
 
             when (val state = uiState) {
-                is EanSearchUiState.Loading -> {
-                    val loadingCd = stringResource(R.string.ean_loading_cd)
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(dimens.spacingXl),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(48.dp),
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        Spacer(modifier = Modifier.height(dimens.spacingMd))
-                        Text(
-                            text = state.progress,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.semantics {
-                                contentDescription = loadingCd
-                                liveRegion = LiveRegionMode.Polite
-                            },
-                        )
-                    }
-                }
-
-                is EanSearchUiState.Error -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(dimens.spacingXl),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.ErrorOutline,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(48.dp),
-                        )
-                        Spacer(modifier = Modifier.height(dimens.spacingMd))
-                        Text(
-                            text = state.message,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = dimens.spacingLg),
-                        )
-                        Spacer(modifier = Modifier.height(dimens.spacingLg))
-                        Button(onClick = { viewModel.retryLoad() }) {
-                            Text(stringResource(R.string.reintentar_carga))
-                        }
-                    }
-                }
-
-                is EanSearchUiState.Ready -> {
-                    val value = state
-                    val lazyItems: LazyPagingItems<EanProductEntity> =
-                        value.pagingFlow.collectAsLazyPagingItems()
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = dimens.spacingMd, vertical = dimens.spacingSm),
-                    ) {
-                        var searchFocused by remember { mutableStateOf(false) }
-                        val searchPill = RoundedCornerShape(28.dp)
-                        val searchBorder by animateColorAsState(
-                            targetValue = if (searchFocused) MaterialTheme.colorScheme.primary
-                            else Color.Transparent,
-                            label = "eanSearchBorder",
-                        )
-                        val searchElevation by animateDpAsState(
-                            targetValue = if (searchFocused) 8.dp else 2.dp,
-                            label = "eanSearchElevation",
-                        )
-                        val scanCd = stringResource(R.string.escanear_codigo_barras)
-                        val flejesCd = stringResource(R.string.flejes_button_cd)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Box(
-                                modifier = Modifier.weight(1f),
-                            ) {
-                            TextField(
-                                value = value.query,
-                                onValueChange = { viewModel.onQueryChange(it) },
-                                label = {
-                                    Text(
-                                        text = stringResource(R.string.ean_search_label),
-                                        style = MaterialTheme.typography.bodyLarge,
-                                    )
-                                },
-                                placeholder = {
-                                    Text(
-                                        text = stringResource(R.string.ean_search_placeholder),
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Filled.Search,
-                                        contentDescription = stringResource(R.string.buscar_cd),
-                                        tint = if (searchFocused) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                },
-                                trailingIcon = {
-                                    if (value.query.isNotEmpty()) {
-                                        IconButton(onClick = { viewModel.clearQuery() }) {
-                                            Icon(
-                                                imageVector = Icons.Filled.Close,
-                                                contentDescription = stringResource(R.string.limpiar_cd),
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                        }
-                                    }
-                                },
-                                singleLine = true,
-                                colors = tfColors,
-                                shape = searchPill,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(min = dimens.touchMin)
-                                    .onFocusChanged { searchFocused = it.isFocused }
-                                    .shadow(searchElevation, searchPill)
-                                    .border(1.5.dp, searchBorder, searchPill),
-                            )
-                            }
-                            Spacer(modifier = Modifier.width(dimens.spacingSm))
-                            // Botón Flejes — entre buscador y scanner, con efecto iluminado 2026
-                            // (estático si hay movimiento reducido).
-                            val flejesGlow: Float = if (LocalReducedMotionEnabled.current) {
-                                0.7f
-                            } else {
-                                val flejesInfinite = rememberInfiniteTransition(label = "flejesGlow")
-                                flejesInfinite.animateFloat(
-                                    initialValue = 0.45f, targetValue = 1f,
-                                    animationSpec = infiniteRepeatable(tween(1400), RepeatMode.Reverse),
-                                    label = "flejesGlow",
-                                ).value
-                            }
-                            val flejesPress = rememberPressInteractionSource()
-                            Box(
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .shadow(10.dp * flejesGlow, CircleShape, clip = false)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primaryContainer)
-                                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f + 0.25f * flejesGlow), CircleShape)
-                                    .pressScale(flejesPress)
-                                    .clickable(
-                                        interactionSource = flejesPress,
-                                        indication = LocalIndication.current,
-                                        onClick = { showFlejes = true },
-                                        role = Role.Button,
-                                        onClickLabel = flejesCd,
-                                    )
-                                    .semantics { contentDescription = flejesCd },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Print,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier
-                                        .size(20.dp)
-                                        .graphicsLayer {
-                                            scaleX = 1f + 0.06f * flejesGlow
-                                            scaleY = 1f + 0.06f * flejesGlow
-                                        },
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(dimens.spacingSm))
-                            val scanPress = rememberPressInteractionSource()
-                            Box(
-                                modifier = Modifier
-                                    .size(52.dp)
-                                    .shadow(8.dp, CircleShape)
-                                    .clip(CircleShape)
-                                    .background(
-                                        Brush.horizontalGradient(
-                                            colors = listOf(
-                                                MaterialTheme.colorScheme.primary,
-                                                MaterialTheme.colorScheme.tertiary,
-                                            )
-                                        )
-                                    )
-                                    .pressScale(scanPress)
-                                    .clickable(
-                                        interactionSource = scanPress,
-                                        indication = LocalIndication.current,
-                                        onClick = launchScanner,
-                                        role = Role.Button,
-                                        onClickLabel = scanCd,
-                                    )
-                                    .semantics { contentDescription = scanCd },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_barcode),
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(24.dp),
-                                )
-                            }
-                            }
-
-                        // Con resultados, el conteo + compartir viven junto a la
-                        // lista (ahí están los filtros aplicados); aquí solo el
-                        // caso "0 resultados" para no duplicar.
-                        if (value.query.isNotEmpty() && lazyItems.itemCount == 0) {
-                            Text(
-                                text = stringResource(R.string.ean_results_count, 0),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier
-                                    .padding(vertical = dimens.spacingXs)
-                                    .semantics { liveRegion = LiveRegionMode.Polite },
-                            )
-                        }
-
-                    if (lazyItems.itemCount == 0) {
-                        Box(modifier = Modifier.weight(1f)) {
-                            if (value.query.isBlank()) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(dimens.spacingXl),
-                                    verticalArrangement = Arrangement.Center,
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                ) {
-                                    Text(
-                                        text = stringResource(R.string.ean_empty_catalog),
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier.semantics { heading() },
-                                    )
-                                    Spacer(modifier = Modifier.height(dimens.spacingMd))
-                                    Button(
-                                        onClick = { viewModel.forceReload() },
-                                        modifier = Modifier.heightIn(min = dimens.touchMin),
-                                    ) {
-                                        Text(stringResource(R.string.ean_reload_catalog))
-                                    }
-                                }
-                            } else {
-                                EanEmptyState(query = value.query, onClear = { viewModel.clearQuery() })
-                            }
-                        }
-                    } else {
-                        // Marcas y cajas desde ViewModel (evita snapshot O(n) en UI).
-                        val searchBrandCounts by viewModel.searchBrandCounts.collectAsStateWithLifecycle()
-                        val searchCajas by viewModel.searchCajas.collectAsStateWithLifecycle()
-                        val brandCountsInResults = remember(searchBrandCounts) {
-                            searchBrandCounts.mapValues { (_, v) -> v }
-                        }
-                        val brandsInResults = remember(brandCountsInResults) {
-                            brandCountsInResults.keys.sortedWith(
-                                compareBy({ it == "Sin marca" || it == "\u0000" }, { it.lowercase() })
-                            )
-                        }
-                        val cajasInResults = remember(searchCajas) {
-                            searchCajas.sortedBy { it.toIntOrNull() ?: Int.MAX_VALUE }
-                        }
-                        var brandFilter by remember(value.query) { mutableStateOf<String?>(null) }
-                        var cajaFilter by remember(value.query) { mutableStateOf<String?>(null) }
-                        if (brandsInResults.size > 1 || cajasInResults.isNotEmpty()) {
-                            LazyRow(
-                                modifier = Modifier.fillMaxWidth(),
-                                contentPadding = PaddingValues(vertical = dimens.spacingXs),
-                                horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
-                            ) {
-                                if (brandsInResults.size > 1) {
-                                    item(key = "ean_brand_all") {
-                                        Box(modifier = Modifier.heightIn(min = dimens.touchMin)) {
-                                            FilterChip(
-                                                selected = brandFilter == null,
-                                                onClick = { brandFilter = null },
-                                                label = { Text(stringResource(R.string.todas)) },
-                                            )
-                                        }
-                                    }
-                                    items(brandsInResults, key = { brandKey -> "ean_brand_$brandKey" }) { brandKey ->
-                                        Box(modifier = Modifier.heightIn(min = dimens.touchMin)) {
-                                            FilterChip(
-                                                selected = brandFilter == brandKey,
-                                                onClick = { brandFilter = if (brandFilter == brandKey) null else brandKey },
-                                                label = {
-                                                    Text(
-                                                        if (brandKey == NO_BRAND_KEY) stringResource(R.string.ean_sin_marca)
-                                                        else "$brandKey · ${brandCountsInResults[brandKey] ?: 0}"
-                                                    )
-                                                },
-                                            )
-                                        }
-                                    }
-                                }
-                                if (cajasInResults.isNotEmpty()) {
-                                    item(key = "ean_caja_all") {
-                                        Box(modifier = Modifier.heightIn(min = dimens.touchMin)) {
-                                            FilterChip(
-                                                selected = cajaFilter == null,
-                                                onClick = { cajaFilter = null },
-                                                label = { Text("Todas cajas") },
-                                            )
-                                        }
-                                    }
-                                    items(cajasInResults, key = { caja -> "ean_caja_$caja" }) { caja ->
-                                        Box(modifier = Modifier.heightIn(min = dimens.touchMin)) {
-                                            FilterChip(
-                                                selected = cajaFilter == caja,
-                                                onClick = { cajaFilter = if (cajaFilter == caja) null else caja },
-                                                label = { Text("CAJA ×$caja") },
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        val rows = remember(lazyItems, brandFilter, cajaFilter) {
-                            // Usar itemSnapshotList en lugar de iterar lazyItems[it] (O(n) por frame)
-                            val products = lazyItems.itemSnapshotList.mapNotNull { it }
-                                .filter { cajaFilter == null || it.conversion.trim() == cajaFilter }
-                            val grouped = products.groupBy { it.marca.ifBlank { "\u0000" } }
-                            buildList<EanResultRow> {
-                                for ((brandKey, ps) in grouped) {
-                                    if (brandFilter != null && brandKey != brandFilter) continue
-                                    add(EanBrandRow(brandKey))
-                                    ps.forEach { add(EanProductRow(it)) }
-                                }
-                            }
-                        }
-                        val shareCd = stringResource(R.string.ean_share_list_cd)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = stringResource(R.string.ean_results_count, lazyItems.itemCount),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(vertical = dimens.spacingXs)
-                                    .semantics { liveRegion = LiveRegionMode.Polite },
-                            )
-                            IconButton(
-                                onClick = {
-                                    val products = rows.filterIsInstance<EanProductRow>()
-                                        .map { it.product }
-                                    val q = value.query.trim()
-                                    val title = if (q.isBlank()) {
-                                        context.getString(R.string.ean_share_catalog_title, products.size)
-                                    } else {
-                                        context.getString(R.string.ean_share_list_title, q, products.size)
-                                    }
-                                    val text = buildEanListShareText(
-                                        title = title,
-                                        products = products,
-                                    ) { n ->
-                                        context.getString(R.string.ean_share_more, n)
-                                    }
-                                    val intent = Intent(Intent.ACTION_SEND).apply {
-                                        type = "text/plain"
-                                        putExtra(Intent.EXTRA_TEXT, text)
-                                    }
-                                    context.startActivity(
-                                        Intent.createChooser(intent, context.getString(R.string.compartir))
-                                    )
-                                },
-                                modifier = Modifier.size(dimens.touchMin),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Share,
-                                    contentDescription = shareCd,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                            contentPadding = PaddingValues(
-                                start = 0.dp,
-                                end = 0.dp,
-                                top = dimens.spacingSm,
-                                bottom = dimens.scrollBottomPadding,
-                            ),
-                            verticalArrangement = Arrangement.spacedBy(6.dp * rs()),
-                        ) {
-                            itemsIndexed(rows, key = { _, it ->
-                                when (it) {
-                                    is EanBrandRow -> "brand_${it.brand}"
-                                    is EanProductRow -> it.product.id
-                                }
-                            }, contentType = { _, it ->
-                                when (it) {
-                                    is EanBrandRow -> "brand_header"
-                                    is EanProductRow -> "product"
-                                }
-                            }) { index, row ->
-                                var visible by remember { mutableStateOf(false) }
-                                // Springs (parten del valor en pantalla, interrumpibles);
-                                // el stagger vive en el disparo, no en la curva.
-                                // Reducido: solo cross-fade, sin desplazamiento.
-                                val reducedMotion = LocalReducedMotionEnabled.current
-                                val animAlpha by animateFloatAsState(
-                                    targetValue = if (visible) 1f else 0f,
-                                    animationSpec = if (reducedMotion) tween(150)
-                                    else MotionSprings.default(),
-                                    label = "eanRowAlpha",
-                                )
-                                val animOffsetY by animateDpAsState(
-                                    targetValue = if (visible) 0.dp else 12.dp,
-                                    animationSpec = if (reducedMotion) tween(150)
-                                    else MotionSprings.default(),
-                                    label = "eanRowOffset",
-                                )
-                                LaunchedEffect(Unit) {
-                                    if (!reducedMotion) delay(minOf(index, 8) * 40L)
-                                    visible = true
-                                }
-val density = LocalDensity.current
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .graphicsLayer {
-                                            alpha = animAlpha
-                                            translationY = animOffsetY.value * density.density
-                                        },
-                                    ) {
-                                when (row) {
-                                    is EanBrandRow -> EanBrandHeader(
-                                        title = if (row.brand == "\u0000")
-                                            stringResource(R.string.ean_sin_marca)
-                                        else row.brand,
-                                    )
-                                    is EanProductRow -> EanProductCard(
-                                        product = row.product,
-                                        query = value.query,
-                                        onBarcodeClick = { zoomProduct = row.product },
-                                    )
-                                }
-                                }
-                            }
-                    }
-
-                    }
-
-                    val brandCounts by viewModel.brandCounts.collectAsStateWithLifecycle()
-                    catalogMeta?.let { (version, count) ->
-                        // Marcas del catálogo como atajos: tocan y buscan.
-                        // "Sin marca" no se ofrece (no matchearía nada útil).
-                        val brandShortcuts = remember(brandCounts) {
-                            brandCounts.entries
-                                .filter { it.key.isNotBlank() && it.key != "Sin marca" }
-                                .sortedByDescending { it.value }
-                                .take(8)
-                        }
-                        // Meta + atajos en un solo renglón con scroll (ahorra
-                        // una línea completa de chrome inferior).
-                        LazyRow(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = dimens.spacingXs),
-                            contentPadding = PaddingValues(horizontal = dimens.spacingMd),
-                            horizontalArrangement = Arrangement.spacedBy(
-                                dimens.spacingSm,
-                                Alignment.CenterHorizontally,
-                            ),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            item(key = "ean_meta") {
-                                Text(
-                                    text = stringResource(R.string.ean_catalog_meta, version, count),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                )
-                            }
-                            if (brandShortcuts.size > 1) {
-                                items(brandShortcuts, key = { it.key }) { (brand, n) ->
-                                    AssistChip(
-                                        onClick = { viewModel.onQueryChange(brand) },
-                                        label = { Text("$brand · $n") },
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    }
-
-                }
-
-                is EanSearchUiState.BarcodeResult -> {
-                    // Estado transitorio: se resuelve en Ready con el código como query
-                }
+                is EanSearchUiState.Loading -> EanLoadingContent(state.progress)
+                is EanSearchUiState.Error -> EanErrorContent(state.message, viewModel::retryLoad)
+                is EanSearchUiState.Ready -> EanSearchContent(
+                    state = state,
+                    viewModel = viewModel,
+                    catalogMeta = catalogMeta,
+                    catalogBrands = catalogBrands,
+                    onScan = launchScanner,
+                    onShowFlejes = { showFlejes = true },
+                    onBarcodeClick = { zoomProduct = it },
+                )
             }
         }
     }
 
     zoomProduct?.let { product ->
-        // Entrada tipo container-transform (el Dialog es otra ventana:
-        // sharedElement real no es posible, se emula con spring + fade)
-        var zoomVisible by remember(product.eanPrincipal) { mutableStateOf(false) }
-        val zoomScale by animateFloatAsState(
-            targetValue = if (zoomVisible) 1f else 0.88f,
-            animationSpec = spring(dampingRatio = 0.75f, stiffness = 350f),
-            label = "eanZoomScale",
-        )
-        val zoomAlpha by animateFloatAsState(
-            targetValue = if (zoomVisible) 1f else 0f,
-            animationSpec = tween(200),
-            label = "eanZoomAlpha",
-        )
-        LaunchedEffect(product.eanPrincipal) { zoomVisible = true }
-        IosModal(
-            visible = true,
+        EanBarcodeZoom(
+            product = product,
             onDismiss = { zoomProduct = null },
-            title = product.descripcionProducto.ifBlank { product.eanPrincipal },
-            subtitle = product.eanPrincipal,
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .graphicsLayer {
-                        scaleX = zoomScale
-                        scaleY = zoomScale
-                        alpha = zoomAlpha
-                    },
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                BarcodeImage(
-                    ean = product.eanPrincipal,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 160.dp),
-                )
-                Spacer(modifier = Modifier.height(dimens.spacingSm))
-                Text(
-                    text = stringResource(R.string.ean_barcode_zoom_hint),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(modifier = Modifier.height(dimens.spacingMd))
-                Button(
-                    onClick = {
-                        val cm = context.getSystemService(ClipboardManager::class.java)
-                        cm?.setPrimaryClip(
-                            android.content.ClipData.newPlainText(
-                                "EAN",
-                                product.eanPrincipal,
-                            )
-                        )
-                        Toast.makeText(context, R.string.ean_copied, Toast.LENGTH_SHORT).show()
-                    },
-                    modifier = Modifier.heightIn(min = dimens.touchMin),
-                ) {
-                    Text(stringResource(R.string.ean_copy_cd))
-                }
-                Spacer(modifier = Modifier.height(dimens.spacingSm))
-                Button(
-                    onClick = {
-                        try {
-                            val file = ShareImageGenerator.generateForEanProduct(
-                                context = context,
-                                productName = product.descripcionProducto,
-                                ean = product.eanPrincipal,
-                            )
-                            val uri = FileProvider.getUriForFile(
-                                context,
-                                "${context.packageName}.fileprovider",
-                                file,
-                            )
-                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                type = "image/png"
-                                putExtra(Intent.EXTRA_STREAM, uri)
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            }
-                            context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.ean_share_image)))
-                        } catch (_: Exception) {
-                            Toast.makeText(context, R.string.ean_share_error, Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    modifier = Modifier.heightIn(min = dimens.touchMin),
-                ) {
-                    Text(stringResource(R.string.ean_share_image))
-                }
-            }
-        }
+        )
     }
 
     if (showFlejes) {
-        // Brillo al máximo mientras se muestra el código: los lectores láser
-        // leen la pantalla mucho mejor con brillo alto. Se restaura al cerrar.
-        LaunchedEffect(Unit) {
-            val window = (context as? Activity)?.window ?: return@LaunchedEffect
-            val previous = window.attributes.screenBrightness
-            window.attributes = window.attributes.apply { screenBrightness = 1f }
-            try {
-                awaitCancellation()
-            } finally {
-                window.attributes = window.attributes.apply { screenBrightness = previous }
-            }
-        }
-        val flejesGlow2: Float = if (LocalReducedMotionEnabled.current) {
-            0.65f
-        } else {
-            rememberInfiniteTransition(label = "flejesBarcodeGlow").animateFloat(
-                initialValue = 0.35f, targetValue = 1f,
-                animationSpec = infiniteRepeatable(tween(1600), RepeatMode.Reverse),
-                label = "flejesBarcodeGlow",
-            ).value
-        }
-        IosModal(
-            visible = true,
-            onDismiss = { showFlejes = false },
-            title = stringResource(R.string.flejes_barcode_title),
-            subtitle = null,
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .shadow(18.dp * flejesGlow2, RoundedCornerShape(16.dp), clip = false)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.White)
-                        .padding(12.dp),
-                ) {
-                    Image(
-                        painter = painterResource(R.drawable.img_flejes_barcode),
-                        contentDescription = stringResource(R.string.flejes_barcode_cd),
-                        modifier = Modifier.fillMaxWidth(),
-                        contentScale = androidx.compose.ui.layout.ContentScale.Fit,
-                    )
-                }
-                Spacer(modifier = Modifier.height(dimens.spacingSm))
-                Text(
-                    text = stringResource(R.string.flejes_barcode_title),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-            }
-        }
+        EanFlejesDialog(onDismiss = { showFlejes = false })
     }
 }
 
 @Composable
-private fun EanProductCard(
-    product: EanProductEntity,
-    query: String = "",
-    onBarcodeClick: (EanProductEntity) -> Unit = {},
-) {
+private fun EanLoadingContent(progress: String) {
     val dimens = LocalAppDimens.current
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        ),
-        shape = MaterialTheme.shapes.medium,
-    ) {
-        Column(modifier = Modifier.padding(dimens.spacingMd)) {
-            HighlightedText(
-                text = product.descripcionProducto.ifBlank { product.eanPrincipal },
-                query = query,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.semantics { heading() },
-            )
-
-            if (product.eanPrincipal.isNotBlank()) {
-                Spacer(modifier = Modifier.height(dimens.spacingSm))
-                BarcodeImage(
-                    ean = product.eanPrincipal,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 80.dp)
-                        .clip(MaterialTheme.shapes.small)
-                        .clickable(
-                            role = Role.Button,
-                            onClickLabel = stringResource(R.string.ean_zoom_cd),
-                            onClick = { onBarcodeClick(product) },
-                        ),
-                )
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
-                ) {
-                    if (product.eanPrincipal.isNotBlank()) {
-                        EanCodeChip(
-                            label = "EAN",
-                            value = product.eanPrincipal,
-                            query = query,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                    if (product.codCencosud.isNotBlank()) {
-                        EanCodeChip(
-                            label = "SKU",
-                            value = product.codCencosud,
-                            query = query,
-                            color = AccentGreenText,
-                        )
-                    }
-                    if (product.conversion.isNotBlank()) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(50))
-                                .background(MaterialTheme.colorScheme.tertiaryContainer)
-                                .padding(horizontal = 10.dp, vertical = 5.dp),
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "CAJA",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "×${product.conversion}",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
-                                )
-                            }
-                        }
-                    }
-                    if (product.codProveedor.isNotBlank() && product.codProveedor.trim() != "19") {
-                        EanCodeChip(
-                            label = "Prov",
-                            value = product.codProveedor,
-                            query = query,
-                            color = MaterialTheme.colorScheme.tertiary,
-                        )
-                    }
-                }
-
-                if (product.marca.isNotBlank() || product.estado.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
-                    ) {
-                        if (product.marca.isNotBlank()) {
-                            BrandChip(name = product.marca, query = query)
-                        }
-                        if (product.estado.isNotBlank()) {
-                            Text(
-                                text = product.estado,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-
-                val categorias = listOfNotNull(
-                    product.catN1Cencosud.takeIf { it.isNotBlank() },
-                    product.catN2Cencosud.takeIf { it.isNotBlank() },
-                )
-                if (categorias.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = categorias.joinToString("  ›  "),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun EanBrandHeader(title: String) {
-    val dimens = LocalAppDimens.current
-    val s = rs()
-    val (accent, soft) = brandPair(title)
-    Box(
+    val loadingCd = stringResource(R.string.ean_loading_cd)
+    Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = dimens.spacingMd, vertical = 4.dp * s)
-            .clip(RoundedCornerShape(12.dp))
-            .background(soft),
+            .fillMaxSize()
+            .padding(dimens.spacingXl),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp * s, vertical = 8.dp * s),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(12.dp * s)
-                    .clip(CircleShape)
-                    .background(accent),
-            )
-            Spacer(modifier = Modifier.width(8.dp * s))
-            Column {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.semantics { heading() },
-                )
-                val note = brandNote(title)
-                if (note != null) {
-                    Text(
-                        text = note,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun BrandChip(name: String, query: String = "") {
-    val s = rs()
-    val (accent, soft) = brandPair(name)
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(soft)
-            .padding(horizontal = 8.dp * s, vertical = 3.dp * s),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(8.dp * s)
-                .clip(CircleShape)
-                .background(accent),
+        CircularProgressIndicator(
+            modifier = Modifier.size(48.dp),
+            color = MaterialTheme.colorScheme.primary,
         )
-        Spacer(modifier = Modifier.width(5.dp * s))
-        HighlightedText(
-            text = name,
-            query = query,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurface,
+        Spacer(modifier = Modifier.height(dimens.spacingMd))
+        Text(
+            text = progress,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.semantics {
+                contentDescription = loadingCd
+                liveRegion = LiveRegionMode.Polite
+            },
         )
     }
 }
 
 @Composable
-private fun EanCodeChip(label: String, value: String, color: Color, query: String = "") {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(color.copy(alpha = 0.12f))
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = color,
-            )
-            HighlightedText(
-                text = value,
-                query = query,
-                style = MaterialTheme.typography.labelMedium,
-                color = color,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-@Composable
-private fun BarcodeImage(ean: String, modifier: Modifier = Modifier) {
-    val isAlphanumeric = remember(ean) { ean.any { !it.isDigit() } }
-    val digits = remember(ean) { ean.filter { it.isDigit() } }
-    val cacheKey = remember(ean) { ean }
-    var bitmap by remember(cacheKey) { mutableStateOf<Bitmap?>(barcodeCache.get(cacheKey)) }
-
-    LaunchedEffect(cacheKey) {
-        val cached = barcodeCache.get(cacheKey)
-        if (cached != null) {
-            bitmap = cached
-            return@LaunchedEffect
-        }
-        withContext(Dispatchers.Default) {
-            val generated = try {
-                val encoder = BarcodeEncoder()
-                // EAN-13 con 0 inicial pierde el 0 al escanearse como UPC-A en algunos lectores.
-                // Generamos CODE_128 para preservar el 0 inicial exacto o para códigos alfanuméricos como FLEJES.
-                val format = if (!isAlphanumeric && digits.length == 13 && digits[0] != '0') BarcodeFormat.EAN_13 else if (!isAlphanumeric && digits.length == 12) BarcodeFormat.EAN_13 else BarcodeFormat.CODE_128
-                val data = if (format == BarcodeFormat.CODE_128) ean else digits
-                encoder.encodeBitmap(data, format, 800, 280)
-            } catch (e: WriterException) {
-                try {
-                    BarcodeEncoder().encodeBitmap(if (isAlphanumeric) ean else digits, BarcodeFormat.CODE_128, 800, 280)
-                } catch (e2: WriterException) {
-                    null
-                }
-            } catch (e: IllegalArgumentException) {
-                null
-            }
-            if (generated != null) barcodeCache.put(cacheKey, generated)
-            bitmap = generated
-        }
-    }
-
-    Box(
-        modifier = modifier
-            .background(Color.White)
-            .padding(8.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        val current = bitmap
-        if (current != null) {
-            Image(
-                bitmap = current.asImageBitmap(),
-                contentDescription = stringResource(R.string.ean_barcode_cd, ean),
-                modifier = Modifier.fillMaxWidth(),
-            )
-        } else {
-            CircularProgressIndicator(
-                modifier = Modifier.size(28.dp),
-                color = Color.Gray,
-                strokeWidth = 2.dp,
-            )
-        }
-    }
-}
-
-@Composable
-private fun EanEmptyState(query: String, onClear: () -> Unit = {}) {
+private fun EanErrorContent(message: String, onRetry: () -> Unit) {
     val dimens = LocalAppDimens.current
     Column(
         modifier = Modifier
@@ -1223,40 +255,724 @@ private fun EanEmptyState(query: String, onClear: () -> Unit = {}) {
         Icon(
             imageVector = Icons.Filled.ErrorOutline,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.outline,
+            tint = MaterialTheme.colorScheme.error,
             modifier = Modifier.size(48.dp),
         )
         Spacer(modifier = Modifier.height(dimens.spacingMd))
         Text(
-            text = stringResource(R.string.ean_empty_results, query),
+            text = message,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MaterialTheme.colorScheme.error,
             textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = dimens.spacingLg),
         )
-        Spacer(modifier = Modifier.height(dimens.spacingXs))
-        Text(
-            text = stringResource(R.string.ean_no_results_hint),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(modifier = Modifier.height(dimens.spacingMd))
-        Button(
-            onClick = onClear,
-            modifier = Modifier.heightIn(min = dimens.touchMin),
-        ) {
-            Text(stringResource(R.string.ean_clear_search))
+        Spacer(modifier = Modifier.height(dimens.spacingLg))
+        Button(onClick = onRetry) {
+            Text(stringResource(R.string.reintentar_carga))
         }
     }
 }
 
-
-@Preview(showBackground = true)
+/**
+ * Contenido de la pantalla en estado Ready. La lista, los chips, el conteo y
+ * el "compartir" salen del mismo resultado paginado que ordena SQL: no se
+ * reagrupa ni se filtra en memoria (eso rompía el ranking y la paginación).
+ */
 @Composable
-private fun EanSearchScreenPreview() {
-    if (BuildConfig.DEBUG) {
-        com.rutamercaderistas.ui.theme.MercaderistasTheme {
-            EanSearchScreen(onBack = {})
+private fun EanSearchContent(
+    state: EanSearchUiState.Ready,
+    viewModel: EanSearchViewModel,
+    catalogMeta: Pair<Int, Int>?,
+    catalogBrands: List<BrandCountResult>,
+    onScan: () -> Unit,
+    onShowFlejes: () -> Unit,
+    onBarcodeClick: (EanProductEntity) -> Unit,
+) {
+    val dimens = LocalAppDimens.current
+    val context = LocalContext.current
+    val lazyItems = state.pagingFlow.collectAsLazyPagingItems()
+    val itemCount = lazyItems.itemCount
+    val total = state.totalCount
+    val refreshing = lazyItems.loadState.refresh is LoadState.Loading
+    val browsing = state.query.isBlank()
+    val hasFilters = state.brandFilter != null || state.cajaFilter != null
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = dimens.spacingMd, vertical = dimens.spacingSm),
+    ) {
+        EanSearchBar(
+            query = state.query,
+            onQueryChange = viewModel::onQueryChange,
+            onClear = viewModel::clearQuery,
+            onScan = onScan,
+            onShowFlejes = onShowFlejes,
+        )
+
+        when {
+            browsing && !hasFilters && total == 0 && itemCount == 0 ->
+                Box(modifier = Modifier.weight(1f)) {
+                    EanCatalogEmptyContent(onReload = viewModel::forceReload)
+                }
+            browsing && !hasFilters && itemCount == 0 && total == null && !refreshing ->
+                Box(modifier = Modifier.weight(1f)) {
+                    EanCatalogEmptyContent(onReload = viewModel::forceReload)
+                }
+            // Sin texto pero con filtro activo: el catálogo no está vacío, el
+            // filtro no tiene coincidencias (p. ej. tras un reimport).
+            browsing && hasFilters && total == 0 -> Box(modifier = Modifier.weight(1f)) {
+                EanFiltersEmptyContent(onClear = viewModel::clearFilters)
+            }
+            !browsing && total == 0 -> Box(modifier = Modifier.weight(1f)) {
+                EanEmptyState(query = state.query, onClear = viewModel::clearQuery)
+            }
+            else -> {
+                if (state.brandFacets.size > 1 || state.cajaFacets.isNotEmpty()) {
+                    EanFilterChips(
+                        brandFacets = state.brandFacets,
+                        cajaFacets = state.cajaFacets,
+                        brandFilter = state.brandFilter,
+                        cajaFilter = state.cajaFilter,
+                        onBrandFilter = viewModel::onBrandFilter,
+                        onCajaFilter = viewModel::onCajaFilter,
+                    )
+                }
+
+                val snapshot = lazyItems.itemSnapshotList
+                // Las filas se derivan del snapshot (orden SQL intacto). La clave
+                // del remember es el snapshot completo: con solo lazyItems no se
+                // recalculaba al llegar páginas nuevas y la lista se quedaba corta.
+                val rows = remember(snapshot, browsing) {
+                    buildEanRows(snapshot.items, showBrandHeaders = browsing)
+                }
+                val shareCd = stringResource(R.string.ean_share_list_cd)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(R.string.ean_results_count, total ?: itemCount),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(vertical = dimens.spacingXs)
+                            .semantics { liveRegion = LiveRegionMode.Polite },
+                    )
+                    IconButton(
+                        onClick = {
+                            val products = rows.filterIsInstance<EanResultRow.Product>()
+                                .map { it.product }
+                            val q = state.query.trim()
+                            val title = if (q.isBlank()) {
+                                context.getString(R.string.ean_share_catalog_title, products.size)
+                            } else {
+                                context.getString(R.string.ean_share_list_title, q, products.size)
+                            }
+                            val text = buildEanListShareText(
+                                title = title,
+                                products = products,
+                            ) { n ->
+                                context.getString(R.string.ean_share_more, n)
+                            }
+                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, text)
+                            }
+                            context.startActivity(
+                                Intent.createChooser(intent, context.getString(R.string.compartir)),
+                            )
+                        },
+                        modifier = Modifier.size(dimens.touchMin),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Share,
+                            contentDescription = shareCd,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                EanResultsList(
+                    modifier = Modifier.weight(1f),
+                    rows = rows,
+                    query = state.query,
+                    onBarcodeClick = onBarcodeClick,
+                )
+            }
+        }
+
+        EanCatalogFooter(
+            catalogMeta = catalogMeta,
+            catalogBrands = catalogBrands,
+            onBrandClick = viewModel::onBrandFilter,
+        )
+    }
+}
+
+@Composable
+private fun EanCatalogEmptyContent(onReload: () -> Unit) {
+    val dimens = LocalAppDimens.current
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(dimens.spacingXl),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = stringResource(R.string.ean_empty_catalog),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.semantics { heading() },
+        )
+        Spacer(modifier = Modifier.height(dimens.spacingMd))
+        Button(onClick = onReload, modifier = Modifier.heightIn(min = dimens.touchMin)) {
+            Text(stringResource(R.string.ean_reload_catalog))
+        }
+    }
+}
+
+@Composable
+private fun EanFiltersEmptyContent(onClear: () -> Unit) {
+    val dimens = LocalAppDimens.current
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(dimens.spacingXl),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = stringResource(R.string.sin_resultados),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.semantics { heading() },
+        )
+        Spacer(modifier = Modifier.height(dimens.spacingMd))
+        Button(onClick = onClear, modifier = Modifier.heightIn(min = dimens.touchMin)) {
+            Text(stringResource(R.string.ean_clear_filters))
+        }
+    }
+}
+
+@Composable
+private fun EanSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onClear: () -> Unit,
+    onScan: () -> Unit,
+    onShowFlejes: () -> Unit,
+) {
+    val dimens = LocalAppDimens.current
+    var searchFocused by remember { mutableStateOf(false) }
+    val searchPill = RoundedCornerShape(28.dp)
+    val searchBorder by animateColorAsState(
+        targetValue = if (searchFocused) MaterialTheme.colorScheme.primary else Color.Transparent,
+        label = "eanSearchBorder",
+    )
+    val searchElevation by animateDpAsState(
+        targetValue = if (searchFocused) 8.dp else 2.dp,
+        label = "eanSearchElevation",
+    )
+    val scanCd = stringResource(R.string.escanear_codigo_barras)
+    val flejesCd = stringResource(R.string.flejes_button_cd)
+    val tfColors = TextFieldDefaults.colors(
+        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        unfocusedIndicatorColor = Color.Transparent,
+        focusedIndicatorColor = Color.Transparent,
+        cursorColor = MaterialTheme.colorScheme.primary,
+    )
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(modifier = Modifier.weight(1f)) {
+            TextField(
+                value = query,
+                onValueChange = onQueryChange,
+                label = {
+                    Text(
+                        text = stringResource(R.string.ean_search_label),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                },
+                placeholder = {
+                    Text(
+                        text = stringResource(R.string.ean_search_placeholder),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Filled.Search,
+                        contentDescription = stringResource(R.string.buscar_cd),
+                        tint = if (searchFocused) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                },
+                trailingIcon = {
+                    if (query.isNotEmpty()) {
+                        IconButton(onClick = onClear) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = stringResource(R.string.limpiar_cd),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                },
+                singleLine = true,
+                colors = tfColors,
+                shape = searchPill,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = dimens.touchMin)
+                    .onFocusChanged { searchFocused = it.isFocused }
+                    .shadow(searchElevation, searchPill)
+                    .border(1.5.dp, searchBorder, searchPill),
+            )
+        }
+        Spacer(modifier = Modifier.width(dimens.spacingSm))
+        // Botón Flejes: código estático para imprimir/etiquetar. Brillo pulsante
+        // estático si hay movimiento reducido.
+        val flejesGlow: Float = if (LocalReducedMotionEnabled.current) {
+            0.7f
+        } else {
+            val flejesInfinite = rememberInfiniteTransition(label = "flejesGlow")
+            flejesInfinite.animateFloat(
+                initialValue = 0.45f, targetValue = 1f,
+                animationSpec = infiniteRepeatable(tween(1400), RepeatMode.Reverse),
+                label = "flejesGlow",
+            ).value
+        }
+        val flejesPress = rememberPressInteractionSource()
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .shadow(10.dp * flejesGlow, CircleShape, clip = false)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer)
+                .border(
+                    1.dp,
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.35f + 0.25f * flejesGlow),
+                    CircleShape,
+                )
+                .pressScale(flejesPress)
+                .clickable(
+                    interactionSource = flejesPress,
+                    indication = LocalIndication.current,
+                    onClick = onShowFlejes,
+                    role = Role.Button,
+                    onClickLabel = flejesCd,
+                )
+                .semantics { contentDescription = flejesCd },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Print,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .size(20.dp)
+                    .graphicsLayer {
+                        scaleX = 1f + 0.06f * flejesGlow
+                        scaleY = 1f + 0.06f * flejesGlow
+                    },
+            )
+        }
+        Spacer(modifier = Modifier.width(dimens.spacingSm))
+        val scanPress = rememberPressInteractionSource()
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .shadow(8.dp, CircleShape)
+                .clip(CircleShape)
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary,
+                            MaterialTheme.colorScheme.tertiary,
+                        ),
+                    ),
+                )
+                .pressScale(scanPress)
+                .clickable(
+                    interactionSource = scanPress,
+                    indication = LocalIndication.current,
+                    onClick = onScan,
+                    role = Role.Button,
+                    onClickLabel = scanCd,
+                )
+                .semantics { contentDescription = scanCd },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_barcode),
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(24.dp),
+            )
+        }
+    }
+}
+
+/**
+ * Chips de filtro alimentados por las facetas SQL: los conteos y las opciones
+ * corresponden al resultado real, y al tocar se re-consulta en SQL (no se
+ * filtra la página ya cargada).
+ */
+@Composable
+private fun EanFilterChips(
+    brandFacets: List<BrandCountResult>,
+    cajaFacets: List<CajaCountResult>,
+    brandFilter: String?,
+    cajaFilter: String?,
+    onBrandFilter: (String?) -> Unit,
+    onCajaFilter: (String?) -> Unit,
+) {
+    val dimens = LocalAppDimens.current
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(vertical = dimens.spacingXs),
+        horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+    ) {
+        if (brandFacets.size > 1) {
+            item(key = "ean_brand_all") {
+                Box(modifier = Modifier.heightIn(min = dimens.touchMin)) {
+                    FilterChip(
+                        selected = brandFilter == null,
+                        onClick = { onBrandFilter(null) },
+                        label = { Text(stringResource(R.string.todas)) },
+                    )
+                }
+            }
+            items(brandFacets, key = { "ean_brand_${it.marca}" }) { facet ->
+                Box(modifier = Modifier.heightIn(min = dimens.touchMin)) {
+                    FilterChip(
+                        selected = brandFilter == facet.marca,
+                        onClick = { onBrandFilter(facet.marca) },
+                        label = {
+                            Text(
+                                if (facet.marca.isBlank()) stringResource(R.string.ean_sin_marca)
+                                else "${facet.marca} · ${facet.count}",
+                            )
+                        },
+                    )
+                }
+            }
+        }
+        if (cajaFacets.isNotEmpty()) {
+            item(key = "ean_caja_all") {
+                Box(modifier = Modifier.heightIn(min = dimens.touchMin)) {
+                    FilterChip(
+                        selected = cajaFilter == null,
+                        onClick = { onCajaFilter(null) },
+                        label = { Text(stringResource(R.string.todas_cajas)) },
+                    )
+                }
+            }
+            items(cajaFacets, key = { "ean_caja_${it.conversion}" }) { facet ->
+                Box(modifier = Modifier.heightIn(min = dimens.touchMin)) {
+                    FilterChip(
+                        selected = cajaFilter == facet.conversion,
+                        onClick = { onCajaFilter(facet.conversion) },
+                        label = { Text("CAJA ×${facet.conversion} · ${facet.count}") },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EanResultsList(
+    modifier: Modifier = Modifier,
+    rows: List<EanResultRow>,
+    query: String,
+    onBarcodeClick: (EanProductEntity) -> Unit,
+) {
+    val dimens = LocalAppDimens.current
+    val density = LocalDensity.current
+    LazyColumn(
+        modifier = modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(
+            start = 0.dp,
+            end = 0.dp,
+            top = dimens.spacingSm,
+            bottom = dimens.scrollBottomPadding,
+        ),
+        verticalArrangement = Arrangement.spacedBy(6.dp * rs()),
+    ) {
+        itemsIndexed(
+            items = rows,
+            key = { _, row ->
+                when (row) {
+                    is EanResultRow.BrandHeader -> "brand_${row.brand}"
+                    is EanResultRow.Product -> row.product.id
+                }
+            },
+            contentType = { _, row ->
+                when (row) {
+                    is EanResultRow.BrandHeader -> "brand_header"
+                    is EanResultRow.Product -> "product"
+                }
+            },
+        ) { index, row ->
+            var visible by remember { mutableStateOf(false) }
+            // Springs (parten del valor en pantalla, interrumpibles); el stagger
+            // vive en el disparo, no en la curva. Reducido: solo cross-fade.
+            val reducedMotion = LocalReducedMotionEnabled.current
+            val animAlpha by animateFloatAsState(
+                targetValue = if (visible) 1f else 0f,
+                animationSpec = if (reducedMotion) tween(150) else MotionSprings.default(),
+                label = "eanRowAlpha",
+            )
+            val animOffsetY by animateDpAsState(
+                targetValue = if (visible) 0.dp else 12.dp,
+                animationSpec = if (reducedMotion) tween(150) else MotionSprings.default(),
+                label = "eanRowOffset",
+            )
+            LaunchedEffect(Unit) {
+                if (!reducedMotion) delay(minOf(index, 8) * 40L)
+                visible = true
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        alpha = animAlpha
+                        translationY = animOffsetY.value * density.density
+                    },
+            ) {
+                when (row) {
+                    is EanResultRow.BrandHeader -> EanBrandHeader(
+                        title = if (row.brand.isBlank()) stringResource(R.string.ean_sin_marca)
+                        else row.brand,
+                    )
+                    is EanResultRow.Product -> EanProductCard(
+                        product = row.product,
+                        query = query,
+                        onBarcodeClick = onBarcodeClick,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Pie con versión del catálogo y atajos de marca. Tocar una marca aplica el
+ * filtro exacto (no escribe su nombre en el buscador).
+ */
+@Composable
+private fun EanCatalogFooter(
+    catalogMeta: Pair<Int, Int>?,
+    catalogBrands: List<BrandCountResult>,
+    onBrandClick: (String) -> Unit,
+) {
+    val dimens = LocalAppDimens.current
+    val meta = catalogMeta ?: return
+    val (version, count) = meta
+    val shortcuts = remember(catalogBrands) {
+        catalogBrands
+            .filter { it.marca.isNotBlank() }
+            .sortedByDescending { it.count }
+            .take(8)
+    }
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = dimens.spacingXs),
+        contentPadding = PaddingValues(horizontal = dimens.spacingMd),
+        horizontalArrangement = Arrangement.spacedBy(
+            dimens.spacingSm,
+            Alignment.CenterHorizontally,
+        ),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        item(key = "ean_meta") {
+            Text(
+                text = stringResource(R.string.ean_catalog_meta, version, count),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
+        if (shortcuts.size > 1) {
+            items(shortcuts, key = { "ean_shortcut_${it.marca}" }) { facet ->
+                AssistChip(
+                    onClick = { onBrandClick(facet.marca) },
+                    label = { Text("${facet.marca} · ${facet.count}") },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EanBarcodeZoom(
+    product: EanProductEntity,
+    onDismiss: () -> Unit,
+) {
+    val dimens = LocalAppDimens.current
+    val context = LocalContext.current
+    // Entrada tipo container-transform (el Dialog es otra ventana: sharedElement
+    // real no es posible, se emula con spring + fade).
+    var zoomVisible by remember(product.eanPrincipal) { mutableStateOf(false) }
+    val zoomScale by animateFloatAsState(
+        targetValue = if (zoomVisible) 1f else 0.88f,
+        animationSpec = spring(dampingRatio = 0.75f, stiffness = 350f),
+        label = "eanZoomScale",
+    )
+    val zoomAlpha by animateFloatAsState(
+        targetValue = if (zoomVisible) 1f else 0f,
+        animationSpec = tween(200),
+        label = "eanZoomAlpha",
+    )
+    LaunchedEffect(product.eanPrincipal) { zoomVisible = true }
+    IosModal(
+        visible = true,
+        onDismiss = onDismiss,
+        title = product.descripcionProducto.ifBlank { product.eanPrincipal },
+        subtitle = product.eanPrincipal,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .graphicsLayer {
+                    scaleX = zoomScale
+                    scaleY = zoomScale
+                    alpha = zoomAlpha
+                },
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            EanBarcodeView(
+                ean = product.eanPrincipal,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 160.dp),
+            )
+            Spacer(modifier = Modifier.height(dimens.spacingSm))
+            Text(
+                text = stringResource(R.string.ean_barcode_zoom_hint),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(modifier = Modifier.height(dimens.spacingMd))
+            Button(
+                onClick = {
+                    val cm = context.getSystemService(ClipboardManager::class.java)
+                    cm?.setPrimaryClip(
+                        android.content.ClipData.newPlainText("EAN", product.eanPrincipal),
+                    )
+                    Toast.makeText(context, R.string.ean_copied, Toast.LENGTH_SHORT).show()
+                },
+                modifier = Modifier.heightIn(min = dimens.touchMin),
+            ) {
+                Text(stringResource(R.string.ean_copy_cd))
+            }
+            Spacer(modifier = Modifier.height(dimens.spacingSm))
+            Button(
+                onClick = {
+                    try {
+                        val file = ShareImageGenerator.generateForEanProduct(
+                            context = context,
+                            productName = product.descripcionProducto,
+                            ean = product.eanPrincipal,
+                        )
+                        val uri = FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.fileprovider",
+                            file,
+                        )
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "image/png"
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(
+                            Intent.createChooser(
+                                shareIntent,
+                                context.getString(R.string.ean_share_image),
+                            ),
+                        )
+                    } catch (_: Exception) {
+                        Toast.makeText(context, R.string.ean_share_error, Toast.LENGTH_SHORT).show()
+                    }
+                },
+                modifier = Modifier.heightIn(min = dimens.touchMin),
+            ) {
+                Text(stringResource(R.string.ean_share_image))
+            }
+        }
+    }
+}
+
+@Composable
+private fun EanFlejesDialog(onDismiss: () -> Unit) {
+    val dimens = LocalAppDimens.current
+    val context = LocalContext.current
+    // Brillo al máximo mientras se muestra el código: los lectores láser leen la
+    // pantalla mucho mejor con brillo alto. Se restaura al cerrar.
+    LaunchedEffect(Unit) {
+        val window = (context as? Activity)?.window ?: return@LaunchedEffect
+        val previous = window.attributes.screenBrightness
+        window.attributes = window.attributes.apply { screenBrightness = 1f }
+        try {
+            awaitCancellation()
+        } finally {
+            window.attributes = window.attributes.apply { screenBrightness = previous }
+        }
+    }
+    val glow: Float = if (LocalReducedMotionEnabled.current) {
+        0.65f
+    } else {
+        rememberInfiniteTransition(label = "flejesBarcodeGlow").animateFloat(
+            initialValue = 0.35f, targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(1600), RepeatMode.Reverse),
+            label = "flejesBarcodeGlow",
+        ).value
+    }
+    IosModal(
+        visible = true,
+        onDismiss = onDismiss,
+        title = stringResource(R.string.flejes_barcode_title),
+        subtitle = null,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(18.dp * glow, RoundedCornerShape(16.dp), clip = false)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.White)
+                    .padding(12.dp),
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.img_flejes_barcode),
+                    contentDescription = stringResource(R.string.flejes_barcode_cd),
+                    modifier = Modifier.fillMaxWidth(),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                )
+            }
+            Spacer(modifier = Modifier.height(dimens.spacingSm))
+            Text(
+                text = stringResource(R.string.flejes_barcode_title),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }

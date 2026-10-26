@@ -2,7 +2,6 @@ package com.rutamercaderistas.services
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
-import com.rutamercaderistas.data.local.EanFtsManager
 import com.rutamercaderistas.data.local.EanProductDao
 import com.rutamercaderistas.data.local.EanProductEntity
 import org.apache.poi.ss.usermodel.Cell
@@ -16,7 +15,7 @@ import java.text.Normalizer
 import javax.inject.Inject
 import kotlinx.coroutines.sync.Mutex
 
-const val EAN_DATA_VERSION = 38
+const val EAN_DATA_VERSION = 39
 
 // Prefijo/sufijo de los archivos Excel de catálogo EAN en assets.
 // Para agregar más productos basta con soltar otro archivo "ean*.xlsx"
@@ -53,6 +52,7 @@ private val EAN_FILE_BRANDS = mapOf(
     "fermen" to "FERMENTISTA",
     "pett" to "PET KITCHEN",
     "producto_bwild_gel_pomelo" to "BWILD",
+    "patpot" to "PATPOT",
 )
 
 // Alias de marca: la empresa ve algunas marcas con un nombre distinto al del
@@ -104,7 +104,6 @@ fun compactNorm(text: String): String =
 class EanExcelParser @Inject constructor(
     @ApplicationContext private val context: Context,
     private val eanProductDao: EanProductDao,
-    private val eanFts: EanFtsManager,
 ) {
 
     private var lastDiagnostics: EanDiagnostics = EanDiagnostics()
@@ -149,7 +148,6 @@ class EanExcelParser @Inject constructor(
                 if (deduped.isNotEmpty()) {
                     eanProductDao.clearAll()
                     eanProductDao.insertAll(deduped)
-                    eanFts.ensureAndRebuild()
                 }
                 Result.success(deduped.size)
             } catch (e: Exception) {
@@ -300,6 +298,14 @@ class EanExcelParser @Inject constructor(
         for (cell in headerRow) {
             val col = cell.columnIndex
             val h = normalizeSearch(getStringCellValue(cell))
+            // Columnas de imagen/logo (p. ej. "Código de Barras (imagen)")
+            // no son códigos: si se mapearan taparían el EAN de la columna
+            // vecina y el producto quedaría sin código.
+            if (h.contains("imagen") || h.contains("image") ||
+                h.contains("foto") || h.contains("logo")
+            ) {
+                continue
+            }
             when {
                 "cat" in h -> {
                     val level = Regex("""\d""").find(h)?.value?.toIntOrNull()
@@ -321,6 +327,9 @@ class EanExcelParser @Inject constructor(
                 "descrip" in h -> descripcion = col
                 "articulo" in h -> descripcion = col
                 "producto" in h -> descripcion = col
+                // "Nombre" es el encabezado más común en catálogos de marca:
+                // no debe pisar una columna "Descripción" más específica.
+                "nombre" in h -> if (descripcion == null) descripcion = col
                 "ean" in h -> eanPrincipal = col
             }
         }
@@ -476,7 +485,6 @@ class EanExcelParser @Inject constructor(
             if (deduped.isNotEmpty()) {
                 eanProductDao.clearAll()
                 eanProductDao.insertAll(deduped)
-                eanFts.ensureAndRebuild()
             }
                 Result.success(deduped.size)
             } catch (e: Exception) {

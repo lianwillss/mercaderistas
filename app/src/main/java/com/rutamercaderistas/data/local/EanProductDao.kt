@@ -6,9 +6,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.RawQuery
-import androidx.room.Delete
 import androidx.sqlite.db.SupportSQLiteQuery
-import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface EanProductDao {
@@ -28,87 +26,35 @@ interface EanProductDao {
     @Query("SELECT COUNT(*) FROM ean_products WHERE descripcion_norm IS NULL OR descripcion_norm = ''")
     suspend fun hasUnnormalized(): Int
 
-    // Búsqueda por EAN principal
-    @Query("SELECT * FROM ean_products WHERE eanPrincipal LIKE '%' || :query || '%' ORDER BY descripcionProducto LIMIT 50")
-    fun searchByEan(query: String): Flow<List<EanProductEntity>>
-
-    // Búsqueda por Cód. Cencosud (SKU)
-    @Query("SELECT * FROM ean_products WHERE codCencosud LIKE '%' || :query || '%' ORDER BY descripcionProducto LIMIT 50")
-    fun searchByCodCencosud(query: String): Flow<List<EanProductEntity>>
-
-    // Búsqueda por Cód. Proveedor
-    @Query("SELECT * FROM ean_products WHERE codProveedor LIKE '%' || :query || '%' ORDER BY descripcionProducto LIMIT 50")
-    fun searchByCodProveedor(query: String): Flow<List<EanProductEntity>>
-
-    // Búsqueda por Código de Barra
-    @Query("SELECT * FROM ean_products WHERE codigoBarra LIKE '%' || :query || '%' ORDER BY descripcionProducto LIMIT 50")
-    fun searchByCodigoBarra(query: String): Flow<List<EanProductEntity>>
-
-    // Búsqueda por marca (normalizada)
-    @Query("SELECT * FROM ean_products WHERE marca_norm LIKE '%' || :query || '%' ORDER BY descripcionProducto LIMIT 50")
-    fun searchByMarca(query: String): Flow<List<EanProductEntity>>
-
-    // Obtener todos
-    @Query("SELECT * FROM ean_products ORDER BY descripcionProducto")
-    fun getAll(): Flow<List<EanProductEntity>>
-
-    // PagingSource para todos los productos (lista vacía)
-    @Query("SELECT * FROM ean_products ORDER BY descripcionProducto")
-    fun pagingSourceAll(): PagingSource<Int, EanProductEntity>
-
-    // Búsqueda con ranking en SQL (ver buildRankedSearch): un solo query con
-    // score CASE + AND de tokens y paginación real de Room. Room invalida el
-    // PagingSource al cambiar ean_products (observedEntities).
+    // Resultados con ranking, filtros y orden estable (ver buildRankedSearch).
+    // Room invalida el PagingSource al cambiar ean_products (observedEntities).
     @RawQuery(observedEntities = [EanProductEntity::class])
     fun rankedSearch(query: SupportSQLiteQuery): PagingSource<Int, EanProductEntity>
 
-    // Full-text FTS5 (tabla sidecar ean_product_fts). @RawQuery porque la tabla
-    // no es entidad Room; si no existe, lanza y el llamador usa solo LIKE.
+    // Catálogo sin texto de búsqueda, ordenado por marca/descripción (ver
+    // buildBrowseSearch).
     @RawQuery(observedEntities = [EanProductEntity::class])
-    suspend fun ftsSearch(query: SupportSQLiteQuery): List<EanProductEntity>
+    fun browseSearch(query: SupportSQLiteQuery): PagingSource<Int, EanProductEntity>
 
-    // Marcas y conteo para filtros (se usa en la UI para chips de marca)
-    @Query("""
-        SELECT marca, COUNT(*) as count FROM ean_products
-        WHERE eanPrincipal LIKE '%' || :token || '%'
-           OR codCencosud LIKE '%' || :token || '%'
-           OR codProveedor LIKE '%' || :token || '%'
-           OR codigoBarra LIKE '%' || :token || '%'
-           OR descripcion_norm LIKE '%' || :token || '%'
-           OR marca_norm LIKE '%' || :token || '%'
-           OR descripcion_norm_nospace LIKE '%' || :token || '%'
-           OR marca_norm_nospace LIKE '%' || :token || '%'
-        GROUP BY marca
-        ORDER BY count DESC
-    """)
-    fun getBrandCountsForToken(token: String): Flow<List<BrandCountResult>>
+    // Facetas de los chips (ver buildBrandFacets / buildCajaFacets).
+    @RawQuery(observedEntities = [EanProductEntity::class])
+    suspend fun brandFacets(query: SupportSQLiteQuery): List<BrandCountResult>
 
-    // Cajas distintas para filtros
-    @Query("""
-        SELECT DISTINCT conversion FROM ean_products
-        WHERE conversion IS NOT NULL AND conversion != ''
-           AND (eanPrincipal LIKE '%' || :token || '%'
-             OR codCencosud LIKE '%' || :token || '%'
-             OR codProveedor LIKE '%' || :token || '%'
-             OR codigoBarra LIKE '%' || :token || '%'
-             OR descripcion_norm LIKE '%' || :token || '%'
-             OR marca_norm LIKE '%' || :token || '%'
-             OR descripcion_norm_nospace LIKE '%' || :token || '%'
-             OR marca_norm_nospace LIKE '%' || :token || '%')
-        ORDER BY CAST(conversion AS INTEGER)
-    """)
-    fun getCajasForToken(token: String): Flow<List<String>>
+    @RawQuery(observedEntities = [EanProductEntity::class])
+    suspend fun cajaFacets(query: SupportSQLiteQuery): List<CajaCountResult>
 
-    // Para query vacía: todas las marcas y cajas
-    @Query("SELECT marca, COUNT(*) as count FROM ean_products GROUP BY marca ORDER BY count DESC")
-    fun getAllBrandCounts(): Flow<List<BrandCountResult>>
-
-    @Query("SELECT DISTINCT conversion FROM ean_products WHERE conversion IS NOT NULL AND conversion != '' ORDER BY CAST(conversion AS INTEGER)")
-    fun getAllCajas(): Flow<List<String>>
+    // Total exacto de resultados con los mismos filtros (ver buildCountSearch).
+    @RawQuery(observedEntities = [EanProductEntity::class])
+    suspend fun countForQuery(query: SupportSQLiteQuery): Int
 }
 
-// Resultado de conteo por marca para Room
+// Resultados de las facetas de filtro.
 data class BrandCountResult(
     val marca: String,
-    val count: Int
+    val count: Int,
+)
+
+data class CajaCountResult(
+    val conversion: String,
+    val count: Int,
 )

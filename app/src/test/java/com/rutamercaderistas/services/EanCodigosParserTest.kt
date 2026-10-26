@@ -2,8 +2,13 @@ package com.rutamercaderistas.services
 
 import android.content.Context
 import com.rutamercaderistas.data.local.EanProductDao
+import com.rutamercaderistas.data.local.EanProductEntity
 import io.mockk.coEvery
 import io.mockk.mockk
+import io.mockk.slot
+import org.apache.poi.xssf.usermodel.XSSFWorkbook
+import org.junit.Assert.assertEquals
+import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
@@ -21,7 +26,7 @@ class EanCodigosParserTest {
         coEvery { dao.insertAll(any()) } returns Unit
         val context = mockk<Context>(relaxed = true)
 
-        val parser = EanExcelParser(context, dao, mockk(relaxed = true))
+        val parser = EanExcelParser(context, dao)
         val path = "src/main/assets/ean_codigos.xlsx"
         val result = parser.loadFromFile(path)
 
@@ -44,6 +49,7 @@ class EanCodigosParserTest {
         assertTrue(brandFromFilename("ean_pet.xlsx") == "PET KITCHEN")
         assertTrue(brandFromFilename("ean_fermen.xlsx") == "FERMENTISTA")
         assertTrue(brandFromFilename("ean_pett.xlsx") == "PET KITCHEN")
+        assertTrue(brandFromFilename("ean_patpot.xlsx") == "PATPOT")
     }
 
     @Test
@@ -51,7 +57,7 @@ class EanCodigosParserTest {
         val dao = mockk<EanProductDao>(relaxed = true)
         coEvery { dao.clearAll() } returns Unit
         coEvery { dao.insertAll(any()) } returns Unit
-        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao, mockk(relaxed = true))
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
 
         val result = parser.loadFromFile("src/main/assets/ean_asmode.xlsx")
 
@@ -64,7 +70,7 @@ class EanCodigosParserTest {
         val dao = mockk<EanProductDao>(relaxed = true)
         coEvery { dao.clearAll() } returns Unit
         coEvery { dao.insertAll(any()) } returns Unit
-        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao, mockk(relaxed = true))
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
 
         val result = parser.loadFromFile("src/main/assets/ean_bwild.xlsx")
 
@@ -78,7 +84,7 @@ class EanCodigosParserTest {
         coEvery { dao.clearAll() } returns Unit
         val slot = io.mockk.slot<List<com.rutamercaderistas.data.local.EanProductEntity>>()
         coEvery { dao.insertAll(capture(slot)) } returns Unit
-        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao, mockk(relaxed = true))
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
 
         val result = parser.loadFromFile("src/main/assets/ean_bwild.xlsx")
 
@@ -97,7 +103,7 @@ class EanCodigosParserTest {
         coEvery { dao.clearAll() } returns Unit
         val slot = io.mockk.slot<List<com.rutamercaderistas.data.local.EanProductEntity>>()
         coEvery { dao.insertAll(capture(slot)) } returns Unit
-        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao, mockk(relaxed = true))
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
 
         val result = parser.loadFromFile(
             "src/main/assets/ean_ccc.xlsx",
@@ -120,7 +126,7 @@ class EanCodigosParserTest {
         coEvery { dao.clearAll() } returns Unit
         val slot = io.mockk.slot<List<com.rutamercaderistas.data.local.EanProductEntity>>()
         coEvery { dao.insertAll(capture(slot)) } returns Unit
-        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao, mockk(relaxed = true))
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
 
         val result = parser.loadFromFile(
             "src/main/assets/ean_cafellanquihue.xlsx",
@@ -146,7 +152,7 @@ class EanCodigosParserTest {
         coEvery { dao.clearAll() } returns Unit
         val slot = io.mockk.slot<List<com.rutamercaderistas.data.local.EanProductEntity>>()
         coEvery { dao.insertAll(capture(slot)) } returns Unit
-        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao, mockk(relaxed = true))
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
 
         val result = parser.loadFromFile(
             "src/main/assets/ean_keyfood.xlsx",
@@ -178,7 +184,7 @@ class EanCodigosParserTest {
         coEvery { dao.clearAll() } returns Unit
         val slot = io.mockk.slot<List<com.rutamercaderistas.data.local.EanProductEntity>>()
         coEvery { dao.insertAll(capture(slot)) } returns Unit
-        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao, mockk(relaxed = true))
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
 
         // El archivo no trae columna Marca: la marca viene del nombre del archivo.
         val result = parser.loadFromFile(
@@ -207,7 +213,7 @@ class EanCodigosParserTest {
         coEvery { dao.clearAll() } returns Unit
         val slot = io.mockk.slot<List<com.rutamercaderistas.data.local.EanProductEntity>>()
         coEvery { dao.insertAll(capture(slot)) } returns Unit
-        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao, mockk(relaxed = true))
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
 
         val result = parser.loadFromFile(
             "src/main/assets/ean_pet.xlsx",
@@ -236,7 +242,7 @@ class EanCodigosParserTest {
         coEvery { dao.clearAll() } returns Unit
         val slot = io.mockk.slot<List<com.rutamercaderistas.data.local.EanProductEntity>>()
         coEvery { dao.insertAll(capture(slot)) } returns Unit
-        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao, mockk(relaxed = true))
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
 
         val result = parser.loadFromFile(
             "src/main/assets/ean_fermen.xlsx",
@@ -264,7 +270,7 @@ class EanCodigosParserTest {
         coEvery { dao.clearAll() } returns Unit
         val slot = io.mockk.slot<List<com.rutamercaderistas.data.local.EanProductEntity>>()
         coEvery { dao.insertAll(capture(slot)) } returns Unit
-        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao, mockk(relaxed = true))
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
 
         // La columna Marca trae "INDOMITABLE" por error: el alias lo agrupa en PET KITCHEN.
         val result = parser.loadFromFile(
@@ -295,7 +301,7 @@ class EanCodigosParserTest {
         coEvery { dao.clearAll() } returns Unit
         val slot = io.mockk.slot<List<com.rutamercaderistas.data.local.EanProductEntity>>()
         coEvery { dao.insertAll(capture(slot)) } returns Unit
-        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao, mockk(relaxed = true))
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
 
         val result = parser.loadFromFile(
             "src/main/assets/ean_pett.xlsx",
@@ -324,7 +330,7 @@ class EanCodigosParserTest {
         coEvery { dao.clearAll() } returns Unit
         val slot = io.mockk.slot<List<com.rutamercaderistas.data.local.EanProductEntity>>()
         coEvery { dao.insertAll(capture(slot)) } returns Unit
-        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao, mockk(relaxed = true))
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
 
         val result = parser.loadFromFile(
             "src/main/assets/ean_producto_bwild_gel_pomelo.xlsx",
@@ -346,11 +352,68 @@ class EanCodigosParserTest {
     }
 
     @Test
+    fun `ean_patpot_xlsx_imports_product_with_upc_normalized`() = runTest {
+        val dao = mockk<EanProductDao>(relaxed = true)
+        coEvery { dao.clearAll() } returns Unit
+        val insertedSlot = slot<List<EanProductEntity>>()
+        coEvery { dao.insertAll(capture(insertedSlot)) } returns Unit
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
+
+        val result = parser.loadFromFile(
+            "src/main/assets/ean_patpot.xlsx",
+            brandFromFilename("ean_patpot.xlsx"),
+        )
+
+        assertTrue("parser should succeed: ${result.exceptionOrNull()}", result.isSuccess)
+        assertEquals(1, result.getOrNull())
+        val product = insertedSlot.captured.single()
+        assertEquals("PATPOT", product.marca)
+        // 12 dígitos (UPC-A) se normalizan a EAN-13 con cero inicial; la
+        // columna "Código de Barra (EAN)" se conserva tal cual en codigoBarra.
+        assertEquals("0799192728020", product.eanPrincipal)
+        assertEquals("799192728020", product.codigoBarra)
+        assertEquals("2097602", product.codCencosud)
+        assertEquals("PAPAS FRITAS MERKEN PATPOT 150GR", product.descripcionProducto)
+    }
+
+    @Test
+    fun `image barcode column does not override the real ean`() = runTest {
+        val dao = mockk<EanProductDao>(relaxed = true)
+        coEvery { dao.clearAll() } returns Unit
+        val insertedSlot = slot<List<EanProductEntity>>()
+        coEvery { dao.insertAll(capture(insertedSlot)) } returns Unit
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
+
+        val workbook = XSSFWorkbook()
+        val sheet = workbook.createSheet("Catálogo")
+        sheet.createRow(0).apply {
+            createCell(0).setCellValue("Nombre")
+            createCell(1).setCellValue("SKU")
+            createCell(2).setCellValue("Código de Barra (EAN)")
+            createCell(3).setCellValue("Código de Barras (imagen)")
+        }
+        sheet.createRow(1).apply {
+            createCell(0).setCellValue("PAPAS FRITAS MERKEN PATPOT 150GR")
+            createCell(1).setCellValue("2097602")
+            createCell(2).setCellValue("799192728020")
+            createCell(3).setBlank()
+        }
+        val bytes = ByteArrayOutputStream().also { workbook.write(it) }.toByteArray()
+        workbook.close()
+
+        val result = parser.parseAndSave(bytes.inputStream(), "PATPOT")
+
+        assertTrue("parser should succeed: ${result.exceptionOrNull()}", result.isSuccess)
+        val product = insertedSlot.captured.single()
+        assertEquals("0799192728020", product.eanPrincipal)
+        assertEquals("PAPAS FRITAS MERKEN PATPOT 150GR", product.descripcionProducto)
+    }
+
+    @Test
     fun `concurrent imports do not interleave`() = runTest {
         val parser = EanExcelParser(
             mockk<Context>(relaxed = true),
             mockk<EanProductDao>(relaxed = true),
-            mockk(relaxed = true),
         )
         val events = mutableListOf<String>()
         suspend fun guarded(name: String) = parser.withImportLock {
@@ -376,7 +439,7 @@ class EanCodigosParserTest {
         val dao = mockk<EanProductDao>(relaxed = true)
         coEvery { dao.clearAll() } returns Unit
         coEvery { dao.insertAll(any()) } returns Unit
-        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao, mockk(relaxed = true))
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
 
         val result = parser.loadFromFile("src/main/assets/ean_super.xlsx")
 

@@ -30,6 +30,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldValue
+import androidx.compose.material3.adaptive.navigationsuite.rememberNavigationSuiteScaffoldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -140,6 +142,7 @@ fun MainScreen(
     }
 
     val dest = backStackEntry?.destination
+    val isEanRoute = dest?.hasRoute<EanSearchRoute>() == true
     val currentKey = when {
         dest?.hasRoute<PromotionsRoute>() == true -> BottomBarKey.MARCAS
         dest?.hasRoute<AllLocalesRoute>() == true -> BottomBarKey.LOCALES
@@ -158,8 +161,20 @@ fun MainScreen(
         }
     }
 
+    // El catálogo EAN se abre como pantalla completa (tiene su propio título y
+    // botón volver): se oculta la barra inferior para darle todo el alto a la
+    // lista. snapTo evita que la barra se vea un frame antes de esconderse.
+    val navigationSuiteState = rememberNavigationSuiteScaffoldState()
+    LaunchedEffect(isEanRoute) {
+        navigationSuiteState.snapTo(
+            if (isEanRoute) NavigationSuiteScaffoldValue.Hidden
+            else NavigationSuiteScaffoldValue.Visible,
+        )
+    }
+
     Box(modifier = modifier.fillMaxSize()) {
         NavigationSuiteScaffold(
+            state = navigationSuiteState,
             navigationSuiteItems = {
                 item(
                     selected = currentKey == BottomBarKey.MAIN,

@@ -12,6 +12,8 @@ class RankedSearchQueryTest {
     fun `null on blank tokens`() {
         assertNull(buildRankedSearch("", emptyList()))
         assertNull(buildRankedSearch("   ", listOf("  ", "")))
+        // Con filtros pero sin texto el llamador usa buildBrowseSearch.
+        assertNull(buildRankedSearch("", emptyList(), brand = "KEYFOOD", caja = "12"))
     }
 
     @Test
@@ -63,9 +65,11 @@ class RankedSearchQueryTest {
     }
 
     @Test
-    fun `tiebreak marca then descripcion`() {
-        val q = checkNotNull(buildRankedSearch("x", listOf("x")))
-        assertTrue(q.sql.endsWith(") DESC, p.marca ASC, p.descripcionProducto ASC"))
+    fun `order is total so paging cannot repeat rows`() {
+        val ranked = checkNotNull(buildRankedSearch("x", listOf("x")))
+        // id como último desempate: LIMIT/OFFSET de Room necesita un orden total.
+        assertTrue(ranked.sql.endsWith(") DESC, p.marca ASC, p.descripcionProducto ASC, p.id ASC"))
+        assertTrue(buildBrowseSearch().sql.endsWith("p.descripcionProducto ASC, p.id ASC"))
     }
 
     @Test
@@ -79,6 +83,65 @@ class RankedSearchQueryTest {
         assertEquals("%bacio%", q.args[10])
         // WHERE del token 2 arranca en 14.
         assertEquals("%500%", q.args[14])
+    }
+
+    @Test
+    fun `brand and caja filters go into WHERE before the score`() {
+        val q = checkNotNull(
+            buildRankedSearch("bacio", listOf("bacio"), brand = "KEYFOOD", caja = "12"),
+        )
+        val where = q.sql.substringBefore(" ORDER BY ")
+        assertTrue(where.contains("p.marca = ?"))
+        assertTrue(where.contains("p.conversion = ?"))
+        // 14 args del token, marca en 14, caja en 15, brandHits en 16/17 y el
+        // score (q crudo) arranca en 18.
+        assertEquals("KEYFOOD", q.args[14])
+        assertEquals("12", q.args[15])
+        assertEquals("%bacio%", q.args[16])
+        assertEquals("bacio", q.args[18])
+    }
+
+    @Test
+    fun `browse search filters by brand caja and blank brand`() {
+        val all = buildBrowseSearch()
+        assertTrue(all.sql.contains("FROM ean_products p ORDER BY"))
+        assertTrue(all.args.isEmpty())
+
+        val filtered = buildBrowseSearch(brand = "", caja = "12")
+        assertTrue(filtered.sql.contains("p.marca = ?"))
+        assertTrue(filtered.sql.contains("p.conversion = ?"))
+        assertEquals(listOf<Any?>("", "12"), filtered.args)
+    }
+
+    @Test
+    fun `brand facets ignore the brand filter and honour caja`() {
+        val facets = buildBrandFacets(listOf("bacio"), caja = "12")
+        assertTrue(facets.sql.contains("COUNT(*) AS count"))
+        assertTrue(facets.sql.contains("GROUP BY p.marca"))
+        assertTrue(!facets.sql.contains("p.marca = ?"))
+        assertEquals(14 + 1, facets.args.size)
+        assertEquals("12", facets.args.last())
+    }
+
+    @Test
+    fun `caja facets ignore caja filter and skip empty conversions`() {
+        val facets = buildCajaFacets(listOf("bacio"), brand = "KEYFOOD")
+        assertTrue(facets.sql.contains("GROUP BY p.conversion"))
+        assertTrue(facets.sql.contains("p.conversion != ''"))
+        assertTrue(!facets.sql.contains("p.conversion = ?"))
+        assertEquals("KEYFOOD", facets.args.last())
+    }
+
+    @Test
+    fun `count uses the same filters`() {
+        val q = buildCountSearch(listOf("bacio"), brand = "KEYFOOD", caja = "12")
+        assertTrue(q.sql.startsWith("SELECT COUNT(*) AS total FROM ean_products p WHERE"))
+        assertEquals("KEYFOOD", q.args[q.args.size - 2])
+        assertEquals("12", q.args.last())
+
+        val catalog = buildCountSearch(emptyList())
+        assertEquals("SELECT COUNT(*) AS total FROM ean_products p", catalog.sql)
+        assertTrue(catalog.args.isEmpty())
     }
 
     private fun checkNotNull(q: RankedQuery?): RankedQuery {
