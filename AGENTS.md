@@ -1,6 +1,6 @@
 # Mercaderistas — Guía del repo
 
-App Android de rutas para mercaderistas: Kotlin, Compose, Hilt, Room y WorkManager. El código manda sobre `ARQUITECTURA.md`/`SPEC.md` si difieren.
+App Android de rutas para mercaderistas: Kotlin, Compose, Hilt, Room y WorkManager. El código manda sobre la documentación si difieren. Arquitectura vigente: `README.md` §3; el material anterior está en `docs/archive/`.
 
 ## Comandos
 
@@ -14,15 +14,15 @@ App Android de rutas para mercaderistas: Kotlin, Compose, Hilt, Room y WorkManag
 - Toolchain verificada: Gradle 9.6, AGP 9.4.0, Kotlin 2.4.20, Compose BOM 2026.09.00, Room 2.8.5, Paging 3.5.1, Hilt 2.60.1, KSP 2.3.9, Java 17.
 - Este entorno no tiene `rg`; usar `grep`/Glob para búsquedas.
 
-## Arquitectura
+## Arquitectura (solo invariantes)
 
-- Único módulo `:app`; la entrada es `MainActivity`, la aplicación Hilt es `MercaderistasApp`.
+Capas y flujo de datos: `README.md` §3. Acá solo lo que no se puede romper:
+
+- Único módulo `:app`; entrada `MainActivity`, aplicación Hilt `MercaderistasApp`.
 - Estado de pantalla: ViewModels + `StateFlow`; Compose recolecta con `collectAsStateWithLifecycle()`.
-- Datos persistentes: Room (`AppDatabase` v6); preferencias: DataStore (`PreferencesRepository`).
-- `AppDatabase` NO tiene `fallbackToDestructiveMigration`: toda entidad o cambio de esquema exige `Migration` explícita (ver `MIGRATION_4_5` como plantilla de rebuild con copia de datos).
-- Sincronización en segundo plano: WorkManager + `SyncWorker`/`PromotionRefreshWorker`.
-- La navegación principal usa `NavigationSuiteScaffold` (`AppBottomBar` es legacy, solo se reutiliza `BottomBarKey`); `AppWindowWidth` centraliza Compact `<600dp`, Medium `<840dp` y Expanded.
-- La barra inferior se oculta en la ruta EAN (`EanSearchRoute`) con `NavigationSuiteScaffoldState.snapTo(Hidden)` y reaparece al salir; el catálogo ocupa así todo el alto. No condicionar el `NavHost` a la visibilidad de la barra (se perdería el estado de navegación).
+- `AppDatabase` NO tiene `fallbackToDestructiveMigration`: todo cambio de esquema exige `Migration` explícita (plantilla: `MIGRATION_4_5`).
+- Navegación con `NavigationSuiteScaffold` (`AppBottomBar` es legacy, solo se reutiliza `BottomBarKey`); `AppWindowWidth` centraliza Compact `<600dp`, Medium `<840dp` y Expanded.
+- La barra inferior se oculta en la ruta EAN (`snapTo(Hidden)`) y reaparece al salir. No condicionar el `NavHost` a la visibilidad de la barra (se perdería el estado de navegación).
 
 ## Tests
 
@@ -52,6 +52,7 @@ App Android de rutas para mercaderistas: Kotlin, Compose, Hilt, Room y WorkManag
 - Deduplicación: clave EAN, fallback SKU Cencosud; conserva la fila más completa y fusiona campos no vacíos. No perder ceros iniciales de códigos.
 - Búsqueda: LIKE sobre las columnas normalizadas + ranking por tiers en SQL; no hay FTS5 (el sidecar `ean_product_fts` y su rebuild se eliminaron porque el catálogo ronda los 800 productos y el índice solo encarecía cada importación). No reintroducir FTS sin medir tamaño del catálogo y tiempo de importación.
 - Filtros de marca/caja: los chips salen de facetas SQL (marca se cuenta sin su propio filtro, caja sin el suyo) y al tocarlos se re-consulta el Pager con el filtro en el WHERE; el "%d resultados" usa `buildCountSearch` (total real), no los ítems ya paginados.
+- Sub-marcas de un proveedor: `BRAND_ALIASES` agrupa las submarcas bajo la marca del proveedor (JUMEX y SUPERZINGS → CASO Y CIA). Así el chip de marca, la búsqueda y el conteo las incluyen; la submarca sigue en la descripción, por eso "jumex"/"superzings" se siguen encontrando. Requiere subir `EAN_DATA_VERSION` para que instalados reimporten.
 - Marcas cubiertas: ver `EAN_FILE_BRANDS` + assets `ean*.xlsx` (fuente de verdad, no esta lista). Los Excel/CSV/PDF originales viven en `fuentes-locales/` (gitignored, con CI que lo verifica) y no se commitean salvo petición explícita.
 
 ## PDF de marcas
