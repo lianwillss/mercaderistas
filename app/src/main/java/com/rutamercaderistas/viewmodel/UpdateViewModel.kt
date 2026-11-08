@@ -1,6 +1,7 @@
 package com.rutamercaderistas.viewmodel
 
 import android.app.Application
+import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.rutamercaderistas.Constants
@@ -11,6 +12,7 @@ import com.rutamercaderistas.services.ApkDownloader
 import com.rutamercaderistas.services.ApkValidation
 import com.rutamercaderistas.services.DownloadProgress
 import com.rutamercaderistas.services.DownloadResult
+import com.rutamercaderistas.services.DownloadSpeedMeter
 import com.rutamercaderistas.services.InstallOutcome
 import com.rutamercaderistas.services.InstallStart
 import com.rutamercaderistas.services.InstalledVersion
@@ -45,6 +47,10 @@ sealed interface UpdateCardUiState {
     data class Available(
         override val versionName: String,
         override val versionCode: Int,
+        /** Versión que está instalada ahora: la tarjeta muestra "12.52 → 12.53". */
+        val installedVersionName: String = "",
+        /** Tamaño publicado del APK; 0 si el release no lo informa. */
+        val apkSize: Long = 0L,
     ) : UpdateCardUiState
 
     data class Downloading(
@@ -52,6 +58,12 @@ sealed interface UpdateCardUiState {
         override val versionCode: Int,
         val downloadedBytes: Long,
         val totalBytes: Long,
+        /** Velocidad suavizada en bytes/s; 0 mientras se calcula. */
+        val bytesPerSecond: Long = 0L,
+        /** Segundos restantes estimados; null si aún no se puede calcular. */
+        val etaSeconds: Long? = null,
+        val installedVersionName: String = "",
+        val apkSize: Long = 0L,
     ) : UpdateCardUiState {
         val percent: Int
             get() = if (totalBytes <= 0L) 0
@@ -86,6 +98,8 @@ class UpdateViewModel @Inject constructor(
         val phase: UpdatePhase,
         val downloadedBytes: Long = 0L,
         val totalBytes: Long = 0L,
+        val bytesPerSecond: Long = 0L,
+        val etaSeconds: Long? = null,
         val message: String = "",
         val retryable: Boolean = true,
     )
@@ -95,6 +109,9 @@ class UpdateViewModel @Inject constructor(
 
     private val _suppressed = MutableStateFlow(false)
     private val _download = MutableStateFlow<DownloadSnapshot?>(null)
+    private val _installedVersionName = MutableStateFlow(
+        InstalledVersion.buildConfig().versionName,
+    )
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
@@ -110,7 +127,7 @@ class UpdateViewModel @Inject constructor(
 
     /** Estado que pinta la tarjeta: Disponible, Descargando(%), Lista, Error. */
     val card: StateFlow<UpdateCardUiState?> =
-        combine(_pendingUpdate, _download) { pending, snapshot ->
+        combine(_pendingUpdate, _download, _installedVersionName) { pending, snapshot, installedName ->
             if (pending == null) return@combine null
             when (snapshot?.phase) {
                 UpdatePhase.DOWNLOADING -> UpdateCardUiState.Downloading(
@@ -118,6 +135,10 @@ class UpdateViewModel @Inject constructor(
                     versionCode = pending.versionCode,
                     downloadedBytes = snapshot.downloadedBytes,
                     totalBytes = snapshot.totalBytes,
+                    bytesPerSecond = snapshot.bytesPerSecond,
+                    etaSeconds = snapshot.etaSeconds,
+                    installedVersionName = installedName,
+                    apkSize = pending.apkSize,
                 )
                 UpdatePhase.READY -> UpdateCardUiState.Ready(
                     versionName = pending.versionName,
@@ -132,6 +153,8 @@ class UpdateViewModel @Inject constructor(
                 UpdatePhase.AVAILABLE, null -> UpdateCardUiState.Available(
                     versionName = pending.versionName,
                     versionCode = pending.versionCode,
+                    installedVersionName = installedName,
+                    apkSize = pending.apkSize,
                 )
             }
         }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
@@ -173,6 +196,7 @@ class UpdateViewModel @Inject constructor(
         val installed = withContext(Dispatchers.IO) {
             InstalledVersion.read(getApplication())
         }
+        _installedVersionName.value = installed.versionName
         if (!UpdateChecker.isPendingNewer(stored.versionTag, stored.versionCode, installed)) {
             cleanupResolved(showMessage = false)
             return
@@ -210,6 +234,7 @@ class UpdateViewModel @Inject constructor(
             _checking.value = true
             val context = getApplication<Application>()
             val installed = withContext(Dispatchers.IO) { InstalledVersion.read(context) }
+            _installedVersionName.value = installed.versionName
             val rejected = withContext(Dispatchers.IO) {
                 preferencesRepository.getRejectedUpdateTag()
             }
@@ -351,6 +376,7 @@ class UpdateViewModel @Inject constructor(
         downloadJob?.cancel()
         downloadJob = viewModelScope.launch {
             _download.value = DownloadSnapshot(UpdatePhase.DOWNLOADING)
+            val speedMeter = DownloadSpeedMeter()
             try {
                 val result = ApkDownloader.download(
                     context = context,
@@ -360,10 +386,22 @@ class UpdateViewModel @Inject constructor(
                     expectedVersionName = pending.versionName,
                     expectedVersionCode = pending.versionCode,
                 ) { progress: DownloadProgress ->
+                    val bytesPerSecond = speedMeter.update(
+                        bytes = progress.bytes,
+                        nowMillis = SystemClock.elapsedRealtime(),
+                    )
+                    val remainingBytes = progress.totalBytes - progress.bytes
+                    val etaSeconds = if (bytesPerSecond > 0L && remainingBytes > 0L) {
+                        remainingBytes / bytesPerSecond
+                    } else {
+                        null
+                    }
                     _download.value = DownloadSnapshot(
                         phase = UpdatePhase.DOWNLOADING,
                         downloadedBytes = progress.bytes,
                         totalBytes = progress.totalBytes,
+                        bytesPerSecond = bytesPerSecond,
+                        etaSeconds = etaSeconds,
                     )
                 }
 

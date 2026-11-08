@@ -50,6 +50,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -223,16 +225,29 @@ private fun AvailableContent(
     onClose: (() -> Unit)?,
 ) {
     val dimens = LocalAppDimens.current
+    val available = state as? UpdateCardUiState.Available
+    val installedName = available?.installedVersionName.orEmpty()
+    val targetName = available?.versionName ?: state.versionName
+    val apkSize = available?.apkSize ?: 0L
+    val transition = versionTransition(installedName, targetName)
+    val size = if (apkSize > 0L) formatMb(apkSize) else null
+    val subtitle = when {
+        transition != null && size != null -> stringResource(
+            R.string.update_version_transition_size,
+            installedName,
+            targetName,
+            size,
+        )
+        transition != null -> transition
+        expanded -> stringResource(R.string.update_card_subtitle_expanded, targetName)
+        else -> stringResource(R.string.update_card_subtitle, targetName)
+    }
     UpdateHeader(
         icon = Icons.Rounded.SystemUpdate,
         tint = MaterialTheme.colorScheme.primary,
         title = stringResource(R.string.update_card_title),
-        subtitle = if (expanded) {
-            stringResource(R.string.update_card_subtitle_expanded, state.versionName)
-        } else {
-            stringResource(R.string.update_card_subtitle, state.versionName)
-        },
-        version = state.versionName,
+        subtitle = subtitle,
+        version = targetName,
         expanded = expanded,
         onClose = onClose,
     )
@@ -279,6 +294,11 @@ private fun DownloadingContent(
         label = "updateProgress",
     )
     val percentText = stringResource(R.string.update_download_percent, animatedPercent)
+    // TalkBack no debe recibir un anuncio por cada 1 %: la región viva solo
+    // cambia al cruzar cada decena. La barra conserva progressBarRangeInfo
+    // para consultar el progreso exacto con el foco manual.
+    val announcedPercent = (animatedPercent / 10) * 10
+    val announcedLabel = stringResource(R.string.update_download_percent, announcedPercent)
 
     DownloadHeader(
         versionName = downloading.versionName,
@@ -286,16 +306,22 @@ private fun DownloadingContent(
         onClose = onClose,
     )
 
+    // Contexto del salto de versión (12.52 → 12.53), antes de la barra.
+    val transition = versionTransition(downloading.installedVersionName, downloading.versionName)
+    if (transition != null) {
+        Spacer(Modifier.height(if (expanded) dimens.spacingSm else 2.dp))
+        Text(
+            text = transition,
+            style = MaterialTheme.typography.labelSmall,
+            color = colors.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+
     // 1. Estados y porcentaje: el dato grande y el tamaño comparten línea
     //    base, así el ojo no salta entre tamaños de tipografía.
     Spacer(Modifier.height(if (expanded) dimens.spacingLg else dimens.spacingMd))
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .semantics(mergeDescendants = true) {
-                liveRegion = LiveRegionMode.Polite
-            },
-    ) {
+    Row(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = percentText,
             style = if (expanded) {
@@ -304,7 +330,12 @@ private fun DownloadingContent(
                 MaterialTheme.typography.titleSmall.copy(fontFeatureSettings = "tnum")
             },
             color = BrandIndigoText,
-            modifier = Modifier.alignByBaseline(),
+            modifier = Modifier
+                .alignByBaseline()
+                .clearAndSetSemantics {
+                    liveRegion = LiveRegionMode.Polite
+                    contentDescription = announcedLabel
+                },
         )
         Spacer(Modifier.weight(1f))
         Text(
@@ -325,10 +356,10 @@ private fun DownloadingContent(
         barHeight = if (expanded) 14.dp else 10.dp,
     )
 
-    // 3. Mensaje informativo: ancho completo y sin límite de líneas.
+    // 3. Velocidad y tiempo restante (o "Calculando…" al arrancar).
     Spacer(Modifier.height(4.dp))
     Text(
-        text = stringResource(R.string.update_downloading_subtitle),
+        text = downloadStatsText(downloading),
         style = if (expanded) {
             MaterialTheme.typography.bodyMedium
         } else {
@@ -624,6 +655,47 @@ private fun PrimaryAction(text: String, onClick: () -> Unit) {
             style = MaterialTheme.typography.labelLarge,
         )
     }
+}
+
+/** "12.52 → 12.53"; null si no hay salto que contar. */
+@Composable
+private fun versionTransition(installedVersionName: String, versionName: String): String? {
+    if (installedVersionName.isBlank() || installedVersionName == versionName) return null
+    return stringResource(
+        R.string.update_version_transition,
+        installedVersionName,
+        versionName,
+    )
+}
+
+/** "1,3 MB/s · quedan 24 s" o el estado de cálculo inicial. */
+@Composable
+private fun downloadStatsText(downloading: UpdateCardUiState.Downloading): String {
+    if (downloading.bytesPerSecond <= 0L) {
+        return stringResource(R.string.update_eta_calculating)
+    }
+    val speed = stringResource(R.string.update_speed_mb_s, formatMb(downloading.bytesPerSecond))
+    val eta = downloading.etaSeconds
+    return if (eta != null && eta >= 0L) {
+        stringResource(R.string.update_download_stats, speed, etaText(eta))
+    } else {
+        stringResource(R.string.update_download_speed_only, speed)
+    }
+}
+
+@Composable
+private fun etaText(seconds: Long): String = when {
+    seconds < 60L -> stringResource(R.string.update_eta_seconds, seconds)
+    seconds < 3600L -> stringResource(
+        R.string.update_eta_minutes,
+        seconds / 60L,
+        seconds % 60L,
+    )
+    else -> stringResource(
+        R.string.update_eta_hours,
+        seconds / 3600L,
+        (seconds % 3600L) / 60L,
+    )
 }
 
 @Composable
