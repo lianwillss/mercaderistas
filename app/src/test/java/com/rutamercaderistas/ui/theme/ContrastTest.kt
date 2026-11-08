@@ -250,6 +250,23 @@ class ContrastTest {
      * El placeholder de "Buscar ruta" usaba onSurfaceVariant al 60 %: sobre el
      * contenedor del campo caía a 2,1–2,6:1. Va a opacidad plena (6,1:1).
      */
+    /**
+     * La tarjeta/modal de actualización usa estos pares. Si alguien cambia el
+     * texto a un gris claro o el chip a índigo translúcido, el test lo delata.
+     */
+    @Test
+    fun `la tarjeta de actualizacion cumple AA`() {
+        val tarjeta = Color(0xFFF4F6FA) // surfaceContainerLow
+        assertTrue("titulo: ${ratio(TextPrimary, tarjeta)}", ratio(TextPrimary, tarjeta) >= 4.5)
+        assertTrue("subtitulo: ${ratio(TextSecondary, tarjeta)}", ratio(TextSecondary, tarjeta) >= 4.5)
+        assertTrue("progreso: ${ratio(BrandIndigo, tarjeta)}", ratio(BrandIndigo, tarjeta) >= 4.5)
+        assertTrue(
+            "chip de version: ${ratio(BrandIndigoText, BrandIndigoSoft)}",
+            ratio(BrandIndigoText, BrandIndigoSoft) >= 4.5,
+        )
+        assertTrue("boton: ${ratio(Color.White, BrandIndigo)}", ratio(Color.White, BrandIndigo) >= 4.5)
+    }
+
     @Test
     fun `el placeholder del buscador de ruta cumple AA sobre el contenedor`() {
         // unfocusedContainerColor = surfaceVariant.copy(alpha = 0.4f) sobre Surface

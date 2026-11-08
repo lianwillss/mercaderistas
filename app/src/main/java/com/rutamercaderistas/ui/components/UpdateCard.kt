@@ -11,7 +11,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +32,7 @@ import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -48,9 +48,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rutamercaderistas.R
 import com.rutamercaderistas.ui.theme.ComponentShapes
@@ -69,6 +69,10 @@ private val UpdateCardShape = RoundedCornerShape(999.dp)
  * Tarjeta única de actualización. La misma superficie sirve de banner
  * compacto y de contenido del modal, así el progreso no cambia de lenguaje
  * visual al abrirse.
+ *
+ * Accesibilidad: el bloque de título/subtítulo se anuncia como un solo
+ * encabezado, el texto puede crecer sin truncarse y el botón de cerrar vive
+ * en el flujo del encabezado (target 48 dp), no encima del texto.
  */
 @Composable
 fun UpdateCard(
@@ -112,8 +116,7 @@ fun UpdateCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(if (expanded) dimens.spacingXl else dimens.spacingMd)
-                    .padding(end = if (onClose != null) 56.dp else 0.dp),
+                    .padding(if (expanded) dimens.spacingXl else dimens.spacingMd),
             ) {
                 AnimatedContent(
                     targetState = state.phase,
@@ -132,40 +135,28 @@ fun UpdateCard(
                             onUpdate = onUpdate,
                             onLater = onLater,
                             expanded = expanded,
+                            onClose = onClose,
                         )
                         UpdatePhase.DOWNLOADING -> DownloadingContent(
                             state = state,
                             onCancel = onCancel,
+                            expanded = expanded,
+                            onClose = onClose,
                         )
                         UpdatePhase.READY -> ReadyContent(
                             state = state,
                             onInstall = onInstall,
+                            expanded = expanded,
+                            onClose = onClose,
                         )
                         UpdatePhase.FAILED -> FailedContent(
                             state = state,
                             onRetry = onRetry,
                             onLater = onLater,
+                            expanded = expanded,
+                            onClose = onClose,
                         )
                     }
-                }
-            }
-            if (onClose != null) {
-                val closeCd = stringResource(R.string.cerrar_cd)
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(dimens.spacingSm)
-                        .size(dimens.touchMin)
-                        .clip(CircleShape)
-                        .clickable(onClick = onClose),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Close,
-                        contentDescription = closeCd,
-                        tint = colors.onSurfaceVariant,
-                        modifier = Modifier.size(dimens.iconSm),
-                    )
                 }
             }
         }
@@ -178,6 +169,7 @@ private fun AvailableContent(
     onUpdate: () -> Unit,
     onLater: () -> Unit,
     expanded: Boolean,
+    onClose: (() -> Unit)?,
 ) {
     UpdateHeader(
         icon = Icons.Rounded.SystemUpdate,
@@ -189,6 +181,8 @@ private fun AvailableContent(
             stringResource(R.string.update_card_subtitle, state.versionName)
         },
         version = state.versionName,
+        expanded = expanded,
+        onClose = onClose,
     )
     Spacer(Modifier.height(if (expanded) 18.dp else 10.dp))
     Row(
@@ -215,6 +209,8 @@ private fun AvailableContent(
 private fun DownloadingContent(
     state: UpdateCardUiState,
     onCancel: () -> Unit,
+    expanded: Boolean,
+    onClose: (() -> Unit)?,
 ) {
     val colors = MaterialTheme.colorScheme
     val reducedMotion = LocalReducedMotionEnabled.current
@@ -229,6 +225,7 @@ private fun DownloadingContent(
         animationSpec = if (reducedMotion) snap() else tween(260),
         label = "updateProgress",
     )
+    val percentText = stringResource(R.string.update_download_percent, animatedPercent)
 
     UpdateHeader(
         icon = Icons.Rounded.SystemUpdate,
@@ -236,33 +233,45 @@ private fun DownloadingContent(
         title = stringResource(R.string.update_downloading_title, downloading.versionName),
         subtitle = stringResource(R.string.update_downloading_subtitle),
         version = null,
+        expanded = expanded,
+        onClose = onClose,
     )
     Spacer(Modifier.height(14.dp))
     LinearProgressIndicator(
         progress = { animatedProgress },
         modifier = Modifier
             .fillMaxWidth()
-            .height(8.dp)
+            .height(if (expanded) 10.dp else 8.dp)
             .clip(UpdateCardShape),
         color = colors.primary,
         trackColor = colors.surfaceContainerHighest,
     )
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.height(10.dp))
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .semantics { liveRegion = LiveRegionMode.Polite },
+            .semantics(mergeDescendants = true) {
+                liveRegion = LiveRegionMode.Polite
+            },
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = stringResource(R.string.update_download_percent, animatedPercent),
-            style = MaterialTheme.typography.labelLarge,
+            text = percentText,
+            style = if (expanded) {
+                MaterialTheme.typography.titleSmall
+            } else {
+                MaterialTheme.typography.labelLarge
+            },
             color = colors.primary,
         )
         Text(
             text = downloadSizeText(downloading.downloadedBytes, downloading.totalBytes),
-            style = MaterialTheme.typography.labelMedium,
+            style = if (expanded) {
+                MaterialTheme.typography.bodySmall
+            } else {
+                MaterialTheme.typography.labelMedium
+            },
             color = colors.onSurfaceVariant,
         )
     }
@@ -285,6 +294,8 @@ private fun DownloadingContent(
 private fun ReadyContent(
     state: UpdateCardUiState,
     onInstall: () -> Unit,
+    expanded: Boolean,
+    onClose: (() -> Unit)?,
 ) {
     val colors = MaterialTheme.colorScheme
     UpdateHeader(
@@ -293,6 +304,8 @@ private fun ReadyContent(
         title = stringResource(R.string.update_ready_title),
         subtitle = stringResource(R.string.update_ready_subtitle, state.versionName),
         version = null,
+        expanded = expanded,
+        onClose = onClose,
     )
     Spacer(Modifier.height(12.dp))
     Row(
@@ -311,6 +324,8 @@ private fun FailedContent(
     state: UpdateCardUiState,
     onRetry: () -> Unit,
     onLater: () -> Unit,
+    expanded: Boolean,
+    onClose: (() -> Unit)?,
 ) {
     val colors = MaterialTheme.colorScheme
     val failed = state as UpdateCardUiState.Failed
@@ -322,6 +337,8 @@ private fun FailedContent(
             stringResource(R.string.update_descarga_error)
         },
         version = null,
+        expanded = expanded,
+        onClose = onClose,
     )
     Spacer(Modifier.height(10.dp))
     Row(
@@ -351,12 +368,25 @@ private fun UpdateHeader(
     title: String,
     subtitle: String,
     version: String?,
+    expanded: Boolean,
+    onClose: (() -> Unit)?,
 ) {
     val colors = MaterialTheme.colorScheme
     val dimens = LocalAppDimens.current
+    val titleStyle = if (expanded) {
+        MaterialTheme.typography.titleMedium
+    } else {
+        MaterialTheme.typography.titleSmall
+    }
+    val subtitleStyle = if (expanded) {
+        MaterialTheme.typography.bodyMedium
+    } else {
+        MaterialTheme.typography.bodySmall
+    }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Top,
     ) {
         Box(
             modifier = Modifier
@@ -373,32 +403,40 @@ private fun UpdateHeader(
             )
         }
         Spacer(Modifier.width(dimens.spacingMd))
-        Column(modifier = Modifier.weight(1f)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = colors.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                if (version != null) {
-                    Spacer(Modifier.width(dimens.spacingSm))
-                    VersionPill(version)
-                }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .semantics(mergeDescendants = true) { heading() },
+        ) {
+            Text(
+                text = title,
+                style = titleStyle,
+                color = colors.onSurface,
+            )
+            if (version != null) {
+                Spacer(Modifier.height(4.dp))
+                VersionPill(version)
             }
-            Spacer(Modifier.height(2.dp))
+            Spacer(Modifier.height(if (version != null) 6.dp else 2.dp))
             Text(
                 text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
+                style = subtitleStyle,
                 color = colors.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
             )
+        }
+        if (onClose != null) {
+            Spacer(Modifier.width(4.dp))
+            IconButton(
+                onClick = onClose,
+                modifier = Modifier.size(dimens.touchMin),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = stringResource(R.string.cerrar_cd),
+                    tint = colors.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
     }
 }
@@ -409,14 +447,13 @@ private fun VersionPill(version: String) {
     Box(
         modifier = Modifier
             .clip(UpdateCardShape)
-            .background(colors.primary.copy(alpha = 0.12f))
-            .padding(horizontal = 8.dp, vertical = 2.dp),
+            .background(colors.primaryContainer)
+            .padding(horizontal = 10.dp, vertical = 3.dp),
     ) {
         Text(
             text = stringResource(R.string.update_version_chip, version),
-            style = MaterialTheme.typography.labelSmall,
-            color = colors.primary,
-            maxLines = 1,
+            style = MaterialTheme.typography.labelMedium,
+            color = colors.onPrimaryContainer,
         )
     }
 }
