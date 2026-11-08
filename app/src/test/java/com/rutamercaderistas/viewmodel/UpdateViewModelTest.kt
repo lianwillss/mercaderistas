@@ -376,7 +376,8 @@ class UpdateViewModelTest {
                 autoStartDownload = true,
             )
             awaitOnMain { viewModel.card.value is UpdateCardUiState.Downloading }
-            assertTrue(viewModel.showUpdateSheet.value)
+            // En arranque automático no se abre el modal: descarga en silencio.
+            assertFalse(viewModel.showUpdateSheet.value)
             awaitVerify {
                 verify(exactly = 1) {
                     downloadManager.enqueue(

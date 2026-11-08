@@ -461,10 +461,16 @@ class UpdateViewModel @Inject constructor(
         }
     }
 
-    /** Abre el modal y dispara (o reanuda) la descarga del pendiente. */
+    /** Abre el modal y dispara (o reanuda) la descarga del pendiente. Cuando
+     *  `auto` es true (arranque, chequeo diferido, worker) no se abre el modal:
+     *  la descarga corre en silencio y, al terminar, se instala sola si la app
+     *  está en primer plano. Solo se muestra el aviso persistente de notificación.
+     */
     fun startUpdate(auto: Boolean = false) {
         val pending = _pendingUpdate.value
-        _showSheet.value = true
+        if (!auto) {
+            _showSheet.value = true
+        }
         if (pending == null) return
 
         val phase = _download.value?.phase
