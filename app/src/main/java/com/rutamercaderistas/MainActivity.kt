@@ -224,6 +224,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onPause() {
+        updateViewModel.onActivityPaused()
+        super.onPause()
+    }
+
     private fun scheduleDailyPromotionNotification() {
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.NOT_REQUIRED)

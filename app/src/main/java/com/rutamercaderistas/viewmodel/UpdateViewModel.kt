@@ -34,11 +34,13 @@ import timber.log.Timber
 import javax.inject.Inject
 
 /** Fase visible del aviso de actualización. */
-enum class UpdatePhase { AVAILABLE, DOWNLOADING, READY, FAILED }
+enum class UpdatePhase { AVAILABLE, DOWNLOADING, READY, INSTALLING, FAILED }
 
 /**
  * Único estado de actualización que consume la UI. No hay notificación ni
  * diálogo en paralelo: la tarjeta del banner es la única superficie.
+ * Al quedar Ready, el ViewModel abre solo la instalación; Installing cubre
+ * la validación y la confirmación de Android.
  */
 sealed interface UpdateCardUiState {
     val versionName: String
@@ -73,6 +75,12 @@ sealed interface UpdateCardUiState {
     data class Ready(
         override val versionName: String,
         override val versionCode: Int,
+    ) : UpdateCardUiState
+
+    data class Installing(
+        override val versionName: String,
+        override val versionCode: Int,
+        val installedVersionName: String = "",
     ) : UpdateCardUiState
 
     data class Failed(
@@ -125,7 +133,7 @@ class UpdateViewModel @Inject constructor(
             pending != null && !suppressed
         }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    /** Estado que pinta la tarjeta: Disponible, Descargando(%), Lista, Error. */
+    /** Estado que pinta la tarjeta: Disponible, Descargando(%), Lista, Instalando, Error. */
     val card: StateFlow<UpdateCardUiState?> =
         combine(_pendingUpdate, _download, _installedVersionName) { pending, snapshot, installedName ->
             if (pending == null) return@combine null
@@ -143,6 +151,11 @@ class UpdateViewModel @Inject constructor(
                 UpdatePhase.READY -> UpdateCardUiState.Ready(
                     versionName = pending.versionName,
                     versionCode = pending.versionCode,
+                )
+                UpdatePhase.INSTALLING -> UpdateCardUiState.Installing(
+                    versionName = pending.versionName,
+                    versionCode = pending.versionCode,
+                    installedVersionName = installedName,
                 )
                 UpdatePhase.FAILED -> UpdateCardUiState.Failed(
                     versionName = pending.versionName,
@@ -163,6 +176,11 @@ class UpdateViewModel @Inject constructor(
 
     /** Evita abrir dos sesiones de PackageInstaller si se toca dos veces. */
     private var installSessionActive = false
+
+    /** La app está visible: es el único momento en que puede abrir el instalador. */
+    private var isForeground = false
+    /** El APK ya disparó una instalación automática para este pendiente. */
+    private var autoInstallStarted = false
 
     private var restoreJob: Job? = null
     private var downloadJob: Job? = null
@@ -207,6 +225,7 @@ class UpdateViewModel @Inject constructor(
         // No pisa un progreso que ya esté en curso.
         if (ready != null && downloadJob?.isActive != true) {
             _download.value = ready
+            maybeAutoInstall()
         }
     }
 
@@ -323,10 +342,13 @@ class UpdateViewModel @Inject constructor(
                 _pendingUpdate.value = pending
 
                 if (sameRelease && _download.value == null) {
-                    // Mismo release: si ya hay un APK verificado, se muestra
-                    // "Listo para instalar" sin volver a descargar.
+                    // Mismo release: si ya hay un APK verificado, se instala
+                    // sin volver a descargar.
                     val evaluated = evaluateDownloadedApk(pending)
-                    if (evaluated != null) _download.value = evaluated
+                    if (evaluated != null) {
+                        _download.value = evaluated
+                        if (evaluated.phase == UpdatePhase.READY) maybeAutoInstall()
+                    }
                 }
 
                 if (autoStartDownload) {
@@ -368,11 +390,17 @@ class UpdateViewModel @Inject constructor(
     fun startUpdate() {
         val pending = _pendingUpdate.value ?: return
         val phase = _download.value?.phase
-        if (phase == UpdatePhase.DOWNLOADING || phase == UpdatePhase.READY) return
+        if (phase == UpdatePhase.DOWNLOADING ||
+            phase == UpdatePhase.READY ||
+            phase == UpdatePhase.INSTALLING
+        ) {
+            return
+        }
         if (downloadJob?.isActive == true) return
 
         val context = getApplication<Application>()
         installSessionActive = false
+        autoInstallStarted = false
         downloadJob?.cancel()
         downloadJob = viewModelScope.launch {
             _download.value = DownloadSnapshot(UpdatePhase.DOWNLOADING)
@@ -413,6 +441,7 @@ class UpdateViewModel @Inject constructor(
                             message = context.getString(R.string.update_archivo_faltante),
                             retryable = true,
                         )
+                        if (evaluated?.phase == UpdatePhase.READY) maybeAutoInstall()
                     }
                     is DownloadResult.Error -> {
                         if (result.releaseRejected) {
@@ -450,11 +479,20 @@ class UpdateViewModel @Inject constructor(
             }
             return
         }
+        // Si el APK ya está descargado, reintentar significa reinstalar;
+        // no volver a bajar 52 MB por una confirmación cancelada.
+        val context = getApplication<Application>()
+        if (ApkDownloader.apkFile(context).exists()) {
+            installApk()
+            return
+        }
         startUpdate()
     }
 
     /** Cancela y borra el .part: la tarjeta vuelve a "Disponible". */
     fun cancelDownload() {
+        if (_download.value?.phase == UpdatePhase.INSTALLING) return
+        autoInstallStarted = false
         downloadJob?.cancel()
         downloadJob = null
         _download.value = null
@@ -465,12 +503,13 @@ class UpdateViewModel @Inject constructor(
     }
 
     /**
-     * Verifica el APK descargado y recién entonces abre la sesión de
-     * PackageInstaller. La confirmación del sistema queda fuera de la app,
-     * pero el flujo (progreso, error, reintento) vive en la tarjeta.
+     * Verifica el APK descargado y abre la sesión de PackageInstaller sin
+     * pedir un toque extra. Si el sistema exige confirmación, el receiver la
+     * abre sola; el flujo (progreso, error, reintento) vive en la tarjeta.
      */
     fun installApk() {
         if (installSessionActive) return
+        autoInstallStarted = true
         val context = getApplication<Application>()
         val apk = ApkDownloader.apkFile(context)
         if (!apk.exists()) {
@@ -496,6 +535,7 @@ class UpdateViewModel @Inject constructor(
 
         awaitingInstallPermission = false
         installJob?.cancel()
+        _download.value = DownloadSnapshot(UpdatePhase.INSTALLING)
         installJob = viewModelScope.launch {
             restoreJob?.join()
             val pending = _pendingUpdate.value
@@ -569,6 +609,7 @@ class UpdateViewModel @Inject constructor(
     private suspend fun onInstalled() {
         val context = getApplication<Application>()
         installSessionActive = false
+        autoInstallStarted = false
         downloadJob?.cancel()
         downloadJob = null
         withContext(Dispatchers.IO) {
@@ -581,15 +622,36 @@ class UpdateViewModel @Inject constructor(
     }
 
     fun onActivityResumed() {
+        isForeground = true
         // Solo se retoma el permiso al volver de Ajustes.
-        if (!awaitingInstallPermission) return
-        awaitingInstallPermission = false
-        val context = getApplication<Application>()
-        if (ApkDownloader.canInstallPackages(context)) {
-            installApk()
-        } else {
-            _message.value = context.getString(R.string.update_permiso_no_concedido)
+        if (awaitingInstallPermission) {
+            awaitingInstallPermission = false
+            val context = getApplication<Application>()
+            if (ApkDownloader.canInstallPackages(context)) {
+                installApk()
+            } else {
+                _message.value = context.getString(R.string.update_permiso_no_concedido)
+            }
+            return
         }
+        // Si la descarga terminó en segundo plano, al volver a la app se
+        // lanza el instalador sin que el usuario tenga que tocar "Instalar".
+        maybeAutoInstall()
+    }
+
+    fun onActivityPaused() {
+        isForeground = false
+    }
+
+    /**
+     * Abre la sesión de PackageInstaller sola. El usuario solo ve la
+     * confirmación del sistema cuando Android la exige.
+     */
+    private fun maybeAutoInstall() {
+        if (!isForeground || installSessionActive || autoInstallStarted) return
+        if (_download.value?.phase != UpdatePhase.READY) return
+        autoInstallStarted = true
+        installApk()
     }
 
     fun suppressUntilTomorrow() {
@@ -671,6 +733,7 @@ class UpdateViewModel @Inject constructor(
     private suspend fun cleanupResolved(showMessage: Boolean) {
         val context = getApplication<Application>()
         installSessionActive = false
+        autoInstallStarted = false
         downloadJob?.cancel()
         downloadJob = null
         withContext(Dispatchers.IO) {

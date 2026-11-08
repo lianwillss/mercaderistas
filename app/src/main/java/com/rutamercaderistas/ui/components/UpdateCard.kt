@@ -34,6 +34,7 @@ import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -156,6 +157,11 @@ fun UpdateCard(
                         UpdatePhase.READY -> ReadyContent(
                             state = state,
                             onInstall = onInstall,
+                            expanded = expanded,
+                            onClose = onClose,
+                        )
+                        UpdatePhase.INSTALLING -> InstallingContent(
+                            state = state,
                             expanded = expanded,
                             onClose = onClose,
                         )
@@ -418,6 +424,52 @@ private fun ReadyContent(
         PrimaryAction(
             text = stringResource(R.string.update_instalar),
             onClick = onInstall,
+        )
+    }
+}
+
+@Composable
+private fun InstallingContent(
+    state: UpdateCardUiState,
+    expanded: Boolean,
+    onClose: (() -> Unit)?,
+) {
+    val colors = MaterialTheme.colorScheme
+    val dimens = LocalAppDimens.current
+    val reducedMotion = LocalReducedMotionEnabled.current
+    val installing = state as? UpdateCardUiState.Installing
+    val versionName = installing?.versionName ?: state.versionName
+    UpdateHeader(
+        icon = Icons.Rounded.SystemUpdate,
+        tint = colors.primary,
+        title = stringResource(R.string.update_installing_title, versionName),
+        subtitle = stringResource(R.string.update_installing_subtitle),
+        version = null,
+        expanded = expanded,
+        onClose = onClose,
+    )
+    Spacer(Modifier.height(if (expanded) dimens.spacingLg else dimens.spacingMd))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Sin animación en loop cuando el usuario pidió movimiento reducido.
+        if (!reducedMotion) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(if (expanded) 22.dp else 18.dp),
+                strokeWidth = 2.dp,
+                color = colors.primary,
+            )
+            Spacer(Modifier.width(dimens.spacingSm))
+        }
+        Text(
+            text = stringResource(R.string.update_installing_waiting),
+            style = if (expanded) {
+                MaterialTheme.typography.bodyMedium
+            } else {
+                MaterialTheme.typography.bodySmall
+            },
+            color = colors.onSurfaceVariant,
         )
     }
 }
@@ -721,5 +773,6 @@ private val UpdateCardUiState.phase: UpdatePhase
         is UpdateCardUiState.Available -> UpdatePhase.AVAILABLE
         is UpdateCardUiState.Downloading -> UpdatePhase.DOWNLOADING
         is UpdateCardUiState.Ready -> UpdatePhase.READY
+        is UpdateCardUiState.Installing -> UpdatePhase.INSTALLING
         is UpdateCardUiState.Failed -> UpdatePhase.FAILED
     }

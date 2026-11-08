@@ -230,15 +230,16 @@ class UpdateViewModelTest {
     }
 
     @Test
-    fun `startUpdate downloads in app and ends ready without auto install`() = runTest {
+    fun `download in foreground starts install automatically`() = runTest {
         mockAvailableUpdate()
         try {
+            viewModel.onActivityResumed()
             viewModel.checkForUpdate(force = true, showFeedback = false)
             awaitOnMain { viewModel.pendingUpdate.value != null }
             // Simula el APK que deja el descargador real.
             apkFile.writeBytes(ByteArray(2048))
             viewModel.startUpdate()
-            awaitOnMain { viewModel.card.value is UpdateCardUiState.Ready }
+            awaitOnMain { viewModel.card.value is UpdateCardUiState.Installing }
             awaitCoVerify {
                 coVerify(exactly = 1) {
                     ApkDownloader.download(
@@ -252,8 +253,31 @@ class UpdateViewModelTest {
                     )
                 }
             }
-            // El usuario decide cuándo instalar: nada de auto-instalar.
+            awaitCoVerify {
+                coVerify(exactly = 1) { ApkDownloader.installApk(any(), any()) }
+            }
+        } finally {
+            unmockkObject(UpdateChecker)
+        }
+    }
+
+    @Test
+    fun `download in background waits for resume to install`() = runTest {
+        mockAvailableUpdate()
+        try {
+            viewModel.checkForUpdate(force = true, showFeedback = false)
+            awaitOnMain { viewModel.pendingUpdate.value != null }
+            apkFile.writeBytes(ByteArray(2048))
+            viewModel.startUpdate()
+            awaitOnMain { viewModel.card.value is UpdateCardUiState.Ready }
+            // Sin foreground no se abre la confirmación del sistema.
             verify(exactly = 0) { ApkDownloader.installApk(any(), any()) }
+
+            viewModel.onActivityResumed()
+            awaitOnMain { viewModel.card.value is UpdateCardUiState.Installing }
+            awaitCoVerify {
+                coVerify(exactly = 1) { ApkDownloader.installApk(any(), any()) }
+            }
         } finally {
             unmockkObject(UpdateChecker)
         }
