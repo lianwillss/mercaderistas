@@ -310,6 +310,14 @@
     <string name="notif_detalle_promo_precio">%1$s — %2$s (%3$s)</string>
     <string name="notif_manana">%d vencen mañana</string>
 
+    <!-- Ayuda contextual inline (términos de jerga) -->
+    <string name="ayuda_inline_cd">Ayuda</string>
+    <string name="ayuda_inline_titulo">¿Qué es esto?</string>
+    <string name="ayuda_entendido">Entendido</string>
+    <string name="ayuda_planilla">Es el Excel con tu ruta del día: locales, direcciones y marcas. Se descarga sola al abrir la app.</string>
+    <string name="ayuda_cod_prov">Es el código interno que cada marca (proveedor) le asigna a sus productos. Úsalo para buscar en el catálogo EAN.</string>
+    <string name="ayuda_ean">Es el código de barras de 13 dígitos del producto. Podés escribirlo, escanearlo con la cámara o compartirlo.</string>
+
     <!-- PDF Viewer -->
     <string name="pdf_no_disponible">PDF no disponible</string>
     <string name="pdf_archivo_no_encontrado">Archivo no encontrado</string>

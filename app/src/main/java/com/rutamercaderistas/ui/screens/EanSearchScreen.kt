@@ -122,6 +122,7 @@ fun EanSearchScreen(
 
     var zoomProduct by remember { mutableStateOf<EanProductEntity?>(null) }
     var showFlejes by remember { mutableStateOf(false) }
+    var showAyudaEan by remember { mutableStateOf(false) }
 
     val scannerLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -186,6 +187,27 @@ fun EanSearchScreen(
                         .weight(1f)
                         .semantics { heading() },
                 )
+                val ayudaEanCd = stringResource(R.string.ayuda_inline_cd)
+                val pressEan = rememberPressInteractionSource()
+                Box(
+                    modifier = Modifier
+                        .size(dimens.touchMin)
+                        .pressScale(pressEan)
+                        .clickable(
+                            interactionSource = pressEan,
+                            indication = LocalIndication.current,
+                            onClick = { showAyudaEan = true },
+                            role = Role.Button,
+                        )
+                        .semantics { contentDescription = ayudaEanCd },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "(i)",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
 
             when (val state = uiState) {
@@ -213,6 +235,21 @@ fun EanSearchScreen(
 
     if (showFlejes) {
         EanFlejesDialog(onDismiss = { showFlejes = false })
+    }
+
+    if (showAyudaEan) {
+        IosModal(
+            visible = true,
+            onDismiss = { showAyudaEan = false },
+            title = stringResource(R.string.ayuda_inline_titulo),
+            dismissText = stringResource(R.string.ayuda_entendido),
+        ) {
+            Text(
+                text = stringResource(R.string.ayuda_ean),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
     }
 }
 

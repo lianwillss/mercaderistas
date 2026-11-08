@@ -81,6 +81,7 @@ import com.rutamercaderistas.ui.components.HeaderCollapseState
 import com.rutamercaderistas.ui.components.HeaderSection
 import com.rutamercaderistas.ui.components.rememberHeaderCollapseState
 import com.rutamercaderistas.ui.components.IosModal
+import com.rutamercaderistas.ui.components.InfoTooltip
 import com.rutamercaderistas.ui.components.PromoExpiringSoonModal
 import com.rutamercaderistas.ui.components.RouteSearchBar
 import com.rutamercaderistas.ui.components.UpdateCard
@@ -482,12 +483,27 @@ private fun SyncChangesBanner(changes: PlanillaChanges, onDismiss: () -> Unit) {
         )
         Spacer(modifier = Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = stringResource(R.string.sync_cambios_titulo),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Bold,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.sync_cambios_titulo),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold,
+                )
+                InfoTooltip(
+                    helper = {
+                        Text(
+                            text = stringResource(R.string.ayuda_planilla),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    },
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
             if (summary.isNotBlank()) {
                 Text(
                     text = summary,
@@ -659,13 +675,40 @@ private fun FirstLaunchEmptyState(
             textAlign = TextAlign.Center,
         )
         Spacer(modifier = Modifier.height(dimens.spacingXs))
-        Text(
-            text = if (isOffline) stringResource(R.string.empty_state_offline) else stringResource(R.string.empty_state_subtitulo),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 16.dp),
-        )
+        if (isOffline) {
+            Text(
+                text = stringResource(R.string.empty_state_offline),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.empty_state_subtitulo),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+                InfoTooltip(
+                    helper = {
+                        Text(
+                            text = stringResource(R.string.ayuda_planilla),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    },
+                    modifier = Modifier.padding(start = 4.dp),
+                )
+            }
+        }
         Spacer(modifier = Modifier.height(dimens.spacingLg))
         Button(
             onClick = onSync,

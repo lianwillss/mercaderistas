@@ -1,6 +1,8 @@
 package com.rutamercaderistas.ui.screens
 
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -30,9 +33,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -40,11 +45,14 @@ import com.rutamercaderistas.R
 import com.rutamercaderistas.ui.components.CodProvItems
 import com.rutamercaderistas.ui.components.CodProvRow
 import com.rutamercaderistas.ui.components.DropletToast
+import com.rutamercaderistas.ui.components.IosModal
 import com.rutamercaderistas.ui.components.ScreenHeader
 import com.rutamercaderistas.ui.components.copyCodProvToClipboard
 import com.rutamercaderistas.ui.components.filterCodProvItems
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.LocalAppDimens
+import com.rutamercaderistas.ui.theme.pressScale
+import com.rutamercaderistas.ui.theme.rememberPressInteractionSource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,6 +66,7 @@ fun CodProvScreen(
     var copyToast by remember { mutableStateOf<String?>(null) }
     val copiedMessage = stringResource(R.string.cod_prov_copiado)
     val buscarCd = stringResource(R.string.cod_prov_buscar)
+    var showAyudaCodProv by remember { mutableStateOf(false) }
 
     // Toast-gota hermano en Box (nunca hijo de un Column con peso).
     Box(modifier = Modifier.fillMaxSize()) {
@@ -72,6 +81,29 @@ fun CodProvScreen(
                 onBack = onBack,
                 title = stringResource(R.string.cod_prov_title),
                 scrollBehavior = scrollBehavior,
+                trailingContent = {
+                    val ayudaCd = stringResource(R.string.ayuda_inline_cd)
+                    val press = rememberPressInteractionSource()
+                        Box(
+                            modifier = Modifier
+                                .size(dimens.touchMin)
+                                .pressScale(press)
+                                .clickable(
+                                    interactionSource = press,
+                                    indication = LocalIndication.current,
+                                    onClick = { showAyudaCodProv = true },
+                                    role = Role.Button,
+                                )
+                                .semantics { contentDescription = ayudaCd },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = "(i)",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                },
             )
 
             Text(
@@ -156,5 +188,20 @@ fun CodProvScreen(
             message = copyToast,
             onTimeout = { copyToast = null },
         )
+
+        if (showAyudaCodProv) {
+            IosModal(
+                visible = true,
+                onDismiss = { showAyudaCodProv = false },
+                title = stringResource(R.string.ayuda_inline_titulo),
+                dismissText = stringResource(R.string.ayuda_entendido),
+            ) {
+                Text(
+                    text = stringResource(R.string.ayuda_cod_prov),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
     }
 }
