@@ -38,6 +38,8 @@ class UpdateDownloadManager @Inject constructor(
                     UpdateDownloadWorker.KEY_VERSION_NAME to pending.versionName,
                     UpdateDownloadWorker.KEY_VERSION_CODE to pending.versionCode,
                     UpdateDownloadWorker.KEY_VERSION_TAG to pending.versionTag,
+                    UpdateDownloadWorker.KEY_APK_SIZE to pending.apkSize,
+                    UpdateDownloadWorker.KEY_APK_SHA256 to pending.apkSha256,
                 ),
             )
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)

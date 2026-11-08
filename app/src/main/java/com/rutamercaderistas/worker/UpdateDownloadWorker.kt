@@ -29,6 +29,8 @@ class UpdateDownloadWorker @AssistedInject constructor(
         const val KEY_VERSION_NAME = "version_name"
         const val KEY_VERSION_CODE = "version_code"
         const val KEY_VERSION_TAG = "version_tag"
+        const val KEY_APK_SIZE = "apk_size"
+        const val KEY_APK_SHA256 = "apk_sha256"
         const val KEY_BYTES = "bytes"
         const val KEY_TOTAL_BYTES = "total_bytes"
         const val KEY_PERCENT = "percent"
@@ -43,12 +45,19 @@ class UpdateDownloadWorker @AssistedInject constructor(
             return Result.failure(workDataOf(KEY_ERROR to "Falta la URL del APK"))
         }
         val versionName = inputData.getString(KEY_VERSION_NAME).orEmpty()
+        val expectedSize = inputData.getLong(KEY_APK_SIZE, 0L)
+        val expectedSha256 = inputData.getString(KEY_APK_SHA256).orEmpty()
         var lastPercent = -1
 
         updateForeground(0, 0)
 
         val result = try {
-            ApkDownloader.download(applicationContext, apkUrl) { progress: DownloadProgress ->
+            ApkDownloader.download(
+                applicationContext,
+                apkUrl,
+                expectedSize,
+                expectedSha256,
+            ) { progress: DownloadProgress ->
                 setProgress(
                     workDataOf(
                         KEY_BYTES to progress.bytes,

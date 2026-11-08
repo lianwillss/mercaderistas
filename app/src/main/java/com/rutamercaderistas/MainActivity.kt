@@ -125,7 +125,9 @@ class MainActivity : ComponentActivity() {
             }
 
             LaunchedEffect(Unit) {
-                updateViewModel.checkForUpdate(showFeedback = false)
+                // Al abrir la app: consulta obligatoria y, si hay versión
+                // nueva, descarga e instala de inmediato.
+                updateViewModel.checkForUpdateOnLaunch()
                 routeViewModel.loadInitialData()
             }
 

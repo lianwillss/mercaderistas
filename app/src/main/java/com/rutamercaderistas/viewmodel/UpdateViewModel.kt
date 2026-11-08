@@ -13,6 +13,7 @@ import com.rutamercaderistas.R
 import com.rutamercaderistas.data.preferences.PendingUpdate
 import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.services.ApkDownloader
+import com.rutamercaderistas.services.ApkValidation
 import com.rutamercaderistas.services.UpdateChecker
 import com.rutamercaderistas.services.UpdateNotifier
 import com.rutamercaderistas.worker.UpdateDownloadManager
@@ -146,6 +147,7 @@ class UpdateViewModel @Inject constructor(
     private var autoInstallHandled = false
 
     private var restoreJob: Job? = null
+    private var installJob: Job? = null
 
     init {
         restoreJob = viewModelScope.launch { restorePendingUpdate() }
@@ -186,24 +188,7 @@ class UpdateViewModel @Inject constructor(
             }
         }
 
-        val ready = withContext(Dispatchers.IO) {
-            val apk = ApkDownloader.apkFile(context)
-            if (!apk.exists()) {
-                null
-            } else {
-                val code = ApkDownloader.readApkVersionCode(context, apk)
-                if (code > BuildConfig.VERSION_CODE) {
-                    DownloadSnapshot(
-                        phase = UpdatePhase.READY,
-                        downloadedBytes = apk.length(),
-                        totalBytes = apk.length(),
-                    )
-                } else {
-                    ApkDownloader.clearFinalApk(context)
-                    null
-                }
-            }
-        }
+        val ready = evaluateDownloadedApk(stored)
         // No pisa un progreso que el observer ya esté mostrando.
         if (ready != null) _download.value = ready
     }
@@ -242,23 +227,7 @@ class UpdateViewModel @Inject constructor(
                         val context = getApplication<Application>()
                         // Puede quedar un APK completo de un intento anterior:
                         // en ese caso la tarjeta sigue en "lista para instalar".
-                        val readySnapshot = withContext(Dispatchers.IO) {
-                            val apk = ApkDownloader.apkFile(context)
-                            val apkInfo = if (apk.exists()) {
-                                ApkDownloader.readApkInfo(context, apk)
-                            } else {
-                                null
-                            }
-                            if (apkInfo != null && apkInfo.versionCode > BuildConfig.VERSION_CODE) {
-                                DownloadSnapshot(
-                                    phase = UpdatePhase.READY,
-                                    downloadedBytes = apk.length(),
-                                    totalBytes = apk.length(),
-                                )
-                            } else {
-                                null
-                            }
-                        }
+                        val readySnapshot = evaluateDownloadedApk(_pendingUpdate.value)
                         if (readySnapshot != null) {
                             _download.value = readySnapshot
                         } else {
@@ -293,20 +262,7 @@ class UpdateViewModel @Inject constructor(
             // no borrar el APK en esa carrera (lo valida restorePendingUpdate).
             return
         }
-        val snapshot = withContext(Dispatchers.IO) {
-            val apk = ApkDownloader.apkFile(context)
-            val info = ApkDownloader.readApkInfo(context, apk)
-            if (info == null || info.versionCode <= BuildConfig.VERSION_CODE) {
-                ApkDownloader.clearDownloadedApk(context)
-                null
-            } else {
-                DownloadSnapshot(
-                    phase = UpdatePhase.READY,
-                    downloadedBytes = apk.length(),
-                    totalBytes = apk.length(),
-                )
-            }
-        }
+        val snapshot = evaluateDownloadedApk(_pendingUpdate.value)
         if (snapshot == null) {
             _download.value = DownloadSnapshot(
                 phase = UpdatePhase.FAILED,
@@ -316,6 +272,8 @@ class UpdateViewModel @Inject constructor(
             return
         }
         _download.value = snapshot
+        // Una validación fallida no debe abrir el instalador.
+        if (snapshot.phase != UpdatePhase.READY) return
         // Si el usuario estaba en la app, el instalador aparece solo. En
         // segundo plano queda la notificación persistente "lista".
         if (isForeground && !autoInstallHandled) {
@@ -324,7 +282,52 @@ class UpdateViewModel @Inject constructor(
         }
     }
 
-    fun checkForUpdate(force: Boolean = false, showFeedback: Boolean = true) {
+    /**
+     * Evalúa un APK ya descargado. Solo devuelve READY si pasa tamaño,
+     * SHA-256, paquete, versión y firma; si falla, lo borra y devuelve FAILED
+     * con el motivo. Devuelve null si no hay archivo o ya no es más nuevo.
+     */
+    private suspend fun evaluateDownloadedApk(pending: PendingUpdate?): DownloadSnapshot? =
+        withContext(Dispatchers.IO) {
+            val context = getApplication<Application>()
+            val apk = ApkDownloader.apkFile(context)
+            if (!apk.exists()) return@withContext null
+
+            val info = ApkDownloader.readApkInfo(context, apk)
+            if (info == null || info.versionCode <= BuildConfig.VERSION_CODE) {
+                ApkDownloader.clearFinalApk(context)
+                return@withContext null
+            }
+
+            when (
+                val validation = ApkDownloader.validateApk(
+                    context,
+                    apk,
+                    pending?.apkSize ?: 0L,
+                    pending?.apkSha256.orEmpty(),
+                )
+            ) {
+                ApkValidation.Ok -> DownloadSnapshot(
+                    phase = UpdatePhase.READY,
+                    downloadedBytes = apk.length(),
+                    totalBytes = apk.length(),
+                )
+                is ApkValidation.Failed -> {
+                    ApkDownloader.clearDownloadedApk(context)
+                    DownloadSnapshot(
+                        phase = UpdatePhase.FAILED,
+                        message = validation.message,
+                        retryable = validation.retryable,
+                    )
+                }
+            }
+        }
+
+    fun checkForUpdate(
+        force: Boolean = false,
+        showFeedback: Boolean = true,
+        autoStartDownload: Boolean = false,
+    ) {
         viewModelScope.launch {
             // Restaurar primero evita que un pendiente viejo borre el nuevo.
             restoreJob?.join()
@@ -359,7 +362,9 @@ class UpdateViewModel @Inject constructor(
                     _message.value = if (info.error.contains("conexión", ignoreCase = true)) {
                         getApplication<Application>().getString(R.string.update_sin_internet)
                     } else {
-                        getApplication<Application>().getString(R.string.update_error_buscar)
+                        // Motivo real (p. ej. falta el SHA-256 publicado) en vez
+                        // del genérico "Error al buscar actualización".
+                        info.error
                     }
                 }
                 return@launch
@@ -375,6 +380,8 @@ class UpdateViewModel @Inject constructor(
                     versionCode = info.versionCode,
                     apkUrl = info.apkUrl,
                     versionTag = info.tag,
+                    apkSize = info.apkSize,
+                    apkSha256 = info.apkSha256,
                 )
                 withContext(Dispatchers.IO) {
                     preferencesRepository.setPendingUpdate(pending)
@@ -383,30 +390,41 @@ class UpdateViewModel @Inject constructor(
                     _pendingUpdate.value?.versionCode == pending.versionCode
                 _pendingUpdate.value = pending
                 if (!same && _download.value?.phase != UpdatePhase.DOWNLOADING) {
-                    // Si el pendiente cambió de tag pero el APK ya está
-                    // completo, conservar "lista para instalar".
-                    _download.value = withContext(Dispatchers.IO) {
-                        val context = getApplication<Application>()
-                        val apk = ApkDownloader.apkFile(context)
-                        val apkInfo = if (apk.exists()) {
-                            ApkDownloader.readApkInfo(context, apk)
-                        } else {
-                            null
-                        }
-                        if (apkInfo != null && apkInfo.versionCode > BuildConfig.VERSION_CODE) {
-                            DownloadSnapshot(UpdatePhase.READY, apk.length(), apk.length())
-                        } else {
-                            null
-                        }
-                    }
+                    // El APK de un pendiente anterior puede no corresponder al
+                    // release nuevo (o estar alterado). Solo se conserva si
+                    // pasa la verificación completa; si no, se descarta y la
+                    // descarga arranca de cero.
+                    val evaluated = evaluateDownloadedApk(pending)
+                    _download.value =
+                        if (evaluated?.phase == UpdatePhase.READY) evaluated else null
                     autoInstallHandled = false
                 }
                 notifyOnce(info.tag, info.versionName)
-                if (showFeedback) _showSheet.value = true
+                if (autoStartDownload) {
+                    // Al abrir la app se ignora el "más tarde" anterior y se
+                    // muestra el progreso: la actualización arranca sola.
+                    if (_suppressed.value) {
+                        withContext(Dispatchers.IO) {
+                            preferencesRepository.setUpdateSuppressedUntil(0)
+                        }
+                        _suppressed.value = false
+                    }
+                    startUpdate(auto = true)
+                } else if (showFeedback) {
+                    _showSheet.value = true
+                }
             } else {
                 cleanupResolved(showMessage = showFeedback)
             }
         }
+    }
+
+    /**
+     * Consulta obligatoria al abrir la app: si hay versión nueva, descarga e
+     * instala de inmediato sin esperar a que el usuario toque "Actualizar".
+     */
+    fun checkForUpdateOnLaunch() {
+        checkForUpdate(force = true, showFeedback = false, autoStartDownload = true)
     }
 
     /** Consulta al volver a la app, con throttle para no golpear GitHub. */
@@ -416,20 +434,25 @@ class UpdateViewModel @Inject constructor(
                 preferencesRepository.getLastUpdateCheck()
             }
             if (System.currentTimeMillis() - last >= UPDATE_CHECK_MIN_INTERVAL_MS) {
-                checkForUpdate(force = false, showFeedback = false)
+                checkForUpdate(force = false, showFeedback = false, autoStartDownload = true)
             }
         }
     }
 
     /** Abre el modal y dispara (o reanuda) la descarga del pendiente. */
-    fun startUpdate() {
+    fun startUpdate(auto: Boolean = false) {
         val pending = _pendingUpdate.value
         _showSheet.value = true
         if (pending == null) return
 
         val phase = _download.value?.phase
         if (phase == UpdatePhase.READY) {
-            installApk()
+            // En el arranque automático no se relanza el instalador si ya se
+            // intentó (por ejemplo, al rotar la pantalla).
+            if (!auto || !autoInstallHandled) {
+                autoInstallHandled = true
+                installApk()
+            }
             return
         }
         if (phase == UpdatePhase.DOWNLOADING) return
@@ -455,29 +478,21 @@ class UpdateViewModel @Inject constructor(
         _showSheet.value = false
     }
 
+    /**
+     * Verifica el APK descargado y recién entonces abre el instalador. El
+     * paquete del sistema responde con un error genérico cuando la firma no
+     * coincide; acá se detecta y se explica antes de lanzarlo.
+     */
     fun installApk() {
         val context = getApplication<Application>()
         _showSheet.value = true
 
         // No se exige _pendingUpdate: al abrir desde la notificación el
-        // ViewModel puede estar restaurando el pendiente todavía. El APK ya
-        // fue validado por el worker antes de publicar "lista para instalar".
+        // ViewModel puede estar restaurando el pendiente todavía. La firma y
+        // el paquete se validan siempre; tamaño/SHA si el pendiente los tiene.
         val apk = ApkDownloader.apkFile(context)
         if (!apk.exists()) {
             val message = context.getString(R.string.update_archivo_faltante)
-            _download.value = DownloadSnapshot(
-                phase = UpdatePhase.FAILED,
-                message = message,
-                retryable = true,
-            )
-            _message.value = message
-            return
-        }
-
-        val apkInfo = ApkDownloader.readApkInfo(context, apk)
-        if (apkInfo == null || apkInfo.versionCode <= BuildConfig.VERSION_CODE) {
-            ApkDownloader.clearDownloadedApk(context)
-            val message = context.getString(R.string.update_version_no_reciente)
             _download.value = DownloadSnapshot(
                 phase = UpdatePhase.FAILED,
                 message = message,
@@ -498,15 +513,41 @@ class UpdateViewModel @Inject constructor(
         }
 
         awaitingInstallPermission = false
-        val error = ApkDownloader.installApk(context, apk)
-        if (error != null) {
-            _download.value = DownloadSnapshot(
-                phase = UpdatePhase.FAILED,
-                message = error,
-                retryable = true,
-            )
-        } else {
-            _showSheet.value = false
+        installJob?.cancel()
+        installJob = viewModelScope.launch {
+            restoreJob?.join()
+            val pending = _pendingUpdate.value
+            val validation = withContext(Dispatchers.IO) {
+                ApkDownloader.validateApk(
+                    context,
+                    apk,
+                    pending?.apkSize ?: 0L,
+                    pending?.apkSha256.orEmpty(),
+                )
+            }
+            if (validation is ApkValidation.Failed) {
+                ApkDownloader.clearDownloadedApk(context)
+                // El aviso "lista para instalar" ya no tiene archivo válido.
+                UpdateNotifier.cancelUpdate(context)
+                _download.value = DownloadSnapshot(
+                    phase = UpdatePhase.FAILED,
+                    message = validation.message,
+                    retryable = validation.retryable,
+                )
+                _message.value = validation.message
+                return@launch
+            }
+
+            val error = ApkDownloader.installApk(context, apk)
+            if (error != null) {
+                _download.value = DownloadSnapshot(
+                    phase = UpdatePhase.FAILED,
+                    message = error,
+                    retryable = true,
+                )
+            } else {
+                _showSheet.value = false
+            }
         }
     }
 
@@ -529,6 +570,19 @@ class UpdateViewModel @Inject constructor(
                 installApk()
             } else {
                 _message.value = context.getString(R.string.update_permiso_no_concedido)
+            }
+        } else {
+            // Si la descarga terminó en segundo plano, al volver a la app se
+            // lanza el instalador sin esperar a que el usuario lo toque.
+            viewModelScope.launch {
+                restoreJob?.join()
+                if (isForeground &&
+                    _download.value?.phase == UpdatePhase.READY &&
+                    !autoInstallHandled
+                ) {
+                    autoInstallHandled = true
+                    installApk()
+                }
             }
         }
     }

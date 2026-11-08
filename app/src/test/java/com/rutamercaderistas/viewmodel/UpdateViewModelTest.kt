@@ -6,6 +6,7 @@ import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.data.preferences.PendingUpdate
 import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.services.ApkDownloader
+import com.rutamercaderistas.services.ApkValidation
 import com.rutamercaderistas.services.UpdateChecker
 import com.rutamercaderistas.services.UpdateInfo
 import com.rutamercaderistas.services.UpdateNotifier
@@ -75,6 +76,7 @@ class UpdateViewModelTest {
         every { ApkDownloader.apkFile(any()) } returns apkFile
         every { ApkDownloader.partialFile(any()) } returns File(apkFile.parentFile, "update.apk.part")
         every { ApkDownloader.readApkVersionCode(any(), any()) } returns 0
+        coEvery { ApkDownloader.validateApk(any(), any(), any(), any()) } returns ApkValidation.Ok
         every { ApkDownloader.readApkInfo(any(), any()) } returns
             com.rutamercaderistas.services.ApkInfo(
                 packageName = "com.rutamercaderistas",
@@ -365,6 +367,29 @@ class UpdateViewModelTest {
     }
 
     @Test
+    fun `launch check auto starts the download`() = runTest {
+        mockAvailableUpdate()
+        try {
+            viewModel.checkForUpdate(
+                force = true,
+                showFeedback = false,
+                autoStartDownload = true,
+            )
+            awaitOnMain { viewModel.card.value is UpdateCardUiState.Downloading }
+            assertTrue(viewModel.showUpdateSheet.value)
+            awaitVerify {
+                verify(exactly = 1) {
+                    downloadManager.enqueue(
+                        PendingUpdate("12.02", 12002, "http://x.apk", "v12.02"),
+                    )
+                }
+            }
+        } finally {
+            unmockkObject(UpdateChecker)
+        }
+    }
+
+    @Test
     fun `install without permission opens settings`() = runTest {
         mockAvailableUpdate()
         try {
@@ -375,6 +400,104 @@ class UpdateViewModelTest {
             viewModel.installApk()
             awaitVerify { verify { ApkDownloader.openInstallPermissionSettings(any()) } }
             assertTrue(viewModel.showUpdateSheet.value)
+        } finally {
+            unmockkObject(UpdateChecker)
+        }
+    }
+
+    @Test
+    fun `pending stores published size and sha`() = runTest {
+        mockkObject(UpdateChecker)
+        try {
+            val sha = "a".repeat(64)
+            coEvery {
+                UpdateChecker.check(any())
+            } returns UpdateInfo(
+                available = true,
+                versionCode = 12046,
+                versionName = "12.46",
+                apkUrl = "http://x.apk",
+                tag = "v12.46",
+                apkSize = 1234L,
+                apkSha256 = sha,
+            )
+            viewModel.checkForUpdate(force = true, showFeedback = false)
+            awaitOnMain {
+                viewModel.pendingUpdate.value ==
+                    PendingUpdate("12.46", 12046, "http://x.apk", "v12.46", 1234L, sha)
+            }
+            awaitCoVerify {
+                coVerify {
+                    preferencesRepository.setPendingUpdate(
+                        PendingUpdate("12.46", 12046, "http://x.apk", "v12.46", 1234L, sha),
+                    )
+                }
+            }
+        } finally {
+            unmockkObject(UpdateChecker)
+        }
+    }
+
+    @Test
+    fun `install blocks apk signed with another certificate`() = runTest {
+        mockAvailableUpdate()
+        try {
+            viewModel.checkForUpdate(force = true, showFeedback = false)
+            awaitOnMain { viewModel.pendingUpdate.value != null }
+            apkFile.writeBytes(ByteArray(2048))
+            val message =
+                "El APK está firmado con un certificado distinto al de esta app. Por seguridad no se instala."
+            coEvery { ApkDownloader.validateApk(any(), any(), any(), any()) } returns
+                ApkValidation.Failed(message, retryable = false)
+            viewModel.installApk()
+            awaitOnMain {
+                (viewModel.card.value as? UpdateCardUiState.Failed)?.message == message
+            }
+            verify(exactly = 0) { ApkDownloader.installApk(any(), any()) }
+            verify { ApkDownloader.clearDownloadedApk(any()) }
+        } finally {
+            unmockkObject(UpdateChecker)
+        }
+    }
+
+    @Test
+    fun `restore does not mark invalid apk ready`() = runTest {
+        val pending = PendingUpdate(
+            "99.99",
+            BuildConfig.VERSION_CODE + 1,
+            "http://x.apk",
+            "v99.99",
+            2048L,
+            "a".repeat(64),
+        )
+        coEvery { preferencesRepository.getPendingUpdate() } returns pending
+        apkFile.writeBytes(ByteArray(2048))
+        coEvery { ApkDownloader.validateApk(any(), any(), any(), any()) } returns
+            ApkValidation.Failed("La verificación SHA-256 del APK falló")
+        val restored = track(UpdateViewModel(application, preferencesRepository, downloadManager))
+        awaitOnMain {
+            (restored.card.value as? UpdateCardUiState.Failed)?.message?.contains("SHA-256") == true
+        }
+        verify { ApkDownloader.clearDownloadedApk(any()) }
+    }
+
+    @Test
+    fun `integrity error surfaces its specific message`() = runTest {
+        mockkObject(UpdateChecker)
+        try {
+            coEvery {
+                UpdateChecker.check(any())
+            } returns UpdateInfo(
+                available = false,
+                versionCode = 0,
+                versionName = "",
+                apkUrl = "",
+                error = "El release no publica el SHA-256 del APK",
+            )
+            viewModel.checkForUpdate(force = true, showFeedback = true)
+            awaitOnMain {
+                viewModel.message.value == "El release no publica el SHA-256 del APK"
+            }
         } finally {
             unmockkObject(UpdateChecker)
         }

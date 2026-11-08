@@ -40,6 +40,8 @@ class UpdateCheckWorker @AssistedInject constructor(
                     versionCode = info.versionCode,
                     apkUrl = info.apkUrl,
                     versionTag = info.tag,
+                    apkSize = info.apkSize,
+                    apkSha256 = info.apkSha256,
                 )
                 // Se persiste incluso si ya se notificó: así el banner y el
                 // pendiente sobreviven a cierres y reinicios.

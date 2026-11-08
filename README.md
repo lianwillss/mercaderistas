@@ -201,8 +201,9 @@ marca si hace falta (`EAN_FILE_BRANDS`), subir `EAN_DATA_VERSION` y agregar un t
 
 Reglas del actualizador (dedupe por tag completo, permisos, caché del APK):
 [AGENTS.md](AGENTS.md) §Actualizador de versiones.
-Fuente: `releases/latest` de GitHub; exige el asset `app-universal-release.apk`;
-`versionCode = major * 1000 + minor`.
+Fuente: `releases/latest` de GitHub; usa el asset de la ABI del teléfono o el universal.
+Antes de instalar verifica tamaño real del asset, SHA-256 de `SHA256SUMS.txt` (publicado por el CI)
+y que la firma sea el mismo certificado de la app instalada. `versionCode = major * 1000 + minor`.
 
 Publicar una versión:
 
@@ -212,7 +213,8 @@ git add -A && git commit -m "chore: bump version to X.Y"
 git tag vX.Y && git push origin main vX.Y
 ```
 
-El workflow [.github/workflows/release.yml](.github/workflows/release.yml) compila y publica el APK universal; solo se dispara con tags `v*`.
+El workflow [.github/workflows/release.yml](.github/workflows/release.yml) compila y publica los APK por ABI,
+el universal y `SHA256SUMS.txt`; solo se dispara con tags `v*`.
 
 ---
 

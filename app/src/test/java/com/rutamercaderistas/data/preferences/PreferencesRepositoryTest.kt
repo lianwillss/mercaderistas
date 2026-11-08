@@ -112,6 +112,27 @@ class PreferencesRepositoryTest {
     }
 
     @Test
+    fun `pendingUpdate conserva tamano y sha256`() = runTest {
+        val sha = "a".repeat(64)
+        repository.setPendingUpdate(
+            PendingUpdate(
+                versionName = "12.46",
+                versionCode = 12046,
+                apkUrl = "http://x.apk",
+                versionTag = "v12.46",
+                apkSize = 50_123_456L,
+                apkSha256 = sha,
+            ),
+        )
+        assertEquals(
+            PendingUpdate("12.46", 12046, "http://x.apk", "v12.46", 50_123_456L, sha),
+            repository.getPendingUpdate(),
+        )
+        // El DataStore es singleton por proceso y los tests comparten estado.
+        repository.clearPendingUpdate()
+    }
+
+    @Test
     fun `updateNotifAsked roundtrip`() = runTest {
         assertEquals(false, repository.wasUpdateNotifAsked())
         repository.setUpdateNotifAsked()

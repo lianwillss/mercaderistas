@@ -29,6 +29,10 @@ data class PendingUpdate(
     val apkUrl: String,
     /** Tag completo ("v12.20.1"): versionCode colisiona en patch, el tag no. */
     val versionTag: String = "",
+    /** Bytes publicados en el release (0 = pendiente viejo sin verificación). */
+    val apkSize: Long = 0L,
+    /** SHA-256 publicado por el CI ("" = pendiente viejo sin verificación). */
+    val apkSha256: String = "",
 )
 
 val Context.prefsDataStore: DataStore<Preferences> by preferencesDataStore(name = "mercaderistas_prefs")
@@ -59,6 +63,8 @@ class PreferencesRepository @Inject constructor(
         private val KEY_PENDING_UPDATE_CODE = intPreferencesKey("pending_update_code")
         private val KEY_PENDING_UPDATE_URL = stringPreferencesKey("pending_update_url")
         private val KEY_PENDING_UPDATE_TAG = stringPreferencesKey("pending_update_tag")
+        private val KEY_PENDING_UPDATE_SIZE = longPreferencesKey("pending_update_size")
+        private val KEY_PENDING_UPDATE_SHA = stringPreferencesKey("pending_update_sha")
         private val KEY_LAST_NOTIFIED_UPDATE = intPreferencesKey("last_notified_update_code")
         private val KEY_LAST_NOTIFIED_TAG = stringPreferencesKey("last_notified_update_tag")
         private val KEY_UPDATE_NOTIF_ASKED = stringPreferencesKey("update_notif_asked")
@@ -290,6 +296,10 @@ class PreferencesRepository @Inject constructor(
             prefs[KEY_PENDING_UPDATE_URL] = entry.apkUrl
             if (entry.versionTag.isNotBlank()) prefs[KEY_PENDING_UPDATE_TAG] = entry.versionTag
             else prefs.remove(KEY_PENDING_UPDATE_TAG)
+            if (entry.apkSize > 0L) prefs[KEY_PENDING_UPDATE_SIZE] = entry.apkSize
+            else prefs.remove(KEY_PENDING_UPDATE_SIZE)
+            if (entry.apkSha256.isNotBlank()) prefs[KEY_PENDING_UPDATE_SHA] = entry.apkSha256
+            else prefs.remove(KEY_PENDING_UPDATE_SHA)
         }
     }
 
@@ -302,6 +312,8 @@ class PreferencesRepository @Inject constructor(
             versionCode = code,
             apkUrl = prefs[KEY_PENDING_UPDATE_URL].orEmpty(),
             versionTag = prefs[KEY_PENDING_UPDATE_TAG].orEmpty(),
+            apkSize = prefs[KEY_PENDING_UPDATE_SIZE] ?: 0L,
+            apkSha256 = prefs[KEY_PENDING_UPDATE_SHA].orEmpty(),
         )
     }
 
@@ -311,6 +323,8 @@ class PreferencesRepository @Inject constructor(
             prefs.remove(KEY_PENDING_UPDATE_CODE)
             prefs.remove(KEY_PENDING_UPDATE_URL)
             prefs.remove(KEY_PENDING_UPDATE_TAG)
+            prefs.remove(KEY_PENDING_UPDATE_SIZE)
+            prefs.remove(KEY_PENDING_UPDATE_SHA)
         }
     }
 

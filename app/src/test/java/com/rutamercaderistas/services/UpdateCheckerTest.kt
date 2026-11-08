@@ -86,6 +86,59 @@ class UpdateCheckerTest {
     }
 
     @Test
+    fun `prefiere el APK de la ABI del telefono`() {
+        assertEquals(
+            "app-arm64-v8a-release.apk",
+            UpdateChecker.preferredAssetName(listOf("arm64-v8a", "armeabi-v7a")),
+        )
+        assertEquals(
+            "app-armeabi-v7a-release.apk",
+            UpdateChecker.preferredAssetName(listOf("armeabi-v7a")),
+        )
+        assertEquals(
+            "app-universal-release.apk",
+            UpdateChecker.preferredAssetName(listOf("x86_64")),
+        )
+    }
+
+    @Test
+    fun `usa el asset compatible y cae al universal`() {
+        val assets = listOf(
+            ReleaseAsset(
+                name = "app-universal-release.apk",
+                url = "https://example.com/universal.apk",
+                size = 99_000_000L,
+                digest = "sha256:" + "a".repeat(64),
+            ),
+            ReleaseAsset(
+                name = "app-arm64-v8a-release.apk",
+                url = "https://example.com/arm64.apk",
+                size = 50_000_000L,
+                digest = null,
+            ),
+        )
+        val arm64 = UpdateChecker.findApkAsset(assets, listOf("arm64-v8a"))
+        assertEquals("https://example.com/arm64.apk", arm64?.url)
+        assertEquals(50_000_000L, arm64?.size)
+        assertNull(arm64?.digest)
+
+        val universal = UpdateChecker.findApkAsset(
+            listOf(assets.first()),
+            listOf("arm64-v8a"),
+        )
+        assertEquals("https://example.com/universal.apk", universal?.url)
+        assertEquals(99_000_000L, universal?.size)
+    }
+
+    @Test
+    fun `sin asset compatible no hay APK`() {
+        val assets = listOf(
+            ReleaseAsset("app-x86_64-release.apk", "https://example.com/x86.apk", 1L, null),
+        )
+        assertNull(UpdateChecker.findApkAsset(assets, listOf("arm64-v8a")))
+    }
+
+    @Test
     fun `el versionCode del release manda sobre el tag`() {
         // El body del release puede declarar un code distinto al del tag.
         assertTrue(UpdateChecker.isRemoteNewer("v12.41", 12041, 12042))

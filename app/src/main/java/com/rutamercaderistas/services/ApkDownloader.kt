@@ -2,6 +2,7 @@ package com.rutamercaderistas.services
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -40,7 +41,15 @@ data class ApkInfo(
     val packageName: String,
     val versionCode: Int,
     val versionName: String,
+    /** SHA-256 (hex) de los certificados con los que está firmado el APK. */
+    val signerSha256: Set<String> = emptySet(),
 )
+
+/** Resultado de validar un APK antes de marcarlo listo o lanzar el instalador. */
+sealed interface ApkValidation {
+    data object Ok : ApkValidation
+    data class Failed(val message: String, val retryable: Boolean = true) : ApkValidation
+}
 
 /**
  * Descarga reanudable en filesDir/updates. El .part sobrevive a cierres,
@@ -85,12 +94,23 @@ object ApkDownloader {
     suspend fun download(
         context: Context,
         apkUrl: String,
+        expectedSize: Long = 0L,
+        expectedSha256: String = "",
         onProgress: suspend (DownloadProgress) -> Unit = {},
-    ): DownloadResult = downloadInternal(context, apkUrl, onProgress, allowRangeRestart = true)
+    ): DownloadResult = downloadInternal(
+        context,
+        apkUrl,
+        expectedSize,
+        expectedSha256,
+        onProgress,
+        allowRangeRestart = true,
+    )
 
     private suspend fun downloadInternal(
         context: Context,
         apkUrl: String,
+        expectedSize: Long,
+        expectedSha256: String,
         onProgress: suspend (DownloadProgress) -> Unit,
         allowRangeRestart: Boolean,
     ): DownloadResult = withContext(Dispatchers.IO) {
@@ -134,7 +154,14 @@ object ApkDownloader {
             if (res.code == 416 && existing > 0) {
                 part.delete()
                 return@withContext if (allowRangeRestart) {
-                    downloadInternal(context, apkUrl, onProgress, allowRangeRestart = false)
+                    downloadInternal(
+                        context,
+                        apkUrl,
+                        expectedSize,
+                        expectedSha256,
+                        onProgress,
+                        allowRangeRestart = false,
+                    )
                 } else {
                     DownloadResult.Error(
                         context.getString(R.string.update_descarga_interrumpida),
@@ -162,6 +189,20 @@ object ApkDownloader {
                 resume -> totalFromRange ?: (already + bodyLength).takeIf { bodyLength > 0 } ?: 0L
                 bodyLength > 0 -> bodyLength
                 else -> 0L
+            }
+
+            // Falla rápido si el servidor anuncia otro tamaño que el asset de
+            // GitHub: no tiene sentido gastar la descarga.
+            if (expectedSize > 0 && total > 0 && total != expectedSize) {
+                part.delete()
+                return@withContext DownloadResult.Error(
+                    context.getString(
+                        R.string.update_tamano_no_coincide,
+                        formatMbPrecise(expectedSize),
+                        formatMbPrecise(total),
+                    ),
+                    retryable = true,
+                )
             }
 
             val free = dir.usableSpace
@@ -241,24 +282,17 @@ object ApkDownloader {
                 }
             }
 
-            val info = readApkInfo(context, apk)
-            if (info == null || info.packageName != context.packageName) {
-                apk.delete()
-                return@withContext DownloadResult.Error(
-                    context.getString(R.string.update_apk_corrupto),
-                    retryable = true,
-                )
+            when (val validation = validateApk(context, apk, expectedSize, expectedSha256)) {
+                ApkValidation.Ok -> {
+                    Timber.i("APK descargado y validado (tamaño, SHA-256 y firma)")
+                    DownloadResult.Success(apk)
+                }
+                is ApkValidation.Failed -> {
+                    apk.delete()
+                    part.delete()
+                    DownloadResult.Error(validation.message, validation.retryable)
+                }
             }
-            if (info.versionCode <= BuildConfig.VERSION_CODE) {
-                apk.delete()
-                return@withContext DownloadResult.Error(
-                    context.getString(R.string.update_version_no_reciente),
-                    retryable = true,
-                )
-            }
-
-            Timber.i("APK descargado y validado: %s (%d)", info.versionName, info.versionCode)
-            DownloadResult.Success(apk)
         }
     }
 
@@ -266,7 +300,7 @@ object ApkDownloader {
         return try {
             val info = context.packageManager.getPackageArchiveInfo(
                 apkFile.absolutePath,
-                PackageManager.GET_ACTIVITIES,
+                signingFlags(),
             ) ?: return null
             val code = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 info.longVersionCode.toInt()
@@ -278,6 +312,7 @@ object ApkDownloader {
                 packageName = info.packageName.orEmpty(),
                 versionCode = code,
                 versionName = info.versionName.orEmpty(),
+                signerSha256 = info.signerDigests(),
             )
         } catch (e: Exception) {
             Timber.w(e, "Error leyendo el APK descargado")
@@ -287,6 +322,131 @@ object ApkDownloader {
 
     fun readApkVersionCode(context: Context, apkFile: File): Int =
         readApkInfo(context, apkFile)?.versionCode ?: 0
+
+    /** 28+ expone SigningInfo; 26/27 solo signatures (también con v2). */
+    private fun signingFlags(): Int =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            PackageManager.GET_SIGNING_CERTIFICATES
+        } else {
+            @Suppress("DEPRECATION")
+            PackageManager.GET_SIGNATURES
+        }
+
+    @Suppress("DEPRECATION")
+    private fun PackageInfo.signerDigests(): Set<String> {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                signingInfo
+                    ?.apkContentsSigners
+                    ?.map { ApkVerification.sha256Hex(it.toByteArray()) }
+                    ?.toSet()
+                    .orEmpty()
+            } else {
+                signatures
+                    ?.map { ApkVerification.sha256Hex(it.toByteArray()) }
+                    ?.toSet()
+                    .orEmpty()
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "No se pudieron leer los firmantes del APK")
+            emptySet()
+        }
+    }
+
+    /**
+     * Firma SHA-256 de los certificados de la app instalada. Null si el
+     * PackageManager no pudo leerla.
+     */
+    fun installedSignerSha256(context: Context): Set<String>? {
+        return try {
+            context.packageManager
+                .getPackageInfo(context.packageName, signingFlags())
+                .signerDigests()
+                .takeIf { it.isNotEmpty() }
+        } catch (e: Exception) {
+            Timber.w(e, "No se pudo leer la firma de la app instalada")
+            null
+        }
+    }
+
+    /**
+     * Valida un APK antes de marcarlo listo o de abrir el instalador:
+     * tamaño publicado, SHA-256 del CI, paquete, versión y que la firma sea
+     * el mismo certificado de la app instalada. Devuelve el motivo legible
+     * del primer fallo, que es lo que el instalador no explica.
+     */
+    suspend fun validateApk(
+        context: Context,
+        apkFile: File,
+        expectedSize: Long,
+        expectedSha256: String,
+    ): ApkValidation = withContext(Dispatchers.IO) {
+        val length = if (apkFile.exists()) apkFile.length() else 0L
+        if (length < MIN_APK_BYTES) {
+            return@withContext ApkValidation.Failed(
+                context.getString(R.string.update_archivo_faltante),
+            )
+        }
+
+        if (expectedSize > 0L && length != expectedSize) {
+            return@withContext ApkValidation.Failed(
+                context.getString(
+                    R.string.update_tamano_no_coincide,
+                    formatMbPrecise(expectedSize),
+                    formatMbPrecise(length),
+                ),
+                retryable = true,
+            )
+        }
+
+        val expectedSha = ApkVerification.normalizeSha256(expectedSha256)
+        if (expectedSha256.isNotBlank() && expectedSha == null) {
+            return@withContext ApkValidation.Failed(
+                context.getString(R.string.update_sha_no_coincide),
+                retryable = true,
+            )
+        }
+        if (expectedSha != null) {
+            val actualSha = ApkVerification.sha256Hex(apkFile)
+            if (!ApkVerification.sha256Equals(expectedSha, actualSha)) {
+                return@withContext ApkValidation.Failed(
+                    context.getString(R.string.update_sha_no_coincide),
+                    retryable = true,
+                )
+            }
+        }
+
+        val info = readApkInfo(context, apkFile)
+            ?: return@withContext ApkValidation.Failed(
+                context.getString(R.string.update_apk_corrupto),
+            )
+        if (info.packageName != context.packageName) {
+            return@withContext ApkValidation.Failed(
+                context.getString(R.string.update_apk_corrupto),
+            )
+        }
+        if (info.versionCode <= BuildConfig.VERSION_CODE) {
+            return@withContext ApkValidation.Failed(
+                context.getString(R.string.update_version_no_reciente),
+            )
+        }
+
+        val installed = installedSignerSha256(context)
+        if (info.signerSha256.isEmpty() || installed.isNullOrEmpty()) {
+            return@withContext ApkValidation.Failed(
+                context.getString(R.string.update_firma_ilegible),
+                retryable = false,
+            )
+        }
+        if (installed != info.signerSha256) {
+            return@withContext ApkValidation.Failed(
+                context.getString(R.string.update_firma_no_coincide),
+                retryable = false,
+            )
+        }
+
+        ApkValidation.Ok
+    }
 
     fun canInstallPackages(context: Context): Boolean =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -362,4 +522,7 @@ object ApkDownloader {
 
     private fun formatMbLong(bytes: Long): String =
         String.format(Locale.getDefault(), "%.0f", bytes / 1_000_000.0)
+
+    private fun formatMbPrecise(bytes: Long): String =
+        String.format(Locale.getDefault(), "%.1f", bytes / 1_000_000.0)
 }

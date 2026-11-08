@@ -80,14 +80,15 @@ Capas y flujo de datos: `README.md` §3. Acá solo lo que no se puede romper:
 
 ## Actualizador de versiones
 
-- Fuente: `releases/latest` de GitHub; exige asset `app-universal-release.apk`. Detección al abrir + worker 6h + manual; banner persistente + diálogo + notificación (canal `app_updates`).
+- Fuente: `releases/latest` de GitHub. Prefiere el APK de la ABI del teléfono (`app-arm64-v8a-release.apk` / `app-armeabi-v7a-release.apk`) y cae a `app-universal-release.apk`. Detección al abrir + worker 6h + manual; banner persistente + diálogo + notificación (canal `app_updates`).
 - Dedupe de aviso y restauración del pendiente por **tag completo**, no por code (`v12.20.1` colisiona con `v12.20` en `versionCode`): `lastNotifiedTag`, `PendingUpdate.versionTag`, `isPendingNewer`.
+- Integridad antes de marcar "lista" y antes de abrir el instalador: tamaño real del asset (`assets[].size`), SHA-256 publicado por el CI (`SHA256SUMS.txt`, fallback `assets[].digest`), paquete, versión y **misma firma** que la app instalada (SHA-256 de los certificados). Sin tamaño o SHA publicados no se ofrece la actualización. `PendingUpdate` guarda `apkSize`/`apkSha256`; los pendientes viejos sin esos datos se validan solo por paquete/versión/firma.
 - `POST_NOTIFICATIONS` se pide una sola vez al aparecer el banner (`wasUpdateNotifAsked`); si lo niegan, quedan banner + diálogo. `cleanTempApk` conserva `update.apk` si sigue más nuevo que lo instalado.
 
 ## Release y Git
 
 - La versión oficial es `versionCode`/`versionName` en `app/build.gradle`; cada release debe subir ambos y usar un tag `v*` nuevo. `./gradlew :app:bumpVersion` sube el minor y valida `versionCode == major*1000+minor` (falla si hay mismatch o si es `X.Y.Z`); no commitea ni taguea.
-- `.github/workflows/release.yml` corre solo al hacer push de un tag `v*` y publica `app-universal-release.apk`.
+- `.github/workflows/release.yml` corre solo al hacer push de un tag `v*` y publica los APK por ABI + universal y `SHA256SUMS.txt` (la app verifica ese hash).
 - Acciones CI están fijadas por SHA; no cambiar a tags flotantes. `softprops/action-gh-release` usa `overwrite_files`.
 - Firma local: `keystore.properties` (gitignored). CI: `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`, `KEYSTORE_PATH`.
 - No incluir secretos ni los Excel fuente de la raíz en commits. No hacer commit, tag o push salvo petición explícita.
