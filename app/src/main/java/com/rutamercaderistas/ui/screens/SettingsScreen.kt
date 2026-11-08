@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rutamercaderistas.R
+import com.rutamercaderistas.ui.components.IosModal
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.viewmodel.SettingsViewModel
@@ -79,6 +80,7 @@ fun SettingsScreen(
     val fontScale by viewModel.fontScale.collectAsStateWithLifecycle()
     val transportMode by viewModel.transportMode.collectAsStateWithLifecycle()
     var stagedTransport by remember { mutableStateOf<String?>(null) }
+    var confirmClearHistory by remember { mutableStateOf(false) }
     val displayMode = stagedTransport ?: transportMode
     val hasPendingChange = stagedTransport != null && stagedTransport != transportMode
 
@@ -298,13 +300,31 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                     }
                     androidx.compose.material3.OutlinedButton(onClick = {
-                        viewModel.clearSyncHistory()
+                        confirmClearHistory = true
                     }) {
                         Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.width(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(stringResource(R.string.sync_historial_borrar))
                     }
                 }
+            }
+
+            IosModal(
+                visible = confirmClearHistory,
+                onDismiss = { confirmClearHistory = false },
+                title = stringResource(R.string.sync_historial_titulo),
+                confirmText = stringResource(R.string.sync_historial_borrar),
+                onConfirm = {
+                    viewModel.clearSyncHistory()
+                    confirmClearHistory = false
+                },
+                dismissText = stringResource(R.string.update_cancelar),
+            ) {
+                Text(
+                    text = stringResource(R.string.sync_historial_borrar_pregunta),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
             }
 
             SettingsCard(title = stringResource(R.string.settings_about)) {
