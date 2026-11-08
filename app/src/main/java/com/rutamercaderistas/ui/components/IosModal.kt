@@ -47,7 +47,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.Elevation
 import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.ui.theme.pressScale
@@ -185,51 +184,23 @@ fun IosModal(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
                                 if (dismissText != null) {
-                                    val onClickDismiss = onDismissAction ?: onDismiss
-                                    val dismissPress = rememberPressInteractionSource()
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clip(ComponentShapes.button)
-                                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
-                                            .pressScale(dismissPress)
-                                            .clickable(
-                                                interactionSource = dismissPress,
-                                                indication = LocalIndication.current,
-                                                onClick = onClickDismiss,
-                                            )
-                                            .padding(vertical = 14.dp),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        Text(
-                                            text = dismissText,
-                                            style = MaterialTheme.typography.labelLarge,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
+                                    AppButton(
+                                        text = dismissText,
+                                        onClick = onDismissAction ?: onDismiss,
+                                        modifier = Modifier.weight(1f),
+                                        variant = AppButtonVariant.Tonal,
+                                    )
                                 }
                                 if (confirmText != null) {
-                                    val confirmPress = rememberPressInteractionSource()
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(if (dismissText != null) 1f else 0f)
-                                            .clip(ComponentShapes.button)
-                                            .background(MaterialTheme.colorScheme.primary)
-                                            .pressScale(confirmPress)
-                                            .clickable(
-                                                interactionSource = confirmPress,
-                                                indication = LocalIndication.current,
-                                                onClick = onConfirm ?: onDismiss,
-                                            )
-                                            .padding(vertical = 14.dp),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        Text(
-                                            text = confirmText,
-                                            style = MaterialTheme.typography.labelLarge,
-                                            color = MaterialTheme.colorScheme.onPrimary,
-                                        )
-                                    }
+                                    AppButton(
+                                        text = confirmText,
+                                        onClick = onConfirm ?: onDismiss,
+                                        modifier = if (dismissText != null) {
+                                            Modifier.weight(1f)
+                                        } else {
+                                            Modifier.fillMaxWidth()
+                                        },
+                                    )
                                 }
                             }
                         }

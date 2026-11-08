@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -207,8 +208,8 @@ fun rememberHeaderCollapseState(hasPromos: Boolean): HeaderCollapseState {
         typography.bodyMedium.lineHeight.toDp() + typography.labelLarge.lineHeight.toDp()
     }
     val promo = if (hasPromos) {
-        val altoTexto = with(density) { typography.labelLarge.lineHeight.toDp() }
-        6.dp + 12.dp + maxOf(22.dp, altoTexto)
+        // El banner respeta el target táctil de 48 dp; antes medía 34.
+        6.dp + LocalAppDimens.current.touchMin
     } else {
         0.dp
     }
@@ -659,6 +660,7 @@ private fun PromosPorVencerBanner(
             .shadow(6.dp + 6.dp * bgPulse, shape = MaterialTheme.shapes.extraSmall)
             .clip(MaterialTheme.shapes.extraSmall)
             .background(Brush.horizontalGradient(listOf(UrgencyOrange, PromoGradientEnd)))
+            .heightIn(min = LocalAppDimens.current.touchMin)
             .clickable(onClick = onClick, role = Role.Button)
             .padding(horizontal = 12.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center,

@@ -16,12 +16,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -33,13 +31,11 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.SystemUpdate
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -60,7 +56,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.rutamercaderistas.R
 import com.rutamercaderistas.ui.theme.BrandIndigoText
-import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.DownloadGlassBorderBottom
 import com.rutamercaderistas.ui.theme.DownloadGlassBorderTop
 import com.rutamercaderistas.ui.theme.DownloadGlassWash
@@ -263,13 +258,12 @@ private fun AvailableContent(
         horizontalArrangement = Arrangement.End,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TextButton(onClick = onLater) {
-            Text(
-                text = stringResource(R.string.mas_tarde),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        AppButton(
+            text = stringResource(R.string.mas_tarde),
+            onClick = onLater,
+            variant = AppButtonVariant.Text,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Spacer(Modifier.width(4.dp))
         PrimaryAction(
             text = stringResource(R.string.actualizar_btn),
@@ -383,19 +377,13 @@ private fun DownloadingContent(
         horizontalArrangement = Arrangement.End,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TextButton(
+        AppButton(
+            text = stringResource(R.string.update_cancelar),
             onClick = onCancel,
-            shape = ComponentShapes.pill,
+            variant = AppButtonVariant.Text,
+            contentColor = colors.onSurfaceVariant,
             border = BorderStroke(1.dp, DownloadNeonTrackEdge),
-            contentPadding = PaddingValues(horizontal = 18.dp),
-            modifier = Modifier.heightIn(min = dimens.touchMin),
-        ) {
-            Text(
-                text = stringResource(R.string.update_cancelar),
-                style = MaterialTheme.typography.labelLarge,
-                color = colors.onSurfaceVariant,
-            )
-        }
+        )
     }
 }
 
@@ -502,15 +490,14 @@ private fun FailedContent(
         horizontalArrangement = Arrangement.End,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TextButton(onClick = onLater) {
-            Text(
-                text = stringResource(
-                    if (failed.retryable) R.string.mas_tarde else R.string.update_ocultar,
-                ),
-                style = MaterialTheme.typography.labelLarge,
-                color = colors.onSurfaceVariant,
-            )
-        }
+        AppButton(
+            text = stringResource(
+                if (failed.retryable) R.string.mas_tarde else R.string.update_ocultar,
+            ),
+            onClick = onLater,
+            variant = AppButtonVariant.Text,
+            contentColor = colors.onSurfaceVariant,
+        )
         if (failed.retryable) {
             Spacer(Modifier.width(4.dp))
             PrimaryAction(
@@ -695,18 +682,7 @@ private fun VersionPill(version: String) {
 
 @Composable
 private fun PrimaryAction(text: String, onClick: () -> Unit) {
-    val dimens = LocalAppDimens.current
-    Button(
-        onClick = onClick,
-        shape = ComponentShapes.button,
-        contentPadding = PaddingValues(horizontal = 20.dp),
-        modifier = Modifier.heightIn(min = dimens.touchMin),
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge,
-        )
-    }
+    AppButton(text = text, onClick = onClick)
 }
 
 /** "12.52 → 12.53"; null si no hay salto que contar. */

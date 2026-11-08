@@ -16,8 +16,6 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.Button
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -93,15 +91,18 @@ fun ShareSelectorSheet(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                TextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.compartir_cancelar))
-                }
-                Button(onClick = {
-                    onShare(selectedMode, includeMaps)
-                    onDismiss()
-                }) {
-                    Text(stringResource(R.string.compartir))
-                }
+                AppButton(
+                    text = stringResource(R.string.compartir_cancelar),
+                    onClick = onDismiss,
+                    variant = AppButtonVariant.Text,
+                )
+                AppButton(
+                    text = stringResource(R.string.compartir),
+                    onClick = {
+                        onShare(selectedMode, includeMaps)
+                        onDismiss()
+                    },
+                )
             }
             Spacer(modifier = Modifier.height(16.dp))
         }

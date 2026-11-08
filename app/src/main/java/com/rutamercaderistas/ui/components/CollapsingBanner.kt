@@ -27,14 +27,12 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.WarningAmber
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -589,17 +587,13 @@ fun BannerAccion(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    TextButton(
+    AppButton(
+        text = texto,
         onClick = onClick,
-        modifier = modifier.heightIn(min = LocalAppDimens.current.touchMin),
-        colors = ButtonDefaults.textButtonColors(contentColor = BannerText),
-    ) {
-        Text(
-            text = texto,
-            style = MaterialTheme.typography.labelLarge,
-            maxLines = 1,
-        )
-    }
+        modifier = modifier,
+        variant = AppButtonVariant.Text,
+        contentColor = BannerText,
+    )
 }
 
 @Composable

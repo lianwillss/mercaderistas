@@ -17,8 +17,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,7 +42,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
@@ -75,6 +72,8 @@ import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.domain.model.normalizeChain
 import com.rutamercaderistas.models.LocalDelDia
 import com.rutamercaderistas.ui.components.AppFilterChip
+import com.rutamercaderistas.ui.components.AppButton
+import com.rutamercaderistas.ui.components.AppButtonVariant
 import com.rutamercaderistas.ui.components.CodigoChip
 import com.rutamercaderistas.ui.components.ScreenHeader
 import com.rutamercaderistas.ui.theme.LocalAppDimens
@@ -506,14 +505,15 @@ private fun LocaleSearchRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        TextButton(
+                        AppButton(
+                            text = stringResource(R.string.como_llegar),
                             onClick = { onAddressClick(address) },
                             modifier = Modifier.semantics { contentDescription = navigateCd },
-                        ) {
-                            Text(text = stringResource(R.string.como_llegar))
-                        }
+                            variant = AppButtonVariant.Text,
+                        )
                         if (local.direccion.isNotBlank()) {
-                            TextButton(
+                            AppButton(
+                                text = stringResource(R.string.compartir_copiar_direccion),
                                 onClick = {
                                     onCopyAddress(
                                         buildString {
@@ -522,15 +522,9 @@ private fun LocaleSearchRow(
                                         }
                                     )
                                 },
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.ContentCopy,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = stringResource(R.string.compartir_copiar_direccion))
-                            }
+                                variant = AppButtonVariant.Text,
+                                icon = Icons.Outlined.ContentCopy,
+                            )
                         }
                     }
                 }

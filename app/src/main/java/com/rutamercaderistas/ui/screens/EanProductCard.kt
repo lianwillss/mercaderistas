@@ -21,7 +21,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -57,6 +56,7 @@ import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.EanProductEntity
 import com.rutamercaderistas.services.brandNote
 import com.rutamercaderistas.services.normalizeSearch
+import com.rutamercaderistas.ui.components.AppButton
 import com.rutamercaderistas.ui.components.HighlightedText
 import com.rutamercaderistas.ui.theme.AccentBlue
 import com.rutamercaderistas.ui.theme.AccentBlueSoft
@@ -453,12 +453,10 @@ internal fun EanEmptyState(query: String, onClear: () -> Unit = {}) {
             textAlign = TextAlign.Center,
         )
         Spacer(modifier = Modifier.height(dimens.spacingMd))
-        Button(
+        AppButton(
+            text = stringResource(R.string.ean_clear_search),
             onClick = onClear,
-            modifier = Modifier.heightIn(min = dimens.touchMin),
-        ) {
-            Text(stringResource(R.string.ean_clear_search))
-        }
+        )
     }
 }
 

@@ -31,9 +31,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Button
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,7 +44,6 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -56,8 +53,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rutamercaderistas.R
+import com.rutamercaderistas.ui.components.AppButton
+import com.rutamercaderistas.ui.components.AppButtonVariant
 import com.rutamercaderistas.ui.components.IosModal
-import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.viewmodel.SettingsViewModel
 import com.rutamercaderistas.viewmodel.StockAccessViewModel
@@ -137,17 +135,18 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Button(
+                        AppButton(
+                            text = if (acceso.conectado) "Reconectar" else "Conectar",
                             onClick = accessViewModel::conectar,
                             enabled = !acceso.trabajando,
-                        ) {
-                            Text(if (acceso.conectado) "Reconectar" else "Conectar")
-                        }
+                        )
                         if (acceso.conectado) {
                             Spacer(Modifier.width(8.dp))
-                            TextButton(onClick = accessViewModel::desconectar) {
-                                Text("Desconectar")
-                            }
+                            AppButton(
+                                text = "Desconectar",
+                                onClick = accessViewModel::desconectar,
+                                variant = AppButtonVariant.Text,
+                            )
                         }
                         if (acceso.trabajando) {
                             Spacer(Modifier.width(12.dp))
@@ -170,9 +169,11 @@ fun SettingsScreen(
 
             SettingsCard(title = stringResource(R.string.settings_font_size)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = { viewModel.setFontScale((fontScale - 0.1f).coerceIn(0.8f, 1.8f)) }) {
-                        Text("A−", style = MaterialTheme.typography.labelLarge)
-                    }
+                    AppButton(
+                        text = "A−",
+                        onClick = { viewModel.setFontScale((fontScale - 0.1f).coerceIn(0.8f, 1.8f)) },
+                        variant = AppButtonVariant.Text,
+                    )
                     Slider(
                         value = fontScale,
                         onValueChange = { viewModel.setFontScale(it) },
@@ -180,9 +181,11 @@ fun SettingsScreen(
                         steps = 9,
                         modifier = Modifier.weight(1f),
                     )
-                    TextButton(onClick = { viewModel.setFontScale((fontScale + 0.1f).coerceIn(0.8f, 1.8f)) }) {
-                        Text("A+", style = MaterialTheme.typography.labelLarge)
-                    }
+                    AppButton(
+                        text = "A+",
+                        onClick = { viewModel.setFontScale((fontScale + 0.1f).coerceIn(0.8f, 1.8f)) },
+                        variant = AppButtonVariant.Text,
+                    )
                 }
                 Text(
                     text = String.format("%.1f×", fontScale),
@@ -225,16 +228,15 @@ fun SettingsScreen(
                     }
                     if (hasPendingChange) {
                         Spacer(modifier = Modifier.height(12.dp))
-                        Button(
+                        AppButton(
+                            text = stringResource(R.string.aplicar),
                             onClick = {
                                 stagedTransport?.let { viewModel.setTransportMode(it) }
                                 Toast.makeText(context, R.string.transporte_aplicado, Toast.LENGTH_SHORT).show()
                                 stagedTransport = null
                             },
                             modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(stringResource(R.string.aplicar))
-                        }
+                        )
                     }
                 }
             }
@@ -246,25 +248,27 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                androidx.compose.material3.OutlinedButton(onClick = {
-                    viewModel.clearEanCache()
-                    Toast.makeText(context, R.string.settings_ean_cleared, Toast.LENGTH_SHORT).show()
-                }) {
-                    Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.width(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(stringResource(R.string.settings_clear_ean_cache))
-                }
+                AppButton(
+                    text = stringResource(R.string.settings_clear_ean_cache),
+                    onClick = {
+                        viewModel.clearEanCache()
+                        Toast.makeText(context, R.string.settings_ean_cleared, Toast.LENGTH_SHORT).show()
+                    },
+                    variant = AppButtonVariant.Outlined,
+                    icon = Icons.Outlined.Delete,
+                )
             }
 
             SettingsCard(title = stringResource(R.string.settings_clear_history)) {
-                androidx.compose.material3.OutlinedButton(onClick = {
-                    viewModel.clearSearchHistory()
-                    Toast.makeText(context, R.string.settings_history_cleared, Toast.LENGTH_SHORT).show()
-                }) {
-                    Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.width(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(stringResource(R.string.settings_clear_history))
-                }
+                AppButton(
+                    text = stringResource(R.string.settings_clear_history),
+                    onClick = {
+                        viewModel.clearSearchHistory()
+                        Toast.makeText(context, R.string.settings_history_cleared, Toast.LENGTH_SHORT).show()
+                    },
+                    variant = AppButtonVariant.Outlined,
+                    icon = Icons.Outlined.Delete,
+                )
             }
 
             SettingsCard(title = stringResource(R.string.sync_historial_titulo)) {
@@ -299,13 +303,12 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                     }
-                    androidx.compose.material3.OutlinedButton(onClick = {
-                        confirmClearHistory = true
-                    }) {
-                        Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.width(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(stringResource(R.string.sync_historial_borrar))
-                    }
+                    AppButton(
+                        text = stringResource(R.string.sync_historial_borrar),
+                        onClick = { confirmClearHistory = true },
+                        variant = AppButtonVariant.Outlined,
+                        icon = Icons.Outlined.Delete,
+                    )
                 }
             }
 

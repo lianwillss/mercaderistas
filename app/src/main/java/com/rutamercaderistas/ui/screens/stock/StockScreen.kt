@@ -61,7 +61,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -124,6 +123,8 @@ import com.rutamercaderistas.data.stock.marcaFueraDeRuta
 import com.rutamercaderistas.data.stock.marcasPara
 import com.rutamercaderistas.data.stock.normalizarRuta
 import com.rutamercaderistas.data.stock.normalizarStock
+import com.rutamercaderistas.ui.components.AppButton
+import com.rutamercaderistas.ui.components.AppButtonVariant
 import com.rutamercaderistas.ui.components.AppFilterChip
 import com.rutamercaderistas.ui.components.BannerAccion
 import com.rutamercaderistas.ui.components.BannerAlturas
@@ -629,7 +630,8 @@ private fun StockFiltersCard(
                         .semantics { heading() },
                 )
                 if (hayFiltros) {
-                    TextButton(
+                    AppButton(
+                        text = "Limpiar",
                         onClick = {
                             onFilter {
                                 it.copy(
@@ -644,7 +646,8 @@ private fun StockFiltersCard(
                                 )
                             }
                         },
-                    ) { Text("Limpiar") }
+                        variant = AppButtonVariant.Text,
+                    )
                 }
             }
 
@@ -1207,15 +1210,12 @@ private fun BarraHerramientas(
             compacto = true,
         )
         Spacer(Modifier.weight(1f))
-        TextButton(onClick = onCompartir) {
-            Icon(
-                imageVector = Icons.Outlined.Share,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-            )
-            Spacer(Modifier.width(4.dp))
-            Text("Compartir")
-        }
+        AppButton(
+            text = "Compartir",
+            onClick = onCompartir,
+            variant = AppButtonVariant.Text,
+            icon = Icons.Outlined.Share,
+        )
     }
 }
 
@@ -1464,7 +1464,11 @@ private fun EstadoCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (accion != null && onAccion != null) {
-                TextButton(onClick = onAccion) { Text(accion) }
+                AppButton(
+                    text = accion,
+                    onClick = onAccion,
+                    variant = AppButtonVariant.Text,
+                )
             }
         }
     }

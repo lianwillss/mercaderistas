@@ -46,11 +46,9 @@ import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -76,6 +74,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.rutamercaderistas.R
 import com.rutamercaderistas.models.DiaSemana
+import com.rutamercaderistas.ui.components.AppButton
+import com.rutamercaderistas.ui.components.AppButtonVariant
 import com.rutamercaderistas.ui.components.DaySelector
 import com.rutamercaderistas.ui.components.HeaderCollapseState
 import com.rutamercaderistas.ui.components.HeaderSection
@@ -439,13 +439,12 @@ private fun SyncErrorBanner(message: String, onRetry: () -> Unit) {
             modifier = Modifier.weight(1f),
         )
         Spacer(modifier = Modifier.width(8.dp))
-        TextButton(onClick = onRetry) {
-            Text(
-                text = stringResource(R.string.reintentar),
-                color = MaterialTheme.colorScheme.onErrorContainer,
-                fontWeight = FontWeight.Bold,
-            )
-        }
+        AppButton(
+            text = stringResource(R.string.reintentar),
+            onClick = onRetry,
+            variant = AppButtonVariant.Text,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        )
     }
 }
 
@@ -512,13 +511,11 @@ private fun SyncChangesBanner(changes: PlanillaChanges, onDismiss: () -> Unit) {
                 )
             }
         }
-        TextButton(onClick = { showDetail = true }) {
-            Text(
-                text = stringResource(R.string.ver_detalle),
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold,
-            )
-        }
+        AppButton(
+            text = stringResource(R.string.ver_detalle),
+            onClick = { showDetail = true },
+            variant = AppButtonVariant.Text,
+        )
         IconButton(onClick = onDismiss) {
             Icon(
                 imageVector = Icons.Outlined.Close,
@@ -710,21 +707,18 @@ private fun FirstLaunchEmptyState(
             }
         }
         Spacer(modifier = Modifier.height(dimens.spacingLg))
-        Button(
+        AppButton(
+            text = stringResource(R.string.empty_state_accion),
             onClick = onSync,
             modifier = Modifier.fillMaxWidth(),
-        ) {
-            Icon(Icons.Outlined.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(stringResource(R.string.empty_state_accion))
-        }
+            icon = Icons.Outlined.Sync,
+        )
         Spacer(modifier = Modifier.height(dimens.spacingSm))
-        TextButton(onClick = onOpenManual) {
-            Text(
-                text = stringResource(R.string.header_manual_usuario),
-                style = MaterialTheme.typography.labelMedium,
-            )
-        }
+        AppButton(
+            text = stringResource(R.string.header_manual_usuario),
+            onClick = onOpenManual,
+            variant = AppButtonVariant.Text,
+        )
     }
 }
 

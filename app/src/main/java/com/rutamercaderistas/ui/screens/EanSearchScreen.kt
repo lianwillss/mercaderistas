@@ -49,13 +49,11 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.CheckBox
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
@@ -94,6 +92,8 @@ import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.BrandCountResult
 import com.rutamercaderistas.data.local.CajaCountResult
 import com.rutamercaderistas.data.local.EanProductEntity
+import com.rutamercaderistas.ui.components.AppButton
+import com.rutamercaderistas.ui.components.AppButtonVariant
 import com.rutamercaderistas.ui.components.AppFilterChip
 import com.rutamercaderistas.ui.components.IosModal
 import com.rutamercaderistas.ui.theme.LocalAppDimens
@@ -306,9 +306,10 @@ private fun EanErrorContent(message: String, onRetry: () -> Unit) {
             modifier = Modifier.padding(horizontal = dimens.spacingLg),
         )
         Spacer(modifier = Modifier.height(dimens.spacingLg))
-        Button(onClick = onRetry) {
-            Text(stringResource(R.string.reintentar_carga))
-        }
+        AppButton(
+            text = stringResource(R.string.reintentar_carga),
+            onClick = onRetry,
+        )
     }
 }
 
@@ -412,19 +413,17 @@ private fun EanSearchContent(
                         val visibleEans = rows.filterIsInstance<EanResultRow.Product>()
                             .map { it.product.eanPrincipal }
                             .toSet()
-                        TextButton(
-                            onClick = {
-                                selectedEans = visibleEans
-                            },
-                        ) {
-                            Text(stringResource(R.string.ean_seleccionar_todo))
-                        }
+                        AppButton(
+                            text = stringResource(R.string.ean_seleccionar_todo),
+                            onClick = { selectedEans = visibleEans },
+                            variant = AppButtonVariant.Text,
+                        )
                         Spacer(modifier = Modifier.width(dimens.spacingXs))
-                        TextButton(
+                        AppButton(
+                            text = stringResource(R.string.ean_deseleccionar_todo),
                             onClick = { selectedEans = emptySet() },
-                        ) {
-                            Text(stringResource(R.string.ean_deseleccionar_todo))
-                        }
+                            variant = AppButtonVariant.Text,
+                        )
                         Spacer(modifier = Modifier.width(dimens.spacingSm))
                         IconButton(
                             onClick = { selectionMode = false; selectedEans = emptySet() },
@@ -529,7 +528,11 @@ private fun EanSearchContent(
                             horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Button(
+                            AppButton(
+                                text = stringResource(
+                                    R.string.ean_compartir_seleccionados,
+                                    selectedEans.size,
+                                ),
                                 onClick = {
                                     val selectedProducts = selectedEans
                                         .mapNotNull { ean ->
@@ -567,15 +570,12 @@ private fun EanSearchContent(
                                         ),
                                     )
                                 },
-                            ) {
-                                Text(
-                                    stringResource(
-                                        R.string.ean_compartir_seleccionados,
-                                        selectedEans.size,
-                                    )
-                                )
-                            }
-                            Button(
+                            )
+                            AppButton(
+                                text = stringResource(
+                                    R.string.ean_copiar_seleccionados,
+                                    selectedEans.size,
+                                ),
                                 onClick = {
                                     val eans = selectedEans.sorted().joinToString("\n")
                                     val cm = context.getSystemService(
@@ -593,14 +593,7 @@ private fun EanSearchContent(
                                         Toast.LENGTH_SHORT,
                                     ).show()
                                 },
-                            ) {
-                                Text(
-                                    stringResource(
-                                        R.string.ean_copiar_seleccionados,
-                                        selectedEans.size,
-                                    )
-                                )
-                            }
+                            )
                         }
                     }
                 }
@@ -633,9 +626,10 @@ private fun EanCatalogEmptyContent(onReload: () -> Unit) {
             modifier = Modifier.semantics { heading() },
         )
         Spacer(modifier = Modifier.height(dimens.spacingMd))
-        Button(onClick = onReload, modifier = Modifier.heightIn(min = dimens.touchMin)) {
-            Text(stringResource(R.string.ean_reload_catalog))
-        }
+        AppButton(
+            text = stringResource(R.string.ean_reload_catalog),
+            onClick = onReload,
+        )
     }
 }
 
@@ -657,9 +651,10 @@ private fun EanFiltersEmptyContent(onClear: () -> Unit) {
             modifier = Modifier.semantics { heading() },
         )
         Spacer(modifier = Modifier.height(dimens.spacingMd))
-        Button(onClick = onClear, modifier = Modifier.heightIn(min = dimens.touchMin)) {
-            Text(stringResource(R.string.ean_clear_filters))
-        }
+        AppButton(
+            text = stringResource(R.string.ean_clear_filters),
+            onClick = onClear,
+        )
     }
 }
 
@@ -1077,7 +1072,8 @@ private fun EanBarcodeZoom(
                 textAlign = TextAlign.Center,
             )
             Spacer(modifier = Modifier.height(dimens.spacingMd))
-            Button(
+            AppButton(
+                text = stringResource(R.string.ean_copy_cd),
                 onClick = {
                     val cm = context.getSystemService(ClipboardManager::class.java)
                     cm?.setPrimaryClip(
@@ -1085,12 +1081,10 @@ private fun EanBarcodeZoom(
                     )
                     Toast.makeText(context, R.string.ean_copied, Toast.LENGTH_SHORT).show()
                 },
-                modifier = Modifier.heightIn(min = dimens.touchMin),
-            ) {
-                Text(stringResource(R.string.ean_copy_cd))
-            }
+            )
             Spacer(modifier = Modifier.height(dimens.spacingSm))
-            Button(
+            AppButton(
+                text = stringResource(R.string.ean_share_image),
                 onClick = {
                     try {
                         val file = ShareImageGenerator.generateForEanProduct(
@@ -1118,10 +1112,7 @@ private fun EanBarcodeZoom(
                         Toast.makeText(context, R.string.ean_share_error, Toast.LENGTH_SHORT).show()
                     }
                 },
-                modifier = Modifier.heightIn(min = dimens.touchMin),
-            ) {
-                Text(stringResource(R.string.ean_share_image))
-            }
+            )
         }
     }
 }

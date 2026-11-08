@@ -30,13 +30,11 @@ import androidx.compose.material.icons.outlined.ShoppingBag
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -218,10 +216,19 @@ fun OnboardingOverlay(
                     }
                     androidx.compose.foundation.layout.Spacer(Modifier.height(16.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(onClick = onDismiss) { Text(stringResource(R.string.onboarding_skip)) }
-                        Button(onClick = { if (isLast) onDismiss() else index++ }) {
-                            Text(if (isLast) stringResource(R.string.onboarding_got_it) else stringResource(R.string.onboarding_next), fontWeight = FontWeight.Bold)
-                        }
+                        AppButton(
+                            text = stringResource(R.string.onboarding_skip),
+                            onClick = onDismiss,
+                            variant = AppButtonVariant.Text,
+                        )
+                        AppButton(
+                            text = if (isLast) {
+                                stringResource(R.string.onboarding_got_it)
+                            } else {
+                                stringResource(R.string.onboarding_next)
+                            },
+                            onClick = { if (isLast) onDismiss() else index++ },
+                        )
                     }
                 }
             }
