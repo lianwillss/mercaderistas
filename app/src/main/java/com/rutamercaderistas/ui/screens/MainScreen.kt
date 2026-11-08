@@ -61,7 +61,6 @@ import com.rutamercaderistas.ui.theme.appWindowWidth
 import com.rutamercaderistas.viewmodel.RouteUiState
 import com.rutamercaderistas.viewmodel.SyncUiState
 import com.rutamercaderistas.viewmodel.UpdateCardUiState
-import androidx.compose.foundation.isSystemInDarkTheme
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import androidx.datastore.preferences.core.Preferences
@@ -112,11 +111,10 @@ fun MainScreen(
     val isMainRoute = backStackEntry?.destination?.hasRoute<MainRoute>() ?: true
     // Stock pinta su banner morado hasta el borde superior: iconos claros.
     val isStockRoute = backStackEntry?.destination?.hasRoute<StockRoute>() == true
-    val darkTheme = isSystemInDarkTheme()
     SystemBarAppearance(
-        // Header/stock siempre oscuros; el resto sigue al tema.
-        lightIcons = if (isMainRoute || isStockRoute) false else !darkTheme,
-        lightNavIcons = !darkTheme,
+        // Header/stock llevan fondo oscuro: iconos claros.
+        lightIcons = !isMainRoute && !isStockRoute,
+        lightNavIcons = true,
     )
 
     val onGlobalSearch = { navController.navigate(GlobalSearchRoute) }
