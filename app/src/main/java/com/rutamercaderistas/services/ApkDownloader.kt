@@ -16,6 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import timber.log.Timber
@@ -62,12 +63,22 @@ object ApkDownloader {
     const val PART_NAME = "update.apk.part"
 
     private const val MIN_APK_BYTES = 1024L
-    private const val DISK_MARGIN_BYTES = 20L * 1024 * 1024
+    /** Android necesita aproximadamente otro tanto al instalar (copia en /data/app + metadatos). */
+    internal const val INSTALL_SPACE_FACTOR = 2L
+    internal const val DISK_MARGIN_BYTES = 20L * 1024 * 1024
+    /** 1 MB de buffer reduce drásticamente las llamadas al sistema por chunk de descarga. */
+    private const val DOWNLOAD_BUFFER_SIZE = 1024 * 1024
     private const val UNKNOWN_SIZE_MIN_FREE = 200L * 1024 * 1024
+
+    /** Espacio libre necesario (bytes) para descargar e instalar un APK: ~2× el tamaño + margen. */
+    internal fun espacioNecesarioParaInstalacion(apkSize: Long): Long =
+        apkSize * INSTALL_SPACE_FACTOR + DISK_MARGIN_BYTES
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(5, TimeUnit.MINUTES)
+        .writeTimeout(5, TimeUnit.MINUTES)
+        .connectionPool(ConnectionPool(8, 10, TimeUnit.MINUTES))
         .followRedirects(true)
         .followSslRedirects(true)
         .retryOnConnectionFailure(true)
@@ -207,7 +218,11 @@ object ApkDownloader {
 
             val free = dir.usableSpace
             if (total > 0) {
-                val needed = (total - already).coerceAtLeast(0L) + DISK_MARGIN_BYTES
+                // Espacio para el APK descargado y para la instalación: Android
+                // duplica el APK al instalarlo (copia en /data/app + metadatos).
+                // Exigir ~2× el tamaño + margen evita que la descarga termine
+                // bien y la instalación falle por falta de espacio.
+                val needed = total * INSTALL_SPACE_FACTOR + DISK_MARGIN_BYTES
                 if (free < needed) {
                     val missingMb = ((needed - free) / 1_000_000.0)
                     return@withContext DownloadResult.Error(
@@ -227,7 +242,7 @@ object ApkDownloader {
             try {
                 body.byteStream().use { input ->
                     FileOutputStream(part, already > 0).use { output ->
-                        val buffer = ByteArray(64 * 1024)
+                        val buffer = ByteArray(DOWNLOAD_BUFFER_SIZE)
                         var read: Int
                         var downloaded = already
                         var lastPercent = -1
@@ -477,6 +492,17 @@ object ApkDownloader {
         if (!apkFile.exists() || apkFile.length() < MIN_APK_BYTES) {
             return context.getString(R.string.update_archivo_faltante)
         }
+        // Antes de lanzar el instalador: Android necesita espacio para el APK
+        // ya descargado y otro tanto para instalarlo; si no queda, la
+        // instalación falla tras una descarga exitosa. Un directorio padre
+        // nulo no debería ocurrir, pero no se trata como "sin espacio" para
+        // no bloquear una instalación válida por un valor inesperado.
+        val free = apkFile.parentFile?.usableSpace ?: Long.MAX_VALUE
+        val needed = apkFile.length() * INSTALL_SPACE_FACTOR + DISK_MARGIN_BYTES
+        if (free < needed) {
+            val missingMb = ((needed - free) / 1_000_000.0)
+            return context.getString(R.string.update_poco_espacio, formatMb(missingMb))
+        }
         if (!canInstallPackages(context)) {
             return context.getString(R.string.update_permiso_instalar)
         }
@@ -518,7 +544,7 @@ object ApkDownloader {
         return total.toLongOrNull()?.takeIf { it > 0 }
     }
 
-    private fun formatMb(mb: Double): String = String.format(Locale.getDefault(), "%.0f", mb)
+    internal fun formatMb(mb: Double): String = String.format(Locale.getDefault(), "%.0f", mb)
 
     private fun formatMbLong(bytes: Long): String =
         String.format(Locale.getDefault(), "%.0f", bytes / 1_000_000.0)

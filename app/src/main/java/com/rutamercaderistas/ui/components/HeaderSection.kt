@@ -68,7 +68,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalContext
+
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
@@ -82,15 +82,15 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.datastore.preferences.core.edit
+
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+
 import androidx.lifecycle.compose.currentStateAsState
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.PromotionEntity
-import com.rutamercaderistas.data.preferences.PreferencesRepository
+
 import com.rutamercaderistas.data.preferences.prefsDataStore
 import com.rutamercaderistas.ui.theme.AccentGreen
 import com.rutamercaderistas.ui.theme.HeaderDeepIndigo
@@ -250,11 +250,6 @@ fun HeaderSection(
     var expanded by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
     val dimens = LocalAppDimens.current
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val userScale by context.prefsDataStore.data
-        .map { it[PreferencesRepository.KEY_FONT_SCALE] ?: 1f }
-        .collectAsStateWithLifecycle(initialValue = 1f)
     val themeBackground = MaterialTheme.colorScheme.background
     val syncCd = stringResource(R.string.header_sincronizar_cd)
     val searchCd = stringResource(R.string.header_buscar_cd)
@@ -464,6 +459,15 @@ fun HeaderSection(
                 )
                 Spacer(Modifier.width(8.dp))
                 HeaderAction(
+                    icon = Icons.Outlined.Description,
+                    description = stringResource(R.string.header_manual_usuario),
+                    onClick = {
+                        expanded = false
+                        onOpenManual()
+                    },
+                )
+                Spacer(Modifier.width(8.dp))
+                HeaderAction(
                     icon = Icons.Outlined.MoreVert,
                     description = menuCd,
                     onClick = { expanded = true },
@@ -473,19 +477,6 @@ fun HeaderSection(
                     expanded = expanded,
                     onDismissRequest = { expanded = false },
                 ) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.header_manual_usuario)) },
-                        onClick = {
-                            expanded = false
-                            onOpenManual()
-                        },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Outlined.Description,
-                                contentDescription = stringResource(R.string.header_manual_usuario),
-                            )
-                        },
-                    )
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.header_compartir_ruta)) },
                         onClick = {
@@ -525,43 +516,7 @@ fun HeaderSection(
                             )
                         },
                     )
-                    HorizontalDivider()
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = stringResource(R.string.header_tamano_texto),
-                            style = MaterialTheme.typography.labelLarge,
-                            modifier = Modifier.weight(1f),
-                        )
-                        IconButton(
-                            onClick = {
-                                scope.launch {
-                                    context.prefsDataStore.edit {
-                                        it[PreferencesRepository.KEY_FONT_SCALE] =
-                                            (userScale - 0.1f).coerceIn(0.8f, 1.8f)
-                                    }
-                                }
-                            },
-                        ) {
-                            Text("A−", style = MaterialTheme.typography.labelLarge)
-                        }
-                        IconButton(
-                            onClick = {
-                                scope.launch {
-                                    context.prefsDataStore.edit {
-                                        it[PreferencesRepository.KEY_FONT_SCALE] =
-                                            (userScale + 0.1f).coerceIn(0.8f, 1.8f)
-                                    }
-                                }
-                            },
-                        ) {
-                            Text("A+", style = MaterialTheme.typography.labelLarge)
-                        }
-                    }
+
                 }
             }
 

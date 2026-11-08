@@ -383,6 +383,28 @@ class UpdateViewModel @Inject constructor(
                     apkSize = info.apkSize,
                     apkSha256 = info.apkSha256,
                 )
+                // Si no hay espacio para descargar e instalar (Android duplica el
+                // APK al instalar), no se guarda el pendiente ni se muestra el
+                // banner: el usuario solo vería una actualización que no puede
+                // aplicar. Se re-detecta en la próxima apertura si libera espacio.
+                if (pending.apkSize > 0L) {
+                    val missingMb = withContext(Dispatchers.IO) {
+                        val context = getApplication<Application>()
+                        val dir = context.filesDir
+                        val free = dir?.usableSpace ?: 0L
+                        if (free == 0L) return@withContext null  // espacio indeterminable (p. ej. test): no bloquear
+                        val needed = ApkDownloader.espacioNecesarioParaInstalacion(pending.apkSize)
+                        if (free >= needed) null else ((needed - free) / 1_000_000.0)
+                    }
+                    missingMb?.let { mb ->
+                        val context = getApplication<Application>()
+                        _message.value = context.getString(
+                            R.string.update_poco_espacio,
+                            ApkDownloader.formatMb(mb),
+                        )
+                        return@launch
+                    }
+                }
                 withContext(Dispatchers.IO) {
                     preferencesRepository.setPendingUpdate(pending)
                 }

@@ -388,6 +388,7 @@ fun MainRouteContent(
                     FirstLaunchEmptyState(
                         isOffline = !syncState.isOnline,
                         onSync = onInitialSync,
+                        onOpenManual = onNavigateToManual,
                     )
                 }
             }
@@ -621,7 +622,11 @@ private fun ChangesSection(
 }
 
 @Composable
-private fun FirstLaunchEmptyState(isOffline: Boolean, onSync: () -> Unit) {
+private fun FirstLaunchEmptyState(
+    isOffline: Boolean,
+    onSync: () -> Unit,
+    onOpenManual: () -> Unit = {},
+) {
     val dimens = LocalAppDimens.current
     val cd = stringResource(R.string.empty_state_cd)
     Column(
@@ -664,11 +669,18 @@ private fun FirstLaunchEmptyState(isOffline: Boolean, onSync: () -> Unit) {
         Spacer(modifier = Modifier.height(dimens.spacingLg))
         Button(
             onClick = onSync,
-            modifier = Modifier.fillMaxWidth(0.7f),
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Icon(Icons.Outlined.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
             Text(stringResource(R.string.empty_state_accion))
+        }
+        Spacer(modifier = Modifier.height(dimens.spacingSm))
+        TextButton(onClick = onOpenManual) {
+            Text(
+                text = stringResource(R.string.header_manual_usuario),
+                style = MaterialTheme.typography.labelMedium,
+            )
         }
     }
 }
