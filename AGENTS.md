@@ -84,6 +84,7 @@ Capas y flujo de datos: `README.md` §3. Acá solo lo que no se puede romper:
 - Dedupe de aviso y restauración del pendiente por **tag completo**, no por code (`v12.20.1` colisiona con `v12.20` en `versionCode`): `lastNotifiedTag`, `PendingUpdate.versionTag`, `isPendingNewer`.
 - Integridad antes de marcar "lista" y antes de abrir el instalador: tamaño real del asset (`assets[].size`), SHA-256 publicado por el CI (`SHA256SUMS.txt`, fallback `assets[].digest`), paquete, versión y **misma firma** que la app instalada (SHA-256 de los certificados). Sin tamaño o SHA publicados no se ofrece la actualización. `PendingUpdate` guarda `apkSize`/`apkSha256`; los pendientes viejos sin esos datos se validan solo por paquete/versión/firma.
 - `POST_NOTIFICATIONS` se pide una sola vez al aparecer el banner (`wasUpdateNotifAsked`); si lo niegan, quedan banner + diálogo. `cleanTempApk` conserva `update.apk` si sigue más nuevo que lo instalado.
+- **Contexto del usuario:** su dispositivo ya corre la última release publicada (v12.45 al 2026-11-08). No asumir que está en una versión anterior: antes de sugerir una actualización o diagnosticar "no detecta", confirmar la versión instalada; si ya es la última, no hay nada que detectar. La 12.45 ya incluye el chequeo forzado y la auto-descarga al abrir.
 
 ## Release y Git
 
