@@ -657,12 +657,9 @@ object ApkDownloader {
         } catch (e: Exception) {
             Timber.e(e, "Error al abrir la sesión de instalación")
             sessionId?.let { runCatching { installer.abandonSession(it) } }
-            InstallStart.Error(
-                context.getString(
-                    R.string.update_error_instalador,
-                    e.localizedMessage ?: "desconocido",
-                ),
-            )
+            // El detalle técnico queda en Timber; la tarjeta muestra un
+            // mensaje accionable en español.
+            InstallStart.Error(context.getString(R.string.update_instalacion_error))
         }
     }
 

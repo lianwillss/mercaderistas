@@ -231,8 +231,14 @@
     <string name="update_permiso_instalar">Activa “Instalar apps desconocidas” para continuar.</string>
     <string name="update_permiso_no_concedido">No se concedió el permiso. Toca Instalar para reintentar.</string>
     <string name="update_error_abrir_ajustes">No se pudieron abrir los ajustes de instalación.</string>
-    <string name="update_error_instalador">No se pudo iniciar la instalación: %1$s</string>
-    <string name="update_instalacion_error">La instalación no se completó. Revisa la confirmación de Android e inténtalo de nuevo.</string>
+    <string name="update_instalacion_error">Android no pudo completar la instalación. Reintentá.</string>
+    <string name="update_instalacion_bloqueada">Android bloqueó la instalación. Revisá el permiso para instalar apps desconocidas y reintentá.</string>
+    <string name="update_instalacion_cancelada">La instalación se canceló antes de terminar. Podés reintentarla.</string>
+    <string name="update_instalacion_apk_invalido">El APK está dañado o no es válido. Descargalo de nuevo.</string>
+    <string name="update_instalacion_conflicto">Android encontró un conflicto con la app instalada (firma o versión). No se puede aplicar esta actualización.</string>
+    <string name="update_instalacion_sin_espacio">No hay espacio suficiente para instalar la actualización. Liberá espacio y reintentá.</string>
+    <string name="update_instalacion_incompatible">El APK no es compatible con este dispositivo o con esta versión de Android.</string>
+    <string name="update_instalacion_timeout">La instalación tardó demasiado y Android la canceló. Reintentá.</string>
     <string name="update_confirmar_instalacion">Instalación iniciada. Completa la confirmación de Android si aparece.</string>
     <string name="update_apk_no_corresponde">El APK publicado no corresponde a la versión %1$s. Se ignorará este release; se publicará uno nuevo.</string>
 
