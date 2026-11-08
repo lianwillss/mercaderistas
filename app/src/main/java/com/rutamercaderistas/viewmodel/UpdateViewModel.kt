@@ -1,24 +1,23 @@
 package com.rutamercaderistas.viewmodel
 
-import android.Manifest
 import android.app.Application
-import android.content.pm.PackageManager
-import androidx.core.app.ActivityCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.work.WorkInfo
-import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.Constants
 import com.rutamercaderistas.R
 import com.rutamercaderistas.data.preferences.PendingUpdate
 import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.services.ApkDownloader
 import com.rutamercaderistas.services.ApkValidation
+import com.rutamercaderistas.services.DownloadProgress
+import com.rutamercaderistas.services.DownloadResult
+import com.rutamercaderistas.services.InstallOutcome
+import com.rutamercaderistas.services.InstallStart
+import com.rutamercaderistas.services.InstalledVersion
 import com.rutamercaderistas.services.UpdateChecker
-import com.rutamercaderistas.services.UpdateNotifier
-import com.rutamercaderistas.worker.UpdateDownloadManager
-import com.rutamercaderistas.worker.UpdateDownloadWorker
+import com.rutamercaderistas.services.UpdateInstallBus
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,6 +34,10 @@ import javax.inject.Inject
 /** Fase visible del aviso de actualización. */
 enum class UpdatePhase { AVAILABLE, DOWNLOADING, READY, FAILED }
 
+/**
+ * Único estado de actualización que consume la UI. No hay notificación ni
+ * diálogo en paralelo: la tarjeta del banner es la única superficie.
+ */
 sealed interface UpdateCardUiState {
     val versionName: String
     val versionCode: Int
@@ -72,15 +75,9 @@ sealed interface UpdateCardUiState {
 class UpdateViewModel @Inject constructor(
     application: Application,
     private val preferencesRepository: PreferencesRepository,
-    private val downloadManager: UpdateDownloadManager,
 ) : AndroidViewModel(application) {
 
     companion object {
-        const val UPDATE_NOTIFICATION_ID = UpdateNotifier.PENDING_NOTIFICATION_ID
-        const val UPDATE_CHANNEL_ID = UpdateNotifier.CHANNEL_ID
-        const val EXTRA_SHOW_UPDATE = UpdateNotifier.EXTRA_SHOW_UPDATE
-        const val EXTRA_INSTALL_UPDATE = UpdateNotifier.EXTRA_INSTALL_UPDATE
-
         /** Al volver a la app no se consulta GitHub más de una vez cada 15 min. */
         private const val UPDATE_CHECK_MIN_INTERVAL_MS = 15 * 60_000L
     }
@@ -98,8 +95,6 @@ class UpdateViewModel @Inject constructor(
 
     private val _suppressed = MutableStateFlow(false)
     private val _download = MutableStateFlow<DownloadSnapshot?>(null)
-    private val _showSheet = MutableStateFlow(false)
-    val showUpdateSheet: StateFlow<Boolean> = _showSheet.asStateFlow()
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
@@ -113,7 +108,7 @@ class UpdateViewModel @Inject constructor(
             pending != null && !suppressed
         }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    /** Estado que pinta la tarjeta y el modal. */
+    /** Estado que pinta la tarjeta: Disponible, Descargando(%), Lista, Error. */
     val card: StateFlow<UpdateCardUiState?> =
         combine(_pendingUpdate, _download) { pending, snapshot ->
             if (pending == null) return@combine null
@@ -141,17 +136,18 @@ class UpdateViewModel @Inject constructor(
             }
         }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    private var isForeground = false
-    private var wasPaused = false
     private var awaitingInstallPermission = false
-    private var autoInstallHandled = false
+
+    /** Evita abrir dos sesiones de PackageInstaller si se toca dos veces. */
+    private var installSessionActive = false
 
     private var restoreJob: Job? = null
+    private var downloadJob: Job? = null
     private var installJob: Job? = null
 
     init {
         restoreJob = viewModelScope.launch { restorePendingUpdate() }
-        observeDownloadWork()
+        observeInstallOutcomes()
     }
 
     /** Recupera el pendiente guardado y, si ya hay APK válido, lo marca listo. */
@@ -164,165 +160,37 @@ class UpdateViewModel @Inject constructor(
         }
         if (stored == null) return
 
-        if (!UpdateChecker.isPendingNewer(
-                stored.versionTag,
-                stored.versionCode,
-                BuildConfig.VERSION_CODE,
-            )
-        ) {
+        // Un release ya rechazado no se restaura: evita mostrar la tarjeta
+        // de un APK que nunca se podrá instalar.
+        val rejected = withContext(Dispatchers.IO) {
+            preferencesRepository.getRejectedUpdateTag()
+        }
+        if (UpdateChecker.isRejectedTag(stored.versionTag, rejected)) {
             cleanupResolved(showMessage = false)
             return
         }
 
-        val context = getApplication<Application>()
+        val installed = withContext(Dispatchers.IO) {
+            InstalledVersion.read(getApplication())
+        }
+        if (!UpdateChecker.isPendingNewer(stored.versionTag, stored.versionCode, installed)) {
+            cleanupResolved(showMessage = false)
+            return
+        }
+
         _pendingUpdate.value = stored
-
-        // Reafirma el aviso persistente al abrir: si el sistema lo quitó,
-        // vuelve a aparecer sin sonar otra vez (mismo ID y onlyAlertOnce).
-        if (UpdateNotifier.hasPermission(context)) {
-            UpdateNotifier.postPending(context, stored.versionName)
-        }
-        if (stored.versionTag.isNotBlank()) {
-            withContext(Dispatchers.IO) {
-                preferencesRepository.setLastNotifiedUpdateTag(stored.versionTag)
-            }
-        }
-
         val ready = evaluateDownloadedApk(stored)
-        // No pisa un progreso que el observer ya esté mostrando.
-        if (ready != null) _download.value = ready
-    }
-
-    private fun observeDownloadWork() {
-        viewModelScope.launch {
-            downloadManager.observe().collect { infos ->
-                // Con unique work REPLACE quedan trabajos viejos en el
-                // historial: se prioriza el activo y, si no hay, el último.
-                val active = infos.lastOrNull {
-                    it.state == WorkInfo.State.RUNNING ||
-                        it.state == WorkInfo.State.ENQUEUED ||
-                        it.state == WorkInfo.State.BLOCKED
-                }
-                val info = active ?: infos.lastOrNull() ?: return@collect
-                when (info.state) {
-                    WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED -> {
-                        if (_pendingUpdate.value != null &&
-                            _download.value?.phase != UpdatePhase.READY &&
-                            _download.value?.phase != UpdatePhase.FAILED
-                        ) {
-                            _download.value = DownloadSnapshot(UpdatePhase.DOWNLOADING)
-                        }
-                    }
-                    WorkInfo.State.RUNNING -> {
-                        val bytes = info.progress.getLong(UpdateDownloadWorker.KEY_BYTES, 0L)
-                        val total = info.progress.getLong(UpdateDownloadWorker.KEY_TOTAL_BYTES, 0L)
-                        _download.value = DownloadSnapshot(
-                            phase = UpdatePhase.DOWNLOADING,
-                            downloadedBytes = bytes,
-                            totalBytes = total,
-                        )
-                    }
-                    WorkInfo.State.SUCCEEDED -> onDownloadSucceeded()
-                    WorkInfo.State.FAILED -> {
-                        val context = getApplication<Application>()
-                        // Puede quedar un APK completo de un intento anterior:
-                        // en ese caso la tarjeta sigue en "lista para instalar".
-                        val readySnapshot = evaluateDownloadedApk(_pendingUpdate.value)
-                        if (readySnapshot != null) {
-                            _download.value = readySnapshot
-                        } else {
-                            val msg = info.outputData
-                                .getString(UpdateDownloadWorker.KEY_ERROR)
-                                .orEmpty()
-                                .ifBlank { context.getString(R.string.update_descarga_error) }
-                            val retryable = info.outputData
-                                .getBoolean(UpdateDownloadWorker.KEY_RETRYABLE, true)
-                            _download.value = DownloadSnapshot(
-                                phase = UpdatePhase.FAILED,
-                                message = msg,
-                                retryable = retryable,
-                            )
-                        }
-                    }
-                    WorkInfo.State.CANCELLED -> {
-                        // Un APK ya validado no se pierde por un trabajo viejo.
-                        if (_download.value?.phase != UpdatePhase.READY) {
-                            _download.value = null
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private suspend fun onDownloadSucceeded() {
-        val context = getApplication<Application>()
-        if (_pendingUpdate.value == null) {
-            // El ViewModel todavía puede estar restaurando el pendiente;
-            // no borrar el APK en esa carrera (lo valida restorePendingUpdate).
-            return
-        }
-        val snapshot = evaluateDownloadedApk(_pendingUpdate.value)
-        if (snapshot == null) {
-            _download.value = DownloadSnapshot(
-                phase = UpdatePhase.FAILED,
-                message = context.getString(R.string.update_version_no_reciente),
-                retryable = true,
-            )
-            return
-        }
-        _download.value = snapshot
-        // Una validación fallida no debe abrir el instalador.
-        if (snapshot.phase != UpdatePhase.READY) return
-        // Si el usuario estaba en la app, el instalador aparece solo. En
-        // segundo plano queda la notificación persistente "lista".
-        if (isForeground && !autoInstallHandled) {
-            autoInstallHandled = true
-            installApk()
+        // No pisa un progreso que ya esté en curso.
+        if (ready != null && downloadJob?.isActive != true) {
+            _download.value = ready
         }
     }
 
     /**
-     * Evalúa un APK ya descargado. Solo devuelve READY si pasa tamaño,
-     * SHA-256, paquete, versión y firma; si falla, lo borra y devuelve FAILED
-     * con el motivo. Devuelve null si no hay archivo o ya no es más nuevo.
+     * Consulta GitHub y deja el resultado en el único estado compartido.
+     * En arranque (autoStartDownload) arranca la descarga dentro de la app;
+     * nunca instala sin que el usuario toque "Instalar".
      */
-    private suspend fun evaluateDownloadedApk(pending: PendingUpdate?): DownloadSnapshot? =
-        withContext(Dispatchers.IO) {
-            val context = getApplication<Application>()
-            val apk = ApkDownloader.apkFile(context)
-            if (!apk.exists()) return@withContext null
-
-            val info = ApkDownloader.readApkInfo(context, apk)
-            if (info == null || info.versionCode <= BuildConfig.VERSION_CODE) {
-                ApkDownloader.clearFinalApk(context)
-                return@withContext null
-            }
-
-            when (
-                val validation = ApkDownloader.validateApk(
-                    context,
-                    apk,
-                    pending?.apkSize ?: 0L,
-                    pending?.apkSha256.orEmpty(),
-                )
-            ) {
-                ApkValidation.Ok -> DownloadSnapshot(
-                    phase = UpdatePhase.READY,
-                    downloadedBytes = apk.length(),
-                    totalBytes = apk.length(),
-                )
-                is ApkValidation.Failed -> {
-                    ApkDownloader.clearDownloadedApk(context)
-                    DownloadSnapshot(
-                        phase = UpdatePhase.FAILED,
-                        message = validation.message,
-                        retryable = validation.retryable,
-                    )
-                }
-            }
-        }
-
     fun checkForUpdate(
         force: Boolean = false,
         showFeedback: Boolean = true,
@@ -340,8 +208,15 @@ class UpdateViewModel @Inject constructor(
             }
 
             _checking.value = true
+            val context = getApplication<Application>()
+            val installed = withContext(Dispatchers.IO) { InstalledVersion.read(context) }
+            val rejected = withContext(Dispatchers.IO) {
+                preferencesRepository.getRejectedUpdateTag()
+            }
             val info = try {
-                withContext(Dispatchers.IO) { UpdateChecker.check(BuildConfig.VERSION_CODE) }
+                withContext(Dispatchers.IO) {
+                    UpdateChecker.check(installed, rejected)
+                }
             } catch (e: Exception) {
                 Timber.w(e, "Error consultando actualización")
                 null
@@ -351,8 +226,7 @@ class UpdateViewModel @Inject constructor(
 
             if (info == null) {
                 if (showFeedback) {
-                    _message.value = getApplication<Application>()
-                        .getString(R.string.update_error_buscar)
+                    _message.value = context.getString(R.string.update_error_buscar)
                 }
                 return@launch
             }
@@ -360,10 +234,8 @@ class UpdateViewModel @Inject constructor(
                 // Un fallo transitorio no borra el pendiente ni el aviso.
                 if (showFeedback) {
                     _message.value = if (info.error.contains("conexión", ignoreCase = true)) {
-                        getApplication<Application>().getString(R.string.update_sin_internet)
+                        context.getString(R.string.update_sin_internet)
                     } else {
-                        // Motivo real (p. ej. falta el SHA-256 publicado) en vez
-                        // del genérico "Error al buscar actualización".
                         info.error
                     }
                 }
@@ -389,15 +261,13 @@ class UpdateViewModel @Inject constructor(
                 // aplicar. Se re-detecta en la próxima apertura si libera espacio.
                 if (pending.apkSize > 0L) {
                     val missingMb = withContext(Dispatchers.IO) {
-                        val context = getApplication<Application>()
                         val dir = context.filesDir
                         val free = dir?.usableSpace ?: 0L
-                        if (free == 0L) return@withContext null  // espacio indeterminable (p. ej. test): no bloquear
+                        if (free == 0L) return@withContext null
                         val needed = ApkDownloader.espacioNecesarioParaInstalacion(pending.apkSize)
                         if (free >= needed) null else ((needed - free) / 1_000_000.0)
                     }
                     missingMb?.let { mb ->
-                        val context = getApplication<Application>()
                         _message.value = context.getString(
                             R.string.update_poco_espacio,
                             ApkDownloader.formatMb(mb),
@@ -405,35 +275,43 @@ class UpdateViewModel @Inject constructor(
                         return@launch
                     }
                 }
+
+                val previous = _pendingUpdate.value
+                val sameRelease = previous?.versionTag == pending.versionTag &&
+                    previous.versionCode == pending.versionCode
+
+                if (!sameRelease) {
+                    // Otro release: el APK y el .part viejos no sirven. Se
+                    // borran ANTES de publicar el pendiente, para que una
+                    // descarga recién arrancada no pierda su estado.
+                    downloadJob?.cancel()
+                    downloadJob = null
+                    withContext(Dispatchers.IO) {
+                        ApkDownloader.clearDownloadedApk(context)
+                    }
+                    _download.value = null
+                }
+
                 withContext(Dispatchers.IO) {
                     preferencesRepository.setPendingUpdate(pending)
                 }
-                val same = _pendingUpdate.value?.versionTag == pending.versionTag &&
-                    _pendingUpdate.value?.versionCode == pending.versionCode
                 _pendingUpdate.value = pending
-                if (!same && _download.value?.phase != UpdatePhase.DOWNLOADING) {
-                    // El APK de un pendiente anterior puede no corresponder al
-                    // release nuevo (o estar alterado). Solo se conserva si
-                    // pasa la verificación completa; si no, se descarta y la
-                    // descarga arranca de cero.
+
+                if (sameRelease && _download.value == null) {
+                    // Mismo release: si ya hay un APK verificado, se muestra
+                    // "Listo para instalar" sin volver a descargar.
                     val evaluated = evaluateDownloadedApk(pending)
-                    _download.value =
-                        if (evaluated?.phase == UpdatePhase.READY) evaluated else null
-                    autoInstallHandled = false
+                    if (evaluated != null) _download.value = evaluated
                 }
-                notifyOnce(info.tag, info.versionName)
+
                 if (autoStartDownload) {
-                    // Al abrir la app se ignora el "más tarde" anterior y se
-                    // muestra el progreso: la actualización arranca sola.
                     if (_suppressed.value) {
                         withContext(Dispatchers.IO) {
                             preferencesRepository.setUpdateSuppressedUntil(0)
                         }
                         _suppressed.value = false
                     }
-                    startUpdate(auto = true)
-                } else if (showFeedback) {
-                    _showSheet.value = true
+                    startUpdate()
                 }
             } else {
                 cleanupResolved(showMessage = showFeedback)
@@ -441,10 +319,7 @@ class UpdateViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Consulta obligatoria al abrir la app: si hay versión nueva, descarga e
-     * instala de inmediato sin esperar a que el usuario toque "Actualizar".
-     */
+    /** Consulta obligatoria al abrir: si hay versión nueva, descarga sola. */
     fun checkForUpdateOnLaunch() {
         checkForUpdate(force = true, showFeedback = false, autoStartDownload = true)
     }
@@ -461,63 +336,104 @@ class UpdateViewModel @Inject constructor(
         }
     }
 
-    /** Abre el modal y dispara (o reanuda) la descarga del pendiente. Cuando
-     *  `auto` es true (arranque, chequeo diferido, worker) no se abre el modal:
-     *  la descarga corre en silencio y, al terminar, se instala sola si la app
-     *  está en primer plano. Solo se muestra el aviso persistente de notificación.
+    /**
+     * Descarga el pendiente en el proceso de la app, actualizando el
+     * porcentaje en la tarjeta. No usa WorkManager ni notificaciones.
      */
-    fun startUpdate(auto: Boolean = false) {
-        val pending = _pendingUpdate.value
-        if (!auto) {
-            _showSheet.value = true
-        }
-        if (pending == null) return
-
+    fun startUpdate() {
+        val pending = _pendingUpdate.value ?: return
         val phase = _download.value?.phase
-        if (phase == UpdatePhase.READY) {
-            // En el arranque automático no se relanza el instalador si ya se
-            // intentó (por ejemplo, al rotar la pantalla).
-            if (!auto || !autoInstallHandled) {
-                autoInstallHandled = true
-                installApk()
-            }
-            return
-        }
-        if (phase == UpdatePhase.DOWNLOADING) return
+        if (phase == UpdatePhase.DOWNLOADING || phase == UpdatePhase.READY) return
+        if (downloadJob?.isActive == true) return
 
-        autoInstallHandled = false
-        _download.value = DownloadSnapshot(UpdatePhase.DOWNLOADING)
-        downloadManager.enqueue(pending)
+        val context = getApplication<Application>()
+        installSessionActive = false
+        downloadJob?.cancel()
+        downloadJob = viewModelScope.launch {
+            _download.value = DownloadSnapshot(UpdatePhase.DOWNLOADING)
+            try {
+                val result = ApkDownloader.download(
+                    context = context,
+                    apkUrl = pending.apkUrl,
+                    expectedSize = pending.apkSize,
+                    expectedSha256 = pending.apkSha256,
+                    expectedVersionName = pending.versionName,
+                    expectedVersionCode = pending.versionCode,
+                ) { progress: DownloadProgress ->
+                    _download.value = DownloadSnapshot(
+                        phase = UpdatePhase.DOWNLOADING,
+                        downloadedBytes = progress.bytes,
+                        totalBytes = progress.totalBytes,
+                    )
+                }
+
+                when (result) {
+                    is DownloadResult.Success -> {
+                        val evaluated = evaluateDownloadedApk(pending)
+                        _download.value = evaluated ?: DownloadSnapshot(
+                            phase = UpdatePhase.FAILED,
+                            message = context.getString(R.string.update_archivo_faltante),
+                            retryable = true,
+                        )
+                    }
+                    is DownloadResult.Error -> {
+                        if (result.releaseRejected) {
+                            markReleaseRejected(pending.versionTag)
+                        }
+                        _download.value = DownloadSnapshot(
+                            phase = UpdatePhase.FAILED,
+                            message = result.message,
+                            retryable = result.retryable,
+                        )
+                    }
+                    DownloadResult.Cancelled -> _download.value = null
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "Error inesperado descargando la actualización")
+                _download.value = DownloadSnapshot(
+                    phase = UpdatePhase.FAILED,
+                    message = context.getString(R.string.update_descarga_error),
+                    retryable = true,
+                )
+            }
+        }
     }
 
     fun retryDownload() {
+        val pending = _pendingUpdate.value ?: return
+        val failed = _download.value
+        if (failed?.phase == UpdatePhase.FAILED && !failed.retryable) {
+            // Error permanente del release: se olvida en vez de reintentar.
+            viewModelScope.launch {
+                markReleaseRejected(pending.versionTag)
+                cleanupResolved(showMessage = false)
+            }
+            return
+        }
         startUpdate()
     }
 
-    /** Cancela y borra el .part: el próximo intento empieza limpio. */
+    /** Cancela y borra el .part: la tarjeta vuelve a "Disponible". */
     fun cancelDownload() {
-        autoInstallHandled = false
-        downloadManager.cancel()
+        downloadJob?.cancel()
+        downloadJob = null
+        _download.value = null
         val context = getApplication<Application>()
         viewModelScope.launch(Dispatchers.IO) {
             ApkDownloader.clearPartial(context)
         }
-        _download.value = null
-        _showSheet.value = false
     }
 
     /**
-     * Verifica el APK descargado y recién entonces abre el instalador. El
-     * paquete del sistema responde con un error genérico cuando la firma no
-     * coincide; acá se detecta y se explica antes de lanzarlo.
+     * Verifica el APK descargado y recién entonces abre la sesión de
+     * PackageInstaller. La confirmación del sistema queda fuera de la app,
+     * pero el flujo (progreso, error, reintento) vive en la tarjeta.
      */
     fun installApk() {
+        if (installSessionActive) return
         val context = getApplication<Application>()
-        _showSheet.value = true
-
-        // No se exige _pendingUpdate: al abrir desde la notificación el
-        // ViewModel puede estar restaurando el pendiente todavía. La firma y
-        // el paquete se validan siempre; tamaño/SHA si el pendiente los tiene.
         val apk = ApkDownloader.apkFile(context)
         if (!apk.exists()) {
             val message = context.getString(R.string.update_archivo_faltante)
@@ -551,12 +467,18 @@ class UpdateViewModel @Inject constructor(
                     apk,
                     pending?.apkSize ?: 0L,
                     pending?.apkSha256.orEmpty(),
+                    pending?.versionName.orEmpty(),
+                    pending?.versionCode ?: 0,
                 )
             }
             if (validation is ApkValidation.Failed) {
-                ApkDownloader.clearDownloadedApk(context)
-                // El aviso "lista para instalar" ya no tiene archivo válido.
-                UpdateNotifier.cancelUpdate(context)
+                installSessionActive = false
+                withContext(Dispatchers.IO) {
+                    ApkDownloader.clearDownloadedApk(context)
+                    if (validation.releaseRejected && pending != null) {
+                        markReleaseRejected(pending.versionTag)
+                    }
+                }
                 _download.value = DownloadSnapshot(
                     phase = UpdatePhase.FAILED,
                     message = validation.message,
@@ -566,77 +488,84 @@ class UpdateViewModel @Inject constructor(
                 return@launch
             }
 
-            val error = ApkDownloader.installApk(context, apk)
-            if (error != null) {
-                _download.value = DownloadSnapshot(
-                    phase = UpdatePhase.FAILED,
-                    message = error,
-                    retryable = true,
-                )
-            } else {
-                _showSheet.value = false
-            }
-        }
-    }
-
-    /** Acción "Instalar" de la notificación o de un intent externo. */
-    fun onInstallRequested() {
-        _showSheet.value = true
-        installApk()
-    }
-
-    fun onActivityResumed() {
-        isForeground = true
-        // Solo se retoma el permiso al volver de Ajustes, no en el primer
-        // onResume que ocurre justo después de abrirlos.
-        val returningFromSettings = wasPaused
-        wasPaused = false
-        if (returningFromSettings && awaitingInstallPermission) {
-            awaitingInstallPermission = false
-            val context = getApplication<Application>()
-            if (ApkDownloader.canInstallPackages(context)) {
-                installApk()
-            } else {
-                _message.value = context.getString(R.string.update_permiso_no_concedido)
-            }
-        } else {
-            // Si la descarga terminó en segundo plano, al volver a la app se
-            // lanza el instalador sin esperar a que el usuario lo toque.
-            viewModelScope.launch {
-                restoreJob?.join()
-                if (isForeground &&
-                    _download.value?.phase == UpdatePhase.READY &&
-                    !autoInstallHandled
-                ) {
-                    autoInstallHandled = true
-                    installApk()
+            when (val start = withContext(Dispatchers.IO) {
+                ApkDownloader.installApk(context, apk)
+            }) {
+                InstallStart.Started -> {
+                    installSessionActive = true
+                    _message.value = context.getString(R.string.update_confirmar_instalacion)
+                }
+                is InstallStart.Error -> {
+                    installSessionActive = false
+                    _download.value = DownloadSnapshot(
+                        phase = UpdatePhase.FAILED,
+                        message = start.message,
+                        retryable = start.retryable,
+                    )
                 }
             }
         }
     }
 
-    fun onActivityPaused() {
-        isForeground = false
-        wasPaused = true
+    private fun observeInstallOutcomes() {
+        viewModelScope.launch {
+            UpdateInstallBus.events.collect { outcome ->
+                when (outcome) {
+                    InstallOutcome.Success -> onInstalled()
+                    is InstallOutcome.Failed -> {
+                        installSessionActive = false
+                        val context = getApplication<Application>()
+                        _download.value = DownloadSnapshot(
+                            phase = UpdatePhase.FAILED,
+                            message = outcome.message.ifBlank {
+                                context.getString(R.string.update_instalacion_error)
+                            },
+                            retryable = true,
+                        )
+                    }
+                }
+            }
+        }
     }
 
-    /** Reabre el modal con el pendiente guardado (sin red). */
-    fun showPendingDialog() {
-        _showSheet.value = true
+    private suspend fun onInstalled() {
+        val context = getApplication<Application>()
+        installSessionActive = false
+        downloadJob?.cancel()
+        downloadJob = null
+        withContext(Dispatchers.IO) {
+            preferencesRepository.clearPendingUpdate()
+            preferencesRepository.setRejectedUpdateTag("")
+            ApkDownloader.clearDownloadedApk(context)
+        }
+        _pendingUpdate.value = null
+        _download.value = null
     }
 
-    fun dismissSheet() {
-        _showSheet.value = false
+    fun onActivityResumed() {
+        // Solo se retoma el permiso al volver de Ajustes.
+        if (!awaitingInstallPermission) return
+        awaitingInstallPermission = false
+        val context = getApplication<Application>()
+        if (ApkDownloader.canInstallPackages(context)) {
+            installApk()
+        } else {
+            _message.value = context.getString(R.string.update_permiso_no_concedido)
+        }
     }
 
     fun suppressUntilTomorrow() {
+        val failed = _download.value
+        if (failed?.phase == UpdatePhase.FAILED && !failed.retryable) {
+            viewModelScope.launch { cleanupResolved(showMessage = false) }
+            return
+        }
         viewModelScope.launch {
             val manana = System.currentTimeMillis() + Constants.UPDATE_SUPPRESS_DAYS_MS
             withContext(Dispatchers.IO) {
                 preferencesRepository.setUpdateSuppressedUntil(manana)
             }
             _suppressed.value = true
-            _showSheet.value = false
         }
     }
 
@@ -647,56 +576,71 @@ class UpdateViewModel @Inject constructor(
     /** Compatibilidad con el nombre anterior del snackbar. */
     fun clearSnackbar() = clearMessage()
 
+    /**
+     * Evalúa un APK ya descargado. Solo devuelve READY si pasa tamaño,
+     * SHA-256, release anunciado, versión, paquete y firma. Si no, borra el
+     * archivo y reporta el motivo.
+     */
+    private suspend fun evaluateDownloadedApk(pending: PendingUpdate?): DownloadSnapshot? =
+        withContext(Dispatchers.IO) {
+            val context = getApplication<Application>()
+            val apk = ApkDownloader.apkFile(context)
+            if (!apk.exists()) return@withContext null
+
+            val info = ApkDownloader.readApkInfo(context, apk)
+            if (info == null) {
+                ApkDownloader.clearDownloadedApk(context)
+                return@withContext null
+            }
+
+            when (
+                val validation = ApkDownloader.validateApk(
+                    context,
+                    apk,
+                    pending?.apkSize ?: 0L,
+                    pending?.apkSha256.orEmpty(),
+                    pending?.versionName.orEmpty(),
+                    pending?.versionCode ?: 0,
+                )
+            ) {
+                ApkValidation.Ok -> DownloadSnapshot(
+                    phase = UpdatePhase.READY,
+                    downloadedBytes = apk.length(),
+                    totalBytes = apk.length(),
+                )
+                is ApkValidation.Failed -> {
+                    ApkDownloader.clearDownloadedApk(context)
+                    if (validation.releaseRejected && pending != null) {
+                        markReleaseRejected(pending.versionTag)
+                    }
+                    DownloadSnapshot(
+                        phase = UpdatePhase.FAILED,
+                        message = validation.message,
+                        retryable = validation.retryable,
+                    )
+                }
+            }
+        }
+
+    private suspend fun markReleaseRejected(tag: String) {
+        if (tag.isBlank()) return
+        withContext(Dispatchers.IO) {
+            preferencesRepository.setRejectedUpdateTag(tag)
+        }
+        Timber.w("Release %s rechazado: no se vuelve a ofrecer", tag)
+    }
+
     private suspend fun cleanupResolved(showMessage: Boolean) {
         val context = getApplication<Application>()
-        withContext(Dispatchers.IO) { preferencesRepository.clearPendingUpdate() }
+        installSessionActive = false
+        downloadJob?.cancel()
+        downloadJob = null
+        withContext(Dispatchers.IO) {
+            preferencesRepository.clearPendingUpdate()
+            ApkDownloader.clearDownloadedApk(context)
+        }
         _pendingUpdate.value = null
         _download.value = null
-        _showSheet.value = false
-        downloadManager.cancel()
-        UpdateNotifier.cancelUpdate(context)
-        withContext(Dispatchers.IO) { ApkDownloader.clearDownloadedApk(context) }
         if (showMessage) _message.value = context.getString(R.string.update_no_disponible)
-    }
-
-    /**
-     * Notifica una sola vez por tag (evita spam en cada apertura). Por tag y
-     * no por code: v12.20.1 colisiona con v12.20 en versionCode.
-     */
-    private suspend fun notifyOnce(tag: String, versionName: String) {
-        if (tag.isBlank()) {
-            UpdateNotifier.postPending(getApplication(), versionName)
-            return
-        }
-        val lastNotified = withContext(Dispatchers.IO) {
-            preferencesRepository.getLastNotifiedUpdateTag()
-        }
-        if (lastNotified == tag) return
-        withContext(Dispatchers.IO) {
-            preferencesRepository.setLastNotifiedUpdateTag(tag)
-        }
-        UpdateNotifier.postPending(getApplication(), versionName)
-    }
-
-    /** ¿Falta el permiso de notificaciones (Android 13+)? */
-    fun hasNotifPermission(): Boolean = UpdateNotifier.hasPermission(getApplication())
-
-    /** true si corresponde pedir el permiso una vez (hay update visible). */
-    suspend fun shouldAskNotifPermission(): Boolean {
-        if (hasNotifPermission()) return false
-        return withContext(Dispatchers.IO) { !preferencesRepository.wasUpdateNotifAsked() }
-    }
-
-    fun markNotifAsked() {
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) { preferencesRepository.setUpdateNotifAsked() }
-        }
-    }
-
-    /** Tras conceder el permiso con un update pendiente, avisar de inmediato. */
-    fun onNotifPermissionResult(granted: Boolean) {
-        if (!granted) return
-        val pending = _pendingUpdate.value ?: return
-        UpdateNotifier.postPending(getApplication(), pending.versionName)
     }
 }

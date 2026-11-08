@@ -4,30 +4,36 @@ import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.data.preferences.PendingUpdate
 import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.services.ApkDownloader
+import com.rutamercaderistas.services.InstalledVersion
 import com.rutamercaderistas.services.UpdateChecker
-import com.rutamercaderistas.services.UpdateNotifier
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import timber.log.Timber
 
+/**
+ * Chequeo periódico silencioso. No notifica ni descarga: solo deja el
+ * pendiente persistido para que la próxima apertura muestre la tarjeta
+ * dentro de la app. La descarga la decide el usuario/el arranque en el
+ * ViewModel, que es el único dueño del estado visible.
+ */
 @HiltWorker
 class UpdateCheckWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
     private val preferencesRepository: PreferencesRepository,
-    private val downloadManager: UpdateDownloadManager,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
         return try {
-            val info = UpdateChecker.check(BuildConfig.VERSION_CODE)
+            val installed = InstalledVersion.read(applicationContext)
+            val rejected = preferencesRepository.getRejectedUpdateTag()
+            val info = UpdateChecker.check(installed, rejected)
 
             if (info.error != null) {
-                // Un fallo de red no debe borrar el pendiente ni el aviso.
+                // Un fallo de red no debe borrar el pendiente.
                 Timber.w("No se pudo comprobar la actualización: %s", info.error)
                 return if (runAttemptCount < 2) Result.retry() else Result.success()
             }
@@ -43,27 +49,12 @@ class UpdateCheckWorker @AssistedInject constructor(
                     apkSize = info.apkSize,
                     apkSha256 = info.apkSha256,
                 )
-                // Se persiste incluso si ya se notificó: así el banner y el
-                // pendiente sobreviven a cierres y reinicios.
+                // Se persiste para que el banner sobreviva a cierres.
                 preferencesRepository.setPendingUpdate(pending)
-
-                if (info.tag.isNotBlank() &&
-                    preferencesRepository.getLastNotifiedUpdateTag() == info.tag
-                ) {
-                    Timber.i("Update %s ya notificado", info.versionName)
-                    UpdateNotifier.postPending(applicationContext, info.versionName)
-                    return Result.success()
-                }
-                if (info.tag.isNotBlank()) {
-                    preferencesRepository.setLastNotifiedUpdateTag(info.tag)
-                }
                 Timber.i("Update disponible en segundo plano: %s", info.versionName)
-                UpdateNotifier.postPending(applicationContext, info.versionName)
             } else {
-                // La app ya está al día: el aviso y el APK sobran.
+                // La app ya está al día: el pendiente y el APK sobran.
                 preferencesRepository.clearPendingUpdate()
-                downloadManager.cancel()
-                UpdateNotifier.cancelUpdate(applicationContext)
                 ApkDownloader.clearDownloadedApk(applicationContext)
             }
             Result.success()

@@ -11,11 +11,10 @@ import com.rutamercaderistas.data.preferences.BrandPagesRepository
 import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.data.stock.StockSyncNotifier
 import com.rutamercaderistas.services.ApkDownloader
+import com.rutamercaderistas.services.AppVersion
+import com.rutamercaderistas.services.InstalledVersion
 import com.rutamercaderistas.services.UpdateChecker
-import com.rutamercaderistas.services.UpdateNotifier
 import com.rutamercaderistas.viewmodel.SyncViewModel
-import com.rutamercaderistas.viewmodel.UpdateViewModel
-import com.rutamercaderistas.worker.UpdateDownloadManager
 import dagger.hilt.android.HiltAndroidApp
 import io.sentry.android.core.SentryAndroid
 import io.sentry.android.timber.SentryTimberIntegration
@@ -70,16 +69,18 @@ class MercaderistasApp : Application(), Configuration.Provider {
     private fun cleanTempApk() {
         applicationScope.launch {
             val context = this@MercaderistasApp
+            val installed = InstalledVersion.buildConfig()
             val pending = preferencesRepository.getPendingUpdate()
             val pendingNewer = pending != null && UpdateChecker.isPendingNewer(
                 pending.versionTag,
                 pending.versionCode,
-                BuildConfig.VERSION_CODE,
+                installed,
             )
             val dir = ApkDownloader.apkDir(context)
             val apk = ApkDownloader.apkFile(context)
-            val apkValid = apk.exists() &&
-                ApkDownloader.readApkVersionCode(context, apk) > BuildConfig.VERSION_CODE
+            val apkInfo = if (apk.exists()) ApkDownloader.readApkInfo(context, apk) else null
+            val apkValid = apkInfo != null &&
+                AppVersion.isApkNewer(apkInfo.versionName, apkInfo.versionCode, installed)
 
             // Se conserva el APK listo o el .part de una descarga en curso.
             if (apkValid || pendingNewer) {
@@ -108,16 +109,13 @@ class MercaderistasApp : Application(), Configuration.Provider {
 
     private suspend fun performUpgradeCleanup(previousVersion: Int) {
         // Ya hay una versión instalada: el aviso, el APK y la descarga sobran.
-        WorkManager.getInstance(this).cancelUniqueWork(UpdateDownloadManager.WORK_NAME)
-        UpdateNotifier.cancelUpdate(this)
         File(filesDir, ApkDownloader.UPDATES_DIR).deleteRecursively()
         cacheDir.deleteRecursively()
         File(filesDir, "thumbnails").deleteRecursively()
         File(filesDir, com.rutamercaderistas.models.PdfDownloader.PDF_FILE_NAME).delete()
         brandPagesRepository.clearAll()
         preferencesRepository.clearPendingUpdate()
-        preferencesRepository.setLastNotifiedUpdateTag("")
-        preferencesRepository.setLastNotifiedUpdateCode(0)
+        preferencesRepository.setRejectedUpdateTag("")
         preferencesRepository.setUpdateSuppressedUntil(0)
         preferencesRepository.setLastVersionCode(BuildConfig.VERSION_CODE)
     }
@@ -130,13 +128,6 @@ class MercaderistasApp : Application(), Configuration.Provider {
                 NotificationManager.IMPORTANCE_DEFAULT,
             ).apply {
                 description = "Notificaciones de promociones por vencer"
-            }
-            val actualizaciones = NotificationChannel(
-                UpdateViewModel.UPDATE_CHANNEL_ID,
-                "Actualizaciones",
-                NotificationManager.IMPORTANCE_HIGH,
-            ).apply {
-                description = "Notificaciones de nuevas versiones disponibles"
             }
             val sincronizacion = NotificationChannel(
                 SyncViewModel.SYNC_CHANNEL_ID,
@@ -155,9 +146,11 @@ class MercaderistasApp : Application(), Configuration.Provider {
             }
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(promociones)
-            manager.createNotificationChannel(actualizaciones)
             manager.createNotificationChannel(sincronizacion)
             manager.createNotificationChannel(stock)
+            // El actualizador ya no usa notificaciones: se elimina el canal
+            // viejo para que no queden avisos "Actualización disponible".
+            runCatching { manager.deleteNotificationChannel("app_updates") }
         }
     }
 

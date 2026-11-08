@@ -16,7 +16,7 @@ data class UpdateInfo(
     val versionCode: Int,
     val versionName: String,
     val apkUrl: String,
-    /** Tag crudo ("v12.20.1"): clave de dedupe, versionCode colisiona en patch. */
+    /** Tag crudo ("v12.51"): clave de dedupe y de rechazo. */
     val tag: String = "",
     /** Tamaño real del asset según la API de GitHub (0 = no publicado). */
     val apkSize: Long = 0L,
@@ -47,10 +47,21 @@ object UpdateChecker {
     private const val CHECKSUMS_ASSET = "SHA256SUMS.txt"
     private const val MAX_CHECKSUMS_BYTES = 64 * 1024
 
-    // Se declara una sola vez: se evalúa por release, no por ítem de lista.
-    private val VERSION_CODE_IN_BODY = Regex("""versionCode\s*[:=]\s*(\d+)""", RegexOption.IGNORE_CASE)
-
-    suspend fun check(currentVersionCode: Int): UpdateInfo = withContext(Dispatchers.IO) {
+    /**
+     * Consulta el último release y decide con datos numéricos:
+     *
+     * 1. El tag se parsea por segmentos (12.51 → [12, 51]).
+     * 2. Se compara con PackageInfo.versionName de la app instalada; si son
+     *    iguales NO hay actualización aunque el versionCode difiera.
+     * 3. Además el versionCode del release (major*1000+minor) debe ser
+     *    estrictamente mayor que el instalado. Un tag adelantado a su build
+     *    (v12.51 con APK 12050) no vuelve a ofrecerse.
+     * 4. Un tag ya rechazado por traer un APK que no es más nuevo se omite.
+     */
+    suspend fun check(
+        installed: InstalledVersion,
+        rejectedTag: String = "",
+    ): UpdateInfo = withContext(Dispatchers.IO) {
         try {
             val json = fetchLatestRelease()
             if (json == null) {
@@ -58,9 +69,18 @@ object UpdateChecker {
                 return@withContext checkError("No se pudo comprobar la actualización")
             }
 
-            val tagName = json.optString("tag_name", "")
-            val versionName = tagName.removePrefix("v")
-            val body = json.optString("body", "")
+            val tagName = json.optString("tag_name", "").trim()
+            val versionName = tagName.removePrefix("v").removePrefix("V")
+            val remoteVersion = AppVersion.parse(tagName)
+            if (remoteVersion == null) {
+                Timber.w("Tag de release inválido: %s", tagName)
+                return@withContext checkError("El release no tiene una versión válida")
+            }
+
+            if (isRejectedTag(tagName, rejectedTag)) {
+                Timber.i("Release %s rechazado antes: no se vuelve a ofrecer", tagName)
+                return@withContext noUpdate()
+            }
 
             val assets = parseAssets(json.optJSONArray("assets"))
             val apkAsset = findApkAsset(assets, Build.SUPPORTED_ABIS.toList())
@@ -69,15 +89,32 @@ object UpdateChecker {
                 return@withContext checkError("El release no incluye un APK compatible")
             }
 
-            // El release puede declarar el versionCode real en el cuerpo. Si
-            // no lo hace, se deriva del tag con el esquema major*1000+minor.
-            val remoteCode = VERSION_CODE_IN_BODY.find(body)?.groupValues?.getOrNull(1)?.toIntOrNull()
-                ?: tagToVersionCode(tagName)
-                ?: 0
+            // El versionCode oficial se deriva del tag (major*1000+minor).
+            // No se acepta un número escrito en el cuerpo del release: el
+            // cuerpo es texto libre y podía ofrecer una versión inexistente.
+            val remoteCode = AppVersion.releaseCodeForTag(tagName)
+                ?: return@withContext checkError("El tag del release no encaja con el versionCode")
 
-            if (!isRemoteNewer(tagName, currentVersionCode, remoteCode)) {
-                Timber.i("Sin actualizaciones: remote=%s (%d), local=%d", tagName, remoteCode, currentVersionCode)
+            val installedNumber = AppVersion.parse(installed.versionName)
+                ?: AppVersion.fromVersionCode(installed.versionCode)
+            if (remoteVersion == installedNumber) {
+                Timber.i("Misma versión instalada: %s", tagName)
                 return@withContext noUpdate()
+            }
+            if (!AppVersion.isTagNewer(tagName, installed)) {
+                Timber.i("Tag no más nuevo: remote=%s, local=%s", tagName, installed.versionName)
+                return@withContext noUpdate()
+            }
+            if (!AppVersion.isReleaseCodeNewer(remoteCode, installed)) {
+                Timber.w(
+                    "Release inconsistente: %s anuncia code %d, instalado %d",
+                    tagName,
+                    remoteCode,
+                    installed.versionCode,
+                )
+                return@withContext checkError(
+                    "La versión " + versionName + " no trae un versionCode mayor al instalado",
+                )
             }
 
             // La descarga debe pesar exactamente lo que declara el asset de
@@ -102,17 +139,18 @@ object UpdateChecker {
                 val message = when {
                     checksumsAsset == null -> "El release no publica el SHA-256 del APK"
                     checksums == null -> "No se pudo obtener el SHA-256 publicado por el CI"
-                    else -> "El SHA-256 publicado no incluye ${apkAsset.name}"
+                    else -> "El SHA-256 publicado no incluye " + apkAsset.name
                 }
                 Timber.w(message)
                 return@withContext checkError(message)
             }
 
             Timber.i(
-                "Actualización disponible: %s (%d) > %d, %d bytes, sha=%s",
+                "Actualización disponible: %s (%d) > %d (%s), %d bytes, sha=%s",
                 tagName,
                 remoteCode,
-                currentVersionCode,
+                installed.versionCode,
+                installed.versionName,
                 apkAsset.size,
                 apkSha.take(12),
             )
@@ -144,7 +182,7 @@ object UpdateChecker {
             if (conn.responseCode != 200) {
                 Timber.w("GitHub API status: %d", conn.responseCode)
                 if (conn.responseCode == 404) return null
-                throw IOException("GitHub HTTP ${conn.responseCode}")
+                throw IOException("GitHub HTTP " + conn.responseCode)
             }
 
             val bytes = conn.inputStream.use { it.readBytes() }
@@ -234,59 +272,33 @@ object UpdateChecker {
         }
     }
 
-    /** Parse "12.02.1" → [12, 2, 1]. Null si alguna parte no es número. */
-    internal fun parseTagParts(tagName: String): List<Int>? {
-        val versionName = tagName.removePrefix("v")
-        if (versionName.isBlank()) return null
-        return versionName.split(".").map { it.toIntOrNull() ?: return null }
-    }
-
-    /** Decodifica versionCode con esquema major*1000+minor → [major, minor]. */
-    internal fun decodeVersionCode(versionCode: Int): List<Int> =
-        listOf(versionCode / 1000, versionCode % 1000)
+    /** Convierte un tag "v12.51" al esquema oficial major*1000+minor. */
+    internal fun tagToVersionCode(tagName: String): Int? = AppVersion.releaseCodeForTag(tagName)
 
     /**
-     * true si el tag remoto es más nuevo que el código instalado.
-     * Compara parte por parte (12.02.1 > 12.02.0), sin límite de
-     * dígitos por parte. Visible para tests.
+     * true si el tag remoto es más nuevo que la versión instalada, comparando
+     * segmentos numéricos del tag contra PackageInfo.versionName. Un tag
+     * idéntico a la versión instalada nunca vuelve a ofrecerse.
      */
-    internal fun isRemoteNewer(remoteTag: String, localVersionCode: Int): Boolean {
-        val remote = parseTagParts(remoteTag) ?: return false
-        val local = decodeVersionCode(localVersionCode)
-        val size = maxOf(remote.size, local.size)
-        for (i in 0 until size) {
-            val r = remote.getOrElse(i) { 0 }
-            val l = local.getOrElse(i) { 0 }
-            if (r != l) return r > l
-        }
-        return false
-    }
+    internal fun isRemoteNewer(remoteTag: String, installed: InstalledVersion): Boolean =
+        AppVersion.isTagNewer(remoteTag, installed)
 
     /**
-     * Decisión principal: primero compara el versionCode numérico del release;
-     * si empatan (un patch v12.20.1 contra v12.20), el tag decide.
+     * true si el pendiente guardado sigue siendo más nuevo que lo instalado.
+     * Con tag se compara por segmentos; los pendientes viejos sin tag caen
+     * al versionCode.
      */
-    internal fun isRemoteNewer(
-        remoteTag: String,
-        localVersionCode: Int,
-        remoteVersionCode: Int,
+    internal fun isPendingNewer(
+        pendingTag: String,
+        pendingCode: Int,
+        installed: InstalledVersion,
     ): Boolean {
-        if (remoteVersionCode > localVersionCode) return true
-        if (remoteVersionCode < localVersionCode) return false
-        return isRemoteNewer(remoteTag, localVersionCode)
+        if (pendingTag.isNotBlank()) return isRemoteNewer(pendingTag, installed)
+        return pendingCode > installed.versionCode
     }
 
-    /**
-     * Convierte un tag "v12.01" al esquema de versionCode
-     * (major * 1000 + minor) solo para informar. La decisión de
-     * actualizar la toma [isRemoteNewer]. Visible para tests.
-     */
-    internal fun tagToVersionCode(tagName: String): Int? {
-        val parsed = parseTagParts(tagName) ?: return null
-        val major = parsed.getOrElse(0) { 0 }
-        val minor = parsed.getOrElse(1) { 0 }
-        return major * 1000 + minor
-    }
+    internal fun isRejectedTag(tagName: String, rejectedTag: String): Boolean =
+        rejectedTag.isNotBlank() && rejectedTag.trim().equals(tagName.trim(), ignoreCase = true)
 
     private fun noUpdate() = UpdateInfo(
         available = false,
@@ -302,13 +314,4 @@ object UpdateChecker {
         apkUrl = "",
         error = message,
     )
-
-    /**
-     * true si el pendiente guardado sigue siendo más nuevo que lo instalado.
-     * Usa el tag cuando existe (no colisiona en patch); si no, el code legacy.
-     */
-    internal fun isPendingNewer(pendingTag: String, pendingCode: Int, installedCode: Int): Boolean {
-        if (pendingTag.isNotBlank()) return isRemoteNewer(pendingTag, installedCode)
-        return pendingCode > installedCode
-    }
 }

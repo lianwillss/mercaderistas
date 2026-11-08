@@ -7,10 +7,10 @@ import com.rutamercaderistas.data.preferences.PendingUpdate
 import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.services.ApkDownloader
 import com.rutamercaderistas.services.ApkValidation
+import com.rutamercaderistas.services.DownloadResult
+import com.rutamercaderistas.services.InstallStart
 import com.rutamercaderistas.services.UpdateChecker
 import com.rutamercaderistas.services.UpdateInfo
-import com.rutamercaderistas.services.UpdateNotifier
-import com.rutamercaderistas.worker.UpdateDownloadManager
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -20,7 +20,6 @@ import io.mockk.unmockkObject
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -40,7 +39,6 @@ class UpdateViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var application: Application
     private lateinit var preferencesRepository: PreferencesRepository
-    private lateinit var downloadManager: UpdateDownloadManager
     private lateinit var apkFile: File
     private lateinit var viewModel: UpdateViewModel
     private val createdViewModels = mutableListOf<UpdateViewModel>()
@@ -49,6 +47,9 @@ class UpdateViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         application = mockk(relaxed = true)
+        // PackageManager relajado devuelve valores vacíos: InstalledVersion
+        // cae a BuildConfig, que es la versión real de esta compilación.
+
         apkFile = File.createTempFile("update-test", ".apk").apply { delete() }
 
         preferencesRepository = mockk {
@@ -57,48 +58,34 @@ class UpdateViewModelTest {
             coEvery { getPendingUpdate() } returns null
             coEvery { setPendingUpdate(any()) } returns Unit
             coEvery { clearPendingUpdate() } returns Unit
-            coEvery { getLastNotifiedUpdateCode() } returns 0
-            coEvery { setLastNotifiedUpdateCode(any()) } returns Unit
-            coEvery { getLastNotifiedUpdateTag() } returns ""
-            coEvery { setLastNotifiedUpdateTag(any()) } returns Unit
-            coEvery { wasUpdateNotifAsked() } returns false
-            coEvery { setUpdateNotifAsked() } returns Unit
+            coEvery { getRejectedUpdateTag() } returns ""
+            coEvery { setRejectedUpdateTag(any()) } returns Unit
             coEvery { getLastUpdateCheck() } returns 0L
             coEvery { setLastUpdateCheck(any()) } returns Unit
         }
-
-        downloadManager = mockk(relaxed = true)
-        every { downloadManager.observe() } returns emptyFlow()
-        every { downloadManager.enqueue(any()) } returns Unit
-        every { downloadManager.cancel() } returns Unit
 
         mockkObject(ApkDownloader)
         every { ApkDownloader.apkFile(any()) } returns apkFile
         every { ApkDownloader.partialFile(any()) } returns File(apkFile.parentFile, "update.apk.part")
         every { ApkDownloader.readApkVersionCode(any(), any()) } returns 0
-        coEvery { ApkDownloader.validateApk(any(), any(), any(), any()) } returns ApkValidation.Ok
+        coEvery { ApkDownloader.validateApk(any(), any(), any(), any(), any(), any()) } returns
+            ApkValidation.Ok
         every { ApkDownloader.readApkInfo(any(), any()) } returns
             com.rutamercaderistas.services.ApkInfo(
                 packageName = "com.rutamercaderistas",
                 versionCode = BuildConfig.VERSION_CODE + 1,
-                versionName = "12.42",
+                versionName = "12.53",
             )
         every { ApkDownloader.canInstallPackages(any()) } returns true
-        every { ApkDownloader.installApk(any(), any()) } returns null
+        every { ApkDownloader.installApk(any(), any()) } returns InstallStart.Started
         every { ApkDownloader.openInstallPermissionSettings(any()) } returns true
         every { ApkDownloader.clearDownloadedApk(any()) } returns Unit
         every { ApkDownloader.clearPartial(any()) } returns Unit
+        coEvery {
+            ApkDownloader.download(any(), any(), any(), any(), any(), any(), any())
+        } returns DownloadResult.Success(apkFile)
 
-        mockkObject(UpdateNotifier)
-        every { UpdateNotifier.hasPermission(any()) } returns false
-        every { UpdateNotifier.postPending(any(), any()) } returns Unit
-        every { UpdateNotifier.postReady(any(), any()) } returns Unit
-        every { UpdateNotifier.postDownloadError(any(), any()) } returns Unit
-        every { UpdateNotifier.cancelUpdate(any()) } returns Unit
-        every { UpdateNotifier.cancelProgress(any()) } returns Unit
-        every { UpdateNotifier.ensureChannel(any()) } returns Unit
-
-        viewModel = track(UpdateViewModel(application, preferencesRepository, downloadManager))
+        viewModel = track(UpdateViewModel(application, preferencesRepository))
     }
 
     private fun track(vm: UpdateViewModel): UpdateViewModel {
@@ -111,7 +98,6 @@ class UpdateViewModelTest {
         createdViewModels.forEach { it.viewModelScope.cancel() }
         createdViewModels.clear()
         runCatching { unmockkObject(ApkDownloader) }
-        runCatching { unmockkObject(UpdateNotifier) }
         apkFile.delete()
         Dispatchers.resetMain()
     }
@@ -126,27 +112,6 @@ class UpdateViewModelTest {
             Thread.sleep(10)
         }
         throw AssertionError("Condición no cumplida dentro del timeout")
-    }
-
-    /**
-     * Espera la verificación misma (no un estado proxy): varios awaits de
-     * estado se cumplen trivialmente antes de que la coroutine bajo test
-     * llegue al mock, y el coVerify directo pierde la carrera en suite.
-     */
-    private fun awaitVerify(timeoutMs: Long = 10000, verification: () -> Unit) {
-        val deadline = System.currentTimeMillis() + timeoutMs
-        var lastError: Throwable? = null
-        while (System.currentTimeMillis() < deadline) {
-            testDispatcher.scheduler.advanceUntilIdle()
-            try {
-                verification()
-                return
-            } catch (e: Throwable) {
-                lastError = e
-                Thread.sleep(10)
-            }
-        }
-        throw lastError ?: AssertionError("verify no cumplido dentro del timeout")
     }
 
     private suspend fun awaitCoVerify(timeoutMs: Long = 10000, verification: suspend () -> Unit) {
@@ -165,10 +130,10 @@ class UpdateViewModelTest {
         throw lastError ?: AssertionError("coVerify no cumplido dentro del timeout")
     }
 
-    private fun mockAvailableUpdate(code: Int = 12002, name: String = "12.02", tag: String = "v12.02") {
+    private fun mockAvailableUpdate(code: Int = 12053, name: String = "12.53", tag: String = "v12.53") {
         mockkObject(UpdateChecker)
         coEvery {
-            UpdateChecker.check(any())
+            UpdateChecker.check(any(), any())
         } returns UpdateInfo(
             available = true,
             versionCode = code,
@@ -181,7 +146,7 @@ class UpdateViewModelTest {
     @Test
     fun `initial state is Idle`() {
         assertNull(viewModel.card.value)
-        assertFalse(viewModel.showUpdateSheet.value)
+        assertNull(viewModel.pendingUpdate.value)
     }
 
     @Test
@@ -190,62 +155,38 @@ class UpdateViewModelTest {
         try {
             viewModel.checkForUpdate(force = true, showFeedback = false)
             awaitOnMain {
-                viewModel.pendingUpdate.value == PendingUpdate("12.02", 12002, "http://x.apk", "v12.02")
+                viewModel.pendingUpdate.value ==
+                    PendingUpdate("12.53", 12053, "http://x.apk", "v12.53")
             }
             awaitCoVerify {
                 coVerify {
                     preferencesRepository.setPendingUpdate(
-                        PendingUpdate("12.02", 12002, "http://x.apk", "v12.02"),
+                        PendingUpdate("12.53", 12053, "http://x.apk", "v12.53"),
                     )
                 }
             }
             awaitOnMain { viewModel.showUpdateBanner.value }
             awaitOnMain { viewModel.card.value is UpdateCardUiState.Available }
-            assertEquals("12.02", (viewModel.card.value as UpdateCardUiState.Available).versionName)
+            assertEquals(
+                "12.53",
+                (viewModel.card.value as UpdateCardUiState.Available).versionName,
+            )
         } finally {
             unmockkObject(UpdateChecker)
         }
     }
 
     @Test
-    fun `second check same version does not re-notify`() = runTest {
+    fun `second check same version does not restart the download`() = runTest {
         mockAvailableUpdate()
         try {
-            coEvery { preferencesRepository.getLastNotifiedUpdateTag() } returns "" andThen "v12.02"
-            viewModel.checkForUpdate(force = true, showFeedback = false)
-            awaitOnMain {
-                viewModel.pendingUpdate.value == PendingUpdate("12.02", 12002, "http://x.apk", "v12.02")
-            }
             viewModel.checkForUpdate(force = true, showFeedback = false)
             awaitOnMain { viewModel.pendingUpdate.value != null }
-            awaitVerify { verify(exactly = 1) { UpdateNotifier.postPending(any(), "12.02") } }
-        } finally {
-            unmockkObject(UpdateChecker)
-        }
-    }
-
-    @Test
-    fun `patch version notifies again after minor notified`() = runTest {
-        mockkObject(UpdateChecker)
-        try {
-            coEvery {
-                UpdateChecker.check(any())
-            } returns UpdateInfo(
-                available = true,
-                versionCode = 12020,
-                versionName = "12.20.1",
-                apkUrl = "http://x.apk",
-                tag = "v12.20.1",
-            )
-            coEvery { preferencesRepository.getLastNotifiedUpdateTag() } returns "v12.20"
             viewModel.checkForUpdate(force = true, showFeedback = false)
-            awaitOnMain {
-                viewModel.pendingUpdate.value == PendingUpdate("12.20.1", 12020, "http://x.apk", "v12.20.1")
+            awaitOnMain { viewModel.card.value is UpdateCardUiState.Available }
+            coVerify(exactly = 0) {
+                ApkDownloader.download(any(), any(), any(), any(), any(), any(), any())
             }
-            awaitCoVerify {
-                coVerify { preferencesRepository.setLastNotifiedUpdateTag("v12.20.1") }
-            }
-            awaitVerify { verify { UpdateNotifier.postPending(any(), "12.20.1") } }
         } finally {
             unmockkObject(UpdateChecker)
         }
@@ -255,7 +196,7 @@ class UpdateViewModelTest {
     fun `restore shows banner for stored newer pending`() = runTest {
         val newer = PendingUpdate("99.99", BuildConfig.VERSION_CODE + 1, "http://x.apk")
         coEvery { preferencesRepository.getPendingUpdate() } returns newer
-        val restored = track(UpdateViewModel(application, preferencesRepository, downloadManager))
+        val restored = track(UpdateViewModel(application, preferencesRepository))
         awaitOnMain { restored.pendingUpdate.value == newer }
         awaitOnMain { restored.showUpdateBanner.value }
         awaitOnMain { restored.card.value is UpdateCardUiState.Available }
@@ -265,7 +206,7 @@ class UpdateViewModelTest {
     fun `stale stored pending is cleared`() = runTest {
         coEvery { preferencesRepository.getPendingUpdate() } returns
             PendingUpdate("11.00", 11000, "http://old.apk")
-        val restored = track(UpdateViewModel(application, preferencesRepository, downloadManager))
+        val restored = track(UpdateViewModel(application, preferencesRepository))
         awaitCoVerify { coVerify { preferencesRepository.clearPendingUpdate() } }
         awaitOnMain { restored.pendingUpdate.value == null }
         awaitOnMain { !restored.showUpdateBanner.value }
@@ -280,7 +221,7 @@ class UpdateViewModelTest {
             viewModel.suppressUntilTomorrow()
             awaitOnMain { !viewModel.showUpdateBanner.value }
             assertEquals(
-                PendingUpdate("12.02", 12002, "http://x.apk", "v12.02"),
+                PendingUpdate("12.53", 12053, "http://x.apk", "v12.53"),
                 viewModel.pendingUpdate.value,
             )
         } finally {
@@ -289,36 +230,89 @@ class UpdateViewModelTest {
     }
 
     @Test
-    fun `showPendingDialog reopens the sheet without network`() = runTest {
+    fun `startUpdate downloads in app and ends ready without auto install`() = runTest {
         mockAvailableUpdate()
         try {
             viewModel.checkForUpdate(force = true, showFeedback = false)
             awaitOnMain { viewModel.pendingUpdate.value != null }
-            viewModel.dismissSheet()
-            assertFalse(viewModel.showUpdateSheet.value)
-            viewModel.showPendingDialog()
-            assertTrue(viewModel.showUpdateSheet.value)
+            // Simula el APK que deja el descargador real.
+            apkFile.writeBytes(ByteArray(2048))
+            viewModel.startUpdate()
+            awaitOnMain { viewModel.card.value is UpdateCardUiState.Ready }
+            awaitCoVerify {
+                coVerify(exactly = 1) {
+                    ApkDownloader.download(
+                        any(),
+                        "http://x.apk",
+                        any(),
+                        any(),
+                        "12.53",
+                        12053,
+                        any(),
+                    )
+                }
+            }
+            // El usuario decide cuándo instalar: nada de auto-instalar.
+            verify(exactly = 0) { ApkDownloader.installApk(any(), any()) }
         } finally {
             unmockkObject(UpdateChecker)
         }
     }
 
     @Test
-    fun `startUpdate enqueues and shows downloading card`() = runTest {
+    fun `download error shows retryable failure`() = runTest {
+        mockAvailableUpdate()
+        try {
+            coEvery {
+                ApkDownloader.download(any(), any(), any(), any(), any(), any(), any())
+            } returns DownloadResult.Error("Sin conexión", retryable = true)
+            viewModel.checkForUpdate(force = true, showFeedback = false)
+            awaitOnMain { viewModel.pendingUpdate.value != null }
+            viewModel.startUpdate()
+            awaitOnMain {
+                (viewModel.card.value as? UpdateCardUiState.Failed)?.message == "Sin conexión"
+            }
+            assertTrue((viewModel.card.value as UpdateCardUiState.Failed).retryable)
+        } finally {
+            unmockkObject(UpdateChecker)
+        }
+    }
+
+    @Test
+    fun `release rejected is remembered so it never loops`() = runTest {
+        mockAvailableUpdate()
+        try {
+            coEvery {
+                ApkDownloader.download(any(), any(), any(), any(), any(), any(), any())
+            } returns DownloadResult.Error(
+                "La versión descargada no es más reciente",
+                retryable = false,
+                releaseRejected = true,
+            )
+            viewModel.checkForUpdate(force = true, showFeedback = false)
+            awaitOnMain { viewModel.pendingUpdate.value != null }
+            viewModel.startUpdate()
+            awaitOnMain {
+                (viewModel.card.value as? UpdateCardUiState.Failed)?.retryable == false
+            }
+            awaitCoVerify {
+                coVerify { preferencesRepository.setRejectedUpdateTag("v12.53") }
+            }
+        } finally {
+            unmockkObject(UpdateChecker)
+        }
+    }
+
+    @Test
+    fun `cancel download clears partial and returns to available`() = runTest {
         mockAvailableUpdate()
         try {
             viewModel.checkForUpdate(force = true, showFeedback = false)
             awaitOnMain { viewModel.pendingUpdate.value != null }
             viewModel.startUpdate()
-            assertTrue(viewModel.showUpdateSheet.value)
-            awaitOnMain { viewModel.card.value is UpdateCardUiState.Downloading }
-            awaitVerify {
-                verify(exactly = 1) {
-                    downloadManager.enqueue(
-                        PendingUpdate("12.02", 12002, "http://x.apk", "v12.02"),
-                    )
-                }
-            }
+            viewModel.cancelDownload()
+            awaitOnMain { viewModel.card.value is UpdateCardUiState.Available }
+            awaitCoVerify { coVerify { ApkDownloader.clearPartial(any()) } }
         } finally {
             unmockkObject(UpdateChecker)
         }
@@ -331,7 +325,7 @@ class UpdateViewModelTest {
             viewModel.checkForUpdate(force = true, showFeedback = false)
             awaitOnMain { viewModel.pendingUpdate.value != null }
             coEvery {
-                UpdateChecker.check(any())
+                UpdateChecker.check(any(), any())
             } returns UpdateInfo(
                 available = false,
                 versionCode = 0,
@@ -349,18 +343,18 @@ class UpdateViewModelTest {
     }
 
     @Test
-    fun `up to date clears pending and notification`() = runTest {
+    fun `up to date clears pending and apk`() = runTest {
         mockAvailableUpdate()
         try {
             viewModel.checkForUpdate(force = true, showFeedback = false)
             awaitOnMain { viewModel.pendingUpdate.value != null }
             coEvery {
-                UpdateChecker.check(any())
+                UpdateChecker.check(any(), any())
             } returns UpdateInfo(available = false, versionCode = 0, versionName = "", apkUrl = "")
             viewModel.checkForUpdate(force = true, showFeedback = false)
             awaitOnMain { viewModel.pendingUpdate.value == null }
-            awaitVerify { verify { UpdateNotifier.cancelUpdate(any()) } }
             awaitCoVerify { coVerify { preferencesRepository.clearPendingUpdate() } }
+            verify { ApkDownloader.clearDownloadedApk(any()) }
         } finally {
             unmockkObject(UpdateChecker)
         }
@@ -370,20 +364,15 @@ class UpdateViewModelTest {
     fun `launch check auto starts the download`() = runTest {
         mockAvailableUpdate()
         try {
+            apkFile.writeBytes(ByteArray(2048))
             viewModel.checkForUpdate(
                 force = true,
                 showFeedback = false,
                 autoStartDownload = true,
             )
-            awaitOnMain { viewModel.card.value is UpdateCardUiState.Downloading }
-            // En arranque automático no se abre el modal: descarga en silencio.
-            assertFalse(viewModel.showUpdateSheet.value)
-            awaitVerify {
-                verify(exactly = 1) {
-                    downloadManager.enqueue(
-                        PendingUpdate("12.02", 12002, "http://x.apk", "v12.02"),
-                    )
-                }
+            awaitOnMain { viewModel.card.value is UpdateCardUiState.Ready }
+            coVerify(exactly = 1) {
+                ApkDownloader.download(any(), any(), any(), any(), any(), any(), any())
             }
         } finally {
             unmockkObject(UpdateChecker)
@@ -399,8 +388,8 @@ class UpdateViewModelTest {
             apkFile.writeBytes(ByteArray(2048))
             every { ApkDownloader.canInstallPackages(any()) } returns false
             viewModel.installApk()
-            awaitVerify { verify { ApkDownloader.openInstallPermissionSettings(any()) } }
-            assertTrue(viewModel.showUpdateSheet.value)
+            awaitCoVerify { coVerify { ApkDownloader.openInstallPermissionSettings(any()) } }
+            verify(exactly = 0) { ApkDownloader.installApk(any(), any()) }
         } finally {
             unmockkObject(UpdateChecker)
         }
@@ -412,25 +401,25 @@ class UpdateViewModelTest {
         try {
             val sha = "a".repeat(64)
             coEvery {
-                UpdateChecker.check(any())
+                UpdateChecker.check(any(), any())
             } returns UpdateInfo(
                 available = true,
-                versionCode = 12046,
-                versionName = "12.46",
+                versionCode = 12053,
+                versionName = "12.53",
                 apkUrl = "http://x.apk",
-                tag = "v12.46",
+                tag = "v12.53",
                 apkSize = 1234L,
                 apkSha256 = sha,
             )
             viewModel.checkForUpdate(force = true, showFeedback = false)
             awaitOnMain {
                 viewModel.pendingUpdate.value ==
-                    PendingUpdate("12.46", 12046, "http://x.apk", "v12.46", 1234L, sha)
+                    PendingUpdate("12.53", 12053, "http://x.apk", "v12.53", 1234L, sha)
             }
             awaitCoVerify {
                 coVerify {
                     preferencesRepository.setPendingUpdate(
-                        PendingUpdate("12.46", 12046, "http://x.apk", "v12.46", 1234L, sha),
+                        PendingUpdate("12.53", 12053, "http://x.apk", "v12.53", 1234L, sha),
                     )
                 }
             }
@@ -448,7 +437,7 @@ class UpdateViewModelTest {
             apkFile.writeBytes(ByteArray(2048))
             val message =
                 "El APK está firmado con un certificado distinto al de esta app. Por seguridad no se instala."
-            coEvery { ApkDownloader.validateApk(any(), any(), any(), any()) } returns
+            coEvery { ApkDownloader.validateApk(any(), any(), any(), any(), any(), any()) } returns
                 ApkValidation.Failed(message, retryable = false)
             viewModel.installApk()
             awaitOnMain {
@@ -473,9 +462,9 @@ class UpdateViewModelTest {
         )
         coEvery { preferencesRepository.getPendingUpdate() } returns pending
         apkFile.writeBytes(ByteArray(2048))
-        coEvery { ApkDownloader.validateApk(any(), any(), any(), any()) } returns
+        coEvery { ApkDownloader.validateApk(any(), any(), any(), any(), any(), any()) } returns
             ApkValidation.Failed("La verificación SHA-256 del APK falló")
-        val restored = track(UpdateViewModel(application, preferencesRepository, downloadManager))
+        val restored = track(UpdateViewModel(application, preferencesRepository))
         awaitOnMain {
             (restored.card.value as? UpdateCardUiState.Failed)?.message?.contains("SHA-256") == true
         }
@@ -487,7 +476,7 @@ class UpdateViewModelTest {
         mockkObject(UpdateChecker)
         try {
             coEvery {
-                UpdateChecker.check(any())
+                UpdateChecker.check(any(), any())
             } returns UpdateInfo(
                 available = false,
                 versionCode = 0,

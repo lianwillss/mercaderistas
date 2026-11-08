@@ -89,17 +89,12 @@ class PreferencesRepositoryTest {
     }
 
     @Test
-    fun `lastNotifiedUpdateCode roundtrip`() = runTest {
-        assertEquals(0, repository.getLastNotifiedUpdateCode())
-        repository.setLastNotifiedUpdateCode(12002)
-        assertEquals(12002, repository.getLastNotifiedUpdateCode())
-    }
-
-    @Test
-    fun `lastNotifiedUpdateTag roundtrip`() = runTest {
-        assertEquals("", repository.getLastNotifiedUpdateTag())
-        repository.setLastNotifiedUpdateTag("v12.20.1")
-        assertEquals("v12.20.1", repository.getLastNotifiedUpdateTag())
+    fun `rejectedUpdateTag roundtrip`() = runTest {
+        assertEquals("", repository.getRejectedUpdateTag())
+        repository.setRejectedUpdateTag("v12.51")
+        assertEquals("v12.51", repository.getRejectedUpdateTag())
+        repository.setRejectedUpdateTag("")
+        assertEquals("", repository.getRejectedUpdateTag())
     }
 
     @Test
@@ -130,13 +125,6 @@ class PreferencesRepositoryTest {
         )
         // El DataStore es singleton por proceso y los tests comparten estado.
         repository.clearPendingUpdate()
-    }
-
-    @Test
-    fun `updateNotifAsked roundtrip`() = runTest {
-        assertEquals(false, repository.wasUpdateNotifAsked())
-        repository.setUpdateNotifAsked()
-        assertEquals(true, repository.wasUpdateNotifAsked())
     }
 
     @Test

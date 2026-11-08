@@ -8,6 +8,8 @@ import org.junit.Test
 
 class UpdateCheckerTest {
 
+    private fun installed(name: String, code: Int) = InstalledVersion(code, name)
+
     @Test
     fun `tag v12_01 decodifica a 12001`() {
         assertEquals(12001, UpdateChecker.tagToVersionCode("v12.01"))
@@ -24,65 +26,91 @@ class UpdateCheckerTest {
     }
 
     @Test
-    fun `instalado 11101 ofrece 12001 una sola vez`() {
-        val remote = UpdateChecker.tagToVersionCode("v12.01")!!
-        // App vieja (12.01 con código roto 11101): hay update
-        assertTrue(remote > 11101)
-        // App ya instalada (12.01 con código 12001): NO hay update
-        assertTrue(remote <= 12001)
-    }
-
-    @Test
     fun `misma version no ofrece update`() {
-        val remote = UpdateChecker.tagToVersionCode("v11.95")!!
-        assertTrue(remote <= 11095)
+        assertFalse(UpdateChecker.isRemoteNewer("v12.51", installed("12.51", 12051)))
+        assertFalse(UpdateChecker.isRemoteNewer("v12.51", installed("12.51", 12050)))
     }
 
     @Test
-    fun `comparacion semantica parte por parte`() {
-        assertTrue(UpdateChecker.isRemoteNewer("v12.02", 12001))
-        assertFalse(UpdateChecker.isRemoteNewer("v12.02", 12002))
-        assertFalse(UpdateChecker.isRemoteNewer("v12.01", 12002))
-        assertFalse(UpdateChecker.isRemoteNewer("release-final", 12002))
+    fun `tag adelantado a su build se detecta pero el code no es mayor`() {
+        // Caso real: tag v12.51 compilado con versionCode 12050.
+        val local = installed("12.50", 12050)
+        assertTrue(UpdateChecker.isRemoteNewer("v12.51", local))
+        assertTrue(AppVersion.isReleaseCodeNewer(12051, local))
+        // Si el build no subió el code, no se ofrece como release válido.
+        assertFalse(AppVersion.isReleaseCodeNewer(12050, local))
+    }
+
+    @Test
+    fun `comparacion numerica parte por parte, no decimal`() {
+        assertFalse(UpdateChecker.isRemoteNewer("v12.9", installed("12.51", 12051)))
+        assertTrue(UpdateChecker.isRemoteNewer("v12.100", installed("12.99", 12099)))
+        assertFalse(UpdateChecker.isRemoteNewer("v12.02", installed("12.02", 12002)))
+        assertFalse(UpdateChecker.isRemoteNewer("release-final", installed("12.02", 12002)))
     }
 
     @Test
     fun `parche de tres partes decide`() {
-        assertTrue(UpdateChecker.isRemoteNewer("v12.02.1", 12002))
-        assertFalse(UpdateChecker.isRemoteNewer("v12.02.0", 12002))
+        assertTrue(UpdateChecker.isRemoteNewer("v12.02.1", installed("12.02", 12002)))
+        assertFalse(UpdateChecker.isRemoteNewer("v12.02.0", installed("12.02", 12002)))
     }
 
     @Test
     fun `minor grande no rompe la comparacion`() {
-        assertTrue(UpdateChecker.isRemoteNewer("v11.100", 11099))
-        assertFalse(UpdateChecker.isRemoteNewer("v11.100", 11100))
+        assertTrue(UpdateChecker.isRemoteNewer("v11.100", installed("11.99", 11099)))
+        assertFalse(UpdateChecker.isRemoteNewer("v11.100", installed("11.100", 11100)))
     }
 
     @Test
-    fun `decodeVersionCode mantiene esquema`() {
-        assertEquals(listOf(12, 2), UpdateChecker.decodeVersionCode(12002))
+    fun `decode del versionCode mantiene el esquema`() {
+        assertEquals(VersionNumber(listOf(12, 2)), AppVersion.fromVersionCode(12002))
     }
 
     @Test
-    fun `patch colisiona en code pero el tag lo distingue`() {
-        // v12.20.1 y v12.20 dan el mismo versionCode: por eso el dedupe de
-        // aviso y el pendiente usan el tag, no el code.
-        assertEquals(12020, UpdateChecker.tagToVersionCode("v12.20.1"))
-        assertEquals(12020, UpdateChecker.tagToVersionCode("v12.20"))
-        assertTrue(UpdateChecker.isRemoteNewer("v12.20.1", 12020))
-        assertFalse(UpdateChecker.isRemoteNewer("v12.20", 12020))
+    fun `versionCode sin versionName parseable cae al code`() {
+        assertTrue(UpdateChecker.isRemoteNewer("v12.03", installed("dev-build", 12002)))
+        assertFalse(UpdateChecker.isRemoteNewer("v12.02", installed("dev-build", 12002)))
     }
 
     @Test
     fun `isPendingNewer usa tag cuando existe`() {
-        assertTrue(UpdateChecker.isPendingNewer("v12.20.1", 12020, 12020))
-        assertFalse(UpdateChecker.isPendingNewer("v12.20", 12020, 12020))
+        val local = installed("12.20", 12020)
+        assertTrue(UpdateChecker.isPendingNewer("v12.20.1", 12020, local))
+        assertFalse(UpdateChecker.isPendingNewer("v12.20", 12020, local))
+        // Un pendiente del tag que ya está instalado no se restaura.
+        assertFalse(UpdateChecker.isPendingNewer("v12.51", 12051, installed("12.51", 12051)))
     }
 
     @Test
     fun `isPendingNewer cae a code sin tag (pendientes viejos)`() {
-        assertTrue(UpdateChecker.isPendingNewer("", 12021, 12020))
-        assertFalse(UpdateChecker.isPendingNewer("", 12020, 12020))
+        val local = installed("12.20", 12020)
+        assertTrue(UpdateChecker.isPendingNewer("", 12021, local))
+        assertFalse(UpdateChecker.isPendingNewer("", 12020, local))
+    }
+
+    @Test
+    fun `un tag rechazado no vuelve a ofrecerse`() {
+        assertTrue(UpdateChecker.isRejectedTag("v12.51", "v12.51"))
+        assertTrue(UpdateChecker.isRejectedTag("v12.51", " V12.51 "))
+        assertFalse(UpdateChecker.isRejectedTag("v12.52", "v12.51"))
+        assertFalse(UpdateChecker.isRejectedTag("v12.52", ""))
+    }
+
+    @Test
+    fun `el tag publicado debe coincidir con el versionName del build`() {
+        assertTrue(AppVersion.releaseMatchesTag("v12.52", "12.52"))
+        assertFalse(AppVersion.releaseMatchesTag("v12.52", "12.51"))
+        assertFalse(AppVersion.releaseMatchesTag("v12.51.1", "12.51"))
+    }
+
+    @Test
+    fun `un APK de igual o menor versionCode no es instalable`() {
+        val local = installed("12.50", 12050)
+        assertFalse(AppVersion.isApkNewer("12.50", 12050, local))
+        assertFalse(AppVersion.isApkNewer("12.50", 12049, local))
+        assertTrue(AppVersion.isApkNewer("12.51", 12051, local))
+        // Parche legítimo: mismo code, nombre mayor.
+        assertTrue(AppVersion.isApkNewer("12.50.1", 12050, local))
     }
 
     @Test
@@ -136,15 +164,5 @@ class UpdateCheckerTest {
             ReleaseAsset("app-x86_64-release.apk", "https://example.com/x86.apk", 1L, null),
         )
         assertNull(UpdateChecker.findApkAsset(assets, listOf("arm64-v8a")))
-    }
-
-    @Test
-    fun `el versionCode del release manda sobre el tag`() {
-        // El body del release puede declarar un code distinto al del tag.
-        assertTrue(UpdateChecker.isRemoteNewer("v12.41", 12041, 12042))
-        assertFalse(UpdateChecker.isRemoteNewer("v12.41", 12041, 12040))
-        // Si empatan, el tag resuelve el patch.
-        assertTrue(UpdateChecker.isRemoteNewer("v12.20.1", 12020, 12020))
-        assertFalse(UpdateChecker.isRemoteNewer("v12.20", 12020, 12020))
     }
 }

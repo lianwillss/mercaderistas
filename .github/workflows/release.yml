@@ -21,6 +21,28 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
 
+      # Un tag v12.51 publicado con un APK 12.50 deja a todos los usuarios
+      # en un bucle de "actualización disponible". La versión del build debe
+      # ser exactamente el tag y el versionCode su esquema major*1000+minor.
+      - name: Verify build version matches tag
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          NAME=$(sed -n 's/^[[:space:]]*versionName "\([^"]*\)".*/\1/p' app/build.gradle | head -n1)
+          CODE=$(sed -n 's/^[[:space:]]*versionCode \([0-9][0-9]*\).*/\1/p' app/build.gradle | head -n1)
+          MAJOR="${TAG%%.*}"
+          REST="${TAG#*.}"
+          MINOR="${REST%%.*}"
+          EXPECTED=$((MAJOR * 1000 + MINOR))
+          echo "tag=$TAG versionName=$NAME versionCode=$CODE esperado=$EXPECTED"
+          if [ "$TAG" != "$NAME" ]; then
+            echo "::error::El tag v$TAG no coincide con versionName \"$NAME\" de app/build.gradle"
+            exit 1
+          fi
+          if [ "$CODE" != "$EXPECTED" ]; then
+            echo "::error::versionCode $CODE no coincide con $TAG (esperado $EXPECTED)"
+            exit 1
+          fi
+
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > keystore.jks
 
@@ -31,6 +53,26 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      # Verificación sobre el APK real, no solo sobre el archivo Gradle: si
+      # AGP ignorara versionCode/versionName, el release no se publica.
+      - name: Verify APK version matches tag
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -n1)
+          BADGING=$("$AAPT2" dump badging app/build/outputs/apk/release/app-universal-release.apk | head -n1)
+          NAME=$(echo "$BADGING" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")
+          CODE=$(echo "$BADGING" | sed -n "s/.*versionCode='\([0-9]*\)'.*/\1/p")
+          echo "tag=$TAG apkVersionName=$NAME apkVersionCode=$CODE"
+          if [ "$TAG" != "$NAME" ]; then
+            echo "::error::El APK se compiló como $NAME y el tag es v$TAG"
+            exit 1
+          fi
+          EXPECTED=$(echo "$TAG" | awk -F. '{print $1 * 1000 + $2}')
+          if [ "$CODE" != "$EXPECTED" ]; then
+            echo "::error::El APK tiene versionCode $CODE y el tag v$TAG exige $EXPECTED"
+            exit 1
+          fi
 
       - name: Generate SHA-256 checksums
         working-directory: app/build/outputs/apk/release

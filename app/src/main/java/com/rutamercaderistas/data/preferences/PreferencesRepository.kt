@@ -65,9 +65,11 @@ class PreferencesRepository @Inject constructor(
         private val KEY_PENDING_UPDATE_TAG = stringPreferencesKey("pending_update_tag")
         private val KEY_PENDING_UPDATE_SIZE = longPreferencesKey("pending_update_size")
         private val KEY_PENDING_UPDATE_SHA = stringPreferencesKey("pending_update_sha")
-        private val KEY_LAST_NOTIFIED_UPDATE = intPreferencesKey("last_notified_update_code")
-        private val KEY_LAST_NOTIFIED_TAG = stringPreferencesKey("last_notified_update_tag")
-        private val KEY_UPDATE_NOTIF_ASKED = stringPreferencesKey("update_notif_asked")
+        /**
+         * Tag del release que trajo un APK no instalable (versión anunciada
+         * distinta o no más nueva). No se vuelve a ofrecer ese tag.
+         */
+        private val KEY_REJECTED_UPDATE_TAG = stringPreferencesKey("rejected_update_tag")
         private val KEY_LAST_UPDATE_CHECK = longPreferencesKey("last_update_check")
         private val KEY_SYNC_HISTORY = stringPreferencesKey("sync_history")
         private const val SEARCH_HISTORY_MAX = 8
@@ -328,26 +330,15 @@ class PreferencesRepository @Inject constructor(
         }
     }
 
-    suspend fun getLastNotifiedUpdateCode(): Int =
-        context.prefsDataStore.data.first()[KEY_LAST_NOTIFIED_UPDATE] ?: 0
+    /** Tag publicado cuyo APK no se puede instalar sobre esta versión. */
+    suspend fun getRejectedUpdateTag(): String =
+        context.prefsDataStore.data.first()[KEY_REJECTED_UPDATE_TAG].orEmpty()
 
-    suspend fun setLastNotifiedUpdateCode(code: Int) {
-        context.prefsDataStore.edit { it[KEY_LAST_NOTIFIED_UPDATE] = code }
-    }
-
-    /** Dedupe de aviso por tag completo (v12.20.1 ≠ v12.20 aunque colisionen en code). */
-    suspend fun getLastNotifiedUpdateTag(): String =
-        context.prefsDataStore.data.first()[KEY_LAST_NOTIFIED_TAG].orEmpty()
-
-    suspend fun setLastNotifiedUpdateTag(tag: String) {
-        context.prefsDataStore.edit { it[KEY_LAST_NOTIFIED_TAG] = tag }
-    }
-
-    suspend fun wasUpdateNotifAsked(): Boolean =
-        context.prefsDataStore.data.first()[KEY_UPDATE_NOTIF_ASKED] != null
-
-    suspend fun setUpdateNotifAsked() {
-        context.prefsDataStore.edit { it[KEY_UPDATE_NOTIF_ASKED] = "true" }
+    suspend fun setRejectedUpdateTag(tag: String) {
+        context.prefsDataStore.edit { prefs ->
+            if (tag.isBlank()) prefs.remove(KEY_REJECTED_UPDATE_TAG)
+            else prefs[KEY_REJECTED_UPDATE_TAG] = tag
+        }
     }
 
     /** Última consulta exitosa a GitHub; se usa para no repetir al volver. */

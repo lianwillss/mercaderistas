@@ -1,12 +1,8 @@
 package com.rutamercaderistas
 
-import android.Manifest
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import com.rutamercaderistas.R
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -39,7 +35,6 @@ import com.rutamercaderistas.models.BrandReference
 import com.rutamercaderistas.services.PromotionRepository
 import com.rutamercaderistas.util.openMaps
 import com.rutamercaderistas.ui.screens.MainScreen
-import com.rutamercaderistas.ui.components.UpdateModal
 import com.rutamercaderistas.ui.theme.MercaderistasTheme
 import com.rutamercaderistas.viewmodel.RouteViewModel
 import com.rutamercaderistas.viewmodel.SyncViewModel
@@ -80,13 +75,11 @@ class MainActivity : ComponentActivity() {
             scheduleDailyPromotionNotification()
             schedulePeriodicUpdateCheck()
         }
-        handleUpdateIntent(intent, checkNetwork = false)
 
         setContent {
 
             val showUpdateBanner by updateViewModel.showUpdateBanner.collectAsStateWithLifecycle()
             val updateCard by updateViewModel.card.collectAsStateWithLifecycle()
-            val showUpdateSheet by updateViewModel.showUpdateSheet.collectAsStateWithLifecycle()
             val updateMessage by updateViewModel.message.collectAsStateWithLifecycle()
             val routeUiState by routeViewModel.uiState.collectAsStateWithLifecycle()
             val syncUiState by syncViewModel.state.collectAsStateWithLifecycle()
@@ -129,21 +122,6 @@ class MainActivity : ComponentActivity() {
                 // nueva, descarga e instala de inmediato.
                 updateViewModel.checkForUpdateOnLaunch()
                 routeViewModel.loadInitialData()
-            }
-
-            // Si hay update visible y falta el permiso de notificaciones,
-            // pedirlo una sola vez: es el canal del aviso en 2do plano.
-            // Si lo niega, igual quedan banner + diálogo dentro de la app.
-            val notifPermissionLauncher = rememberLauncherForActivityResult(
-                ActivityResultContracts.RequestPermission()
-            ) { granted ->
-                updateViewModel.onNotifPermissionResult(granted)
-            }
-            LaunchedEffect(showUpdateBanner) {
-                if (showUpdateBanner && updateViewModel.shouldAskNotifPermission()) {
-                    updateViewModel.markNotifAsked()
-                    notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
             }
 
             // Auto-sync del rutero al abrir: una sola vez, cuando ya hay ruta
@@ -230,25 +208,8 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.padding(innerPadding),
                     )
                 }
-
-                UpdateModal(
-                    visible = showUpdateSheet,
-                    state = updateCard,
-                    onDismiss = { updateViewModel.dismissSheet() },
-                    onUpdate = { updateViewModel.startUpdate() },
-                    onLater = { updateViewModel.suppressUntilTomorrow() },
-                    onCancel = { updateViewModel.cancelDownload() },
-                    onRetry = { updateViewModel.retryDownload() },
-                    onInstall = { updateViewModel.installApk() },
-                )
             }
         }
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        handleUpdateIntent(intent, checkNetwork = true)
     }
 
     override fun onResume() {
@@ -260,30 +221,6 @@ class MainActivity : ComponentActivity() {
             updateViewModel.checkForUpdateIfStale()
         } else {
             firstResumeHandled = true
-        }
-    }
-
-    override fun onPause() {
-        updateViewModel.onActivityPaused()
-        super.onPause()
-    }
-
-    private fun handleUpdateIntent(intent: Intent?, checkNetwork: Boolean) {
-        if (intent == null) return
-        val showUpdate = intent.getBooleanExtra(UpdateViewModel.EXTRA_SHOW_UPDATE, false)
-        val installUpdate = intent.getBooleanExtra(UpdateViewModel.EXTRA_INSTALL_UPDATE, false)
-        intent.removeExtra(UpdateViewModel.EXTRA_SHOW_UPDATE)
-        intent.removeExtra(UpdateViewModel.EXTRA_INSTALL_UPDATE)
-        when {
-            installUpdate -> updateViewModel.onInstallRequested()
-            showUpdate -> {
-                updateViewModel.showPendingDialog()
-                // En arranque frío LaunchedEffect(Unit) ya consulta; al
-                // recibir el intent con la app abierta sí hace falta refrescar.
-                if (checkNetwork) {
-                    updateViewModel.checkForUpdate(force = true, showFeedback = false)
-                }
-            }
         }
     }
 

@@ -199,28 +199,19 @@
     <string name="update_error_buscar">Error al buscar actualización</string>
     <string name="update_version_no_reciente">La versión descargada no es más reciente que la instalada</string>
     <string name="update_banner_title">Nueva versión %s disponible</string>
-    <string name="update_notif_disponible">Actualización disponible</string>
-    <string name="update_notif_nueva">Nueva versión %s disponible</string>
-    <string name="update_notif_lista">Actualización lista para instalar</string>
-    <string name="update_notif_toca">Versión %s — toca para instalar</string>
-    <string name="update_notif_canal_nombre">Actualizaciones</string>
-    <string name="update_notif_canal_desc">Avisos de nuevas versiones y descargas</string>
-    <string name="update_notif_descargando">Descargando actualización</string>
-    <string name="update_notif_progreso">%1$d %% descargado</string>
-    <string name="update_notif_error_titulo">Descarga interrumpida</string>
-    <string name="update_notif_error_texto">Toca para reintentar la actualización</string>
 
     <string name="update_card_title">Actualización disponible</string>
     <string name="update_card_subtitle">La versión %1$s está disponible.</string>
-    <string name="update_card_subtitle_expanded">La versión %1$s está disponible. La descarga se puede reanudar si sales de la app.</string>
+    <string name="update_card_subtitle_expanded">La versión %1$s está disponible. La descarga se hace dentro de la app.</string>
     <string name="update_version_chip">v%1$s</string>
     <string name="update_downloading_title">Descargando %1$s</string>
-    <string name="update_downloading_subtitle">Puedes salir de la app; la descarga continúa.</string>
+    <string name="update_downloading_subtitle">Puedes cancelar cuando quieras.</string>
     <string name="update_download_percent">%1$d %%</string>
     <string name="update_download_mb">%1$s / %2$s MB</string>
     <string name="update_download_mb_unknown">%1$s MB descargados</string>
     <string name="update_cancelar">Cancelar</string>
     <string name="update_reintentar">Reintentar</string>
+    <string name="update_ocultar">Ocultar</string>
     <string name="update_instalar">Instalar</string>
     <string name="update_ready_title">Lista para instalar</string>
     <string name="update_ready_subtitle">La versión %1$s está descargada.</string>
@@ -240,7 +231,10 @@
     <string name="update_permiso_instalar">Activa “Instalar apps desconocidas” para continuar.</string>
     <string name="update_permiso_no_concedido">No se concedió el permiso. Toca Instalar para reintentar.</string>
     <string name="update_error_abrir_ajustes">No se pudieron abrir los ajustes de instalación.</string>
-    <string name="update_error_instalador">No se pudo abrir el instalador: %1$s</string>
+    <string name="update_error_instalador">No se pudo iniciar la instalación: %1$s</string>
+    <string name="update_instalacion_error">La instalación no se completó. Revisa la confirmación de Android e inténtalo de nuevo.</string>
+    <string name="update_confirmar_instalacion">Instalación iniciada. Completa la confirmación de Android si aparece.</string>
+    <string name="update_apk_no_corresponde">El APK publicado no corresponde a la versión %1$s. Se ignorará este release; se publicará uno nuevo.</string>
 
     <!-- Manual screen -->
     <string name="manual_que_es">¿Qué es Mercaderistas?</string>

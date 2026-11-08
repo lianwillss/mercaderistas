@@ -421,16 +421,20 @@ private fun FailedContent(
     ) {
         TextButton(onClick = onLater) {
             Text(
-                text = stringResource(R.string.mas_tarde),
+                text = stringResource(
+                    if (failed.retryable) R.string.mas_tarde else R.string.update_ocultar,
+                ),
                 style = MaterialTheme.typography.labelLarge,
                 color = colors.onSurfaceVariant,
             )
         }
-        Spacer(Modifier.width(4.dp))
-        PrimaryAction(
-            text = stringResource(R.string.update_reintentar),
-            onClick = onRetry,
-        )
+        if (failed.retryable) {
+            Spacer(Modifier.width(4.dp))
+            PrimaryAction(
+                text = stringResource(R.string.update_reintentar),
+                onClick = onRetry,
+            )
+        }
     }
 }
 

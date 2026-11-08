@@ -1,16 +1,16 @@
 package com.rutamercaderistas.services
 
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInfo
+import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import androidx.core.content.FileProvider
-import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -28,7 +28,12 @@ import java.util.concurrent.TimeUnit
 
 sealed interface DownloadResult {
     data class Success(val file: File) : DownloadResult
-    data class Error(val message: String, val retryable: Boolean = true) : DownloadResult
+    data class Error(
+        val message: String,
+        val retryable: Boolean = true,
+        /** El release completo no sirve para esta instalación: no reintentar. */
+        val releaseRejected: Boolean = false,
+    ) : DownloadResult
     data object Cancelled : DownloadResult
 }
 
@@ -49,7 +54,22 @@ data class ApkInfo(
 /** Resultado de validar un APK antes de marcarlo listo o lanzar el instalador. */
 sealed interface ApkValidation {
     data object Ok : ApkValidation
-    data class Failed(val message: String, val retryable: Boolean = true) : ApkValidation
+    data class Failed(
+        val message: String,
+        val retryable: Boolean = true,
+        /**
+         * El APK de este release nunca podrá instalarse sobre esta app
+         * (versión anunciada distinta, APK no más nuevo, paquete ajeno).
+         * El ViewModel guarda el tag para no volver a descargarlo en bucle.
+         */
+        val releaseRejected: Boolean = false,
+    ) : ApkValidation
+}
+
+/** Resultado de abrir una sesión de PackageInstaller. */
+sealed interface InstallStart {
+    data object Started : InstallStart
+    data class Error(val message: String, val retryable: Boolean = true) : InstallStart
 }
 
 /**
@@ -61,6 +81,10 @@ object ApkDownloader {
     const val UPDATES_DIR = "updates"
     const val APK_NAME = "update.apk"
     const val PART_NAME = "update.apk.part"
+    const val PART_META_NAME = "update.apk.part.meta"
+
+    /** Acción que el sistema usa para devolver el resultado de la sesión. */
+    const val ACTION_INSTALL_STATUS = "com.rutamercaderistas.action.UPDATE_INSTALL_STATUS"
 
     private const val MIN_APK_BYTES = 1024L
     /** Android necesita aproximadamente otro tanto al instalar (copia en /data/app + metadatos). */
@@ -100,19 +124,27 @@ object ApkDownloader {
 
     fun clearPartial(context: Context) {
         runCatching { partialFile(context).delete() }
+        runCatching { partMetaFile(context).delete() }
     }
+
+    /** Marca de identidad del .part: evita reanudar con la URL/tamaño de otro release. */
+    private fun partMetaFile(context: Context): File = File(apkDir(context), PART_META_NAME)
 
     suspend fun download(
         context: Context,
         apkUrl: String,
         expectedSize: Long = 0L,
         expectedSha256: String = "",
+        expectedVersionName: String = "",
+        expectedVersionCode: Int = 0,
         onProgress: suspend (DownloadProgress) -> Unit = {},
     ): DownloadResult = downloadInternal(
         context,
         apkUrl,
         expectedSize,
         expectedSha256,
+        expectedVersionName,
+        expectedVersionCode,
         onProgress,
         allowRangeRestart = true,
     )
@@ -122,6 +154,8 @@ object ApkDownloader {
         apkUrl: String,
         expectedSize: Long,
         expectedSha256: String,
+        expectedVersionName: String,
+        expectedVersionCode: Int,
         onProgress: suspend (DownloadProgress) -> Unit,
         allowRangeRestart: Boolean,
     ): DownloadResult = withContext(Dispatchers.IO) {
@@ -142,8 +176,30 @@ object ApkDownloader {
 
         val apk = File(dir, APK_NAME)
         val part = File(dir, PART_NAME)
+        val meta = partMetaFile(context)
+        fun discardPartial() {
+            part.delete()
+            meta.delete()
+        }
+
         // Si ya hay un APK completo, se revalida o se descarta.
         if (apk.exists()) apk.delete()
+
+        // Un .part de otro release (u otra URL/tamaño/hash) no se puede
+        // reanudar: mezclaría bytes de dos APK distintos. Se descarta.
+        val identity = listOf(
+            apkUrl,
+            expectedSize.toString(),
+            expectedSha256,
+            expectedVersionName,
+            expectedVersionCode.toString(),
+        ).joinToString("|")
+        val previousIdentity = runCatching { meta.readText() }.getOrNull()
+        if (part.exists() && previousIdentity != identity) {
+            Timber.i("Se descarta .part de otro release")
+            discardPartial()
+        }
+        runCatching { meta.writeText(identity) }
 
         val existing = if (part.exists()) part.length() else 0L
         val request = Request.Builder()
@@ -163,13 +219,15 @@ object ApkDownloader {
 
         response.use { res ->
             if (res.code == 416 && existing > 0) {
-                part.delete()
+                discardPartial()
                 return@withContext if (allowRangeRestart) {
                     downloadInternal(
                         context,
                         apkUrl,
                         expectedSize,
                         expectedSha256,
+                        expectedVersionName,
+                        expectedVersionCode,
                         onProgress,
                         allowRangeRestart = false,
                     )
@@ -205,7 +263,7 @@ object ApkDownloader {
             // Falla rápido si el servidor anuncia otro tamaño que el asset de
             // GitHub: no tiene sentido gastar la descarga.
             if (expectedSize > 0 && total > 0 && total != expectedSize) {
-                part.delete()
+                discardPartial()
                 return@withContext DownloadResult.Error(
                     context.getString(
                         R.string.update_tamano_no_coincide,
@@ -269,7 +327,7 @@ object ApkDownloader {
 
             val downloaded = part.length()
             if (downloaded < MIN_APK_BYTES) {
-                part.delete()
+                discardPartial()
                 return@withContext DownloadResult.Error(
                     context.getString(R.string.update_apk_corrupto),
                     retryable = true,
@@ -289,23 +347,36 @@ object ApkDownloader {
                     part.copyTo(apk, overwrite = true)
                     part.delete()
                 }.onFailure {
-                    part.delete()
+                    discardPartial()
                     return@withContext DownloadResult.Error(
                         context.getString(R.string.update_error_guardar),
                         retryable = true,
                     )
                 }
             }
+            meta.delete()
 
-            when (val validation = validateApk(context, apk, expectedSize, expectedSha256)) {
+            when (
+                val validation = validateApk(
+                    context,
+                    apk,
+                    expectedSize,
+                    expectedSha256,
+                    expectedVersionName,
+                    expectedVersionCode,
+                )
+            ) {
                 ApkValidation.Ok -> {
-                    Timber.i("APK descargado y validado (tamaño, SHA-256 y firma)")
+                    Timber.i("APK descargado y validado (tamaño, SHA-256, versión y firma)")
                     DownloadResult.Success(apk)
                 }
                 is ApkValidation.Failed -> {
-                    apk.delete()
-                    part.delete()
-                    DownloadResult.Error(validation.message, validation.retryable)
+                    ApkDownloader.clearDownloadedApk(context)
+                    DownloadResult.Error(
+                        validation.message,
+                        validation.retryable,
+                        validation.releaseRejected,
+                    )
                 }
             }
         }
@@ -395,6 +466,8 @@ object ApkDownloader {
         apkFile: File,
         expectedSize: Long,
         expectedSha256: String,
+        expectedVersionName: String = "",
+        expectedVersionCode: Int = 0,
     ): ApkValidation = withContext(Dispatchers.IO) {
         val length = if (apkFile.exists()) apkFile.length() else 0L
         if (length < MIN_APK_BYTES) {
@@ -438,11 +511,42 @@ object ApkDownloader {
         if (info.packageName != context.packageName) {
             return@withContext ApkValidation.Failed(
                 context.getString(R.string.update_apk_corrupto),
+                retryable = false,
+                releaseRejected = true,
             )
         }
-        if (info.versionCode <= BuildConfig.VERSION_CODE) {
+
+        // El APK debe ser exactamente el release anunciado. Si el CI publicó
+        // un tag v12.51 con un APK compilado como 12.50, acá se detecta antes
+        // de instalar y el tag queda rechazado (sin bucle de descargas).
+        if (expectedVersionCode > 0 && info.versionCode != expectedVersionCode) {
+            return@withContext ApkValidation.Failed(
+                context.getString(
+                    R.string.update_apk_no_corresponde,
+                    expectedVersionName.ifBlank { expectedVersionCode.toString() },
+                ),
+                retryable = false,
+                releaseRejected = true,
+            )
+        }
+        if (expectedVersionName.isNotBlank()) {
+            val published = AppVersion.parse(expectedVersionName)
+            val actual = AppVersion.parse(info.versionName)
+            if (published == null || actual == null || published != actual) {
+                return@withContext ApkValidation.Failed(
+                    context.getString(R.string.update_apk_no_corresponde, expectedVersionName),
+                    retryable = false,
+                    releaseRejected = true,
+                )
+            }
+        }
+
+        val installedVersion = InstalledVersion.read(context)
+        if (!AppVersion.isApkNewer(info.versionName, info.versionCode, installedVersion)) {
             return@withContext ApkValidation.Failed(
                 context.getString(R.string.update_version_no_reciente),
+                retryable = false,
+                releaseRejected = true,
             )
         }
 
@@ -488,41 +592,77 @@ object ApkDownloader {
         return false
     }
 
-    fun installApk(context: Context, apkFile: File): String? {
+    /**
+     * Instala con una sesión de PackageInstaller (no con un Intent
+     * ACTION_VIEW). En Android 12+ se pide USER_ACTION_NOT_REQUIRED: si el
+     * sistema y el permiso lo permiten, la actualización se aplica sin
+     * diálogo; si no, el receiver recibe STATUS_PENDING_USER_ACTION y abre
+     * la confirmación mínima del sistema.
+     */
+    fun installApk(context: Context, apkFile: File): InstallStart {
         if (!apkFile.exists() || apkFile.length() < MIN_APK_BYTES) {
-            return context.getString(R.string.update_archivo_faltante)
+            return InstallStart.Error(context.getString(R.string.update_archivo_faltante))
         }
-        // Antes de lanzar el instalador: Android necesita espacio para el APK
-        // ya descargado y otro tanto para instalarlo; si no queda, la
-        // instalación falla tras una descarga exitosa. Un directorio padre
-        // nulo no debería ocurrir, pero no se trata como "sin espacio" para
-        // no bloquear una instalación válida por un valor inesperado.
+        // Android necesita espacio para el APK ya descargado y otro tanto
+        // para instalarlo; si no queda, la instalación falla tras una
+        // descarga exitosa.
         val free = apkFile.parentFile?.usableSpace ?: Long.MAX_VALUE
         val needed = apkFile.length() * INSTALL_SPACE_FACTOR + DISK_MARGIN_BYTES
         if (free < needed) {
             val missingMb = ((needed - free) / 1_000_000.0)
-            return context.getString(R.string.update_poco_espacio, formatMb(missingMb))
+            return InstallStart.Error(context.getString(R.string.update_poco_espacio, formatMb(missingMb)))
         }
         if (!canInstallPackages(context)) {
-            return context.getString(R.string.update_permiso_instalar)
+            return InstallStart.Error(context.getString(R.string.update_permiso_instalar))
         }
+
+        val installer = context.packageManager.packageInstaller
+        var sessionId: Int? = null
         return try {
-            val uri = FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.fileprovider",
-                apkFile,
-            )
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "application/vnd.android.package-archive")
-                clipData = android.content.ClipData.newRawUri("", uri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val params = PackageInstaller.SessionParams(
+                PackageInstaller.SessionParams.MODE_FULL_INSTALL,
+            ).apply {
+                setAppPackageName(context.packageName)
+                setSize(apkFile.length())
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    // Requiere UPDATE_PACKAGES_WITHOUT_USER_ACTION y que la
+                    // app se esté actualizando a sí misma. Si el sistema no
+                    // lo permite, sigue el flujo de confirmación normal.
+                    runCatching {
+                        setRequireUserAction(
+                            PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED,
+                        )
+                    }.onFailure {
+                        Timber.w(it, "El sistema no permite instalar sin acción del usuario")
+                    }
+                }
             }
-            context.startActivity(intent)
-            null
+            val id = installer.createSession(params)
+            sessionId = id
+            installer.openSession(id).use { session ->
+                session.openWrite("base.apk", 0, apkFile.length()).use { output ->
+                    apkFile.inputStream().use { input -> input.copyTo(output) }
+                    session.fsync(output)
+                }
+
+                val statusIntent = Intent(context, UpdateInstallReceiver::class.java).apply {
+                    action = ACTION_INSTALL_STATUS
+                }
+                val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
+                val pendingIntent = PendingIntent.getBroadcast(context, id, statusIntent, flags)
+                session.commit(pendingIntent.intentSender)
+            }
+            InstallStart.Started
         } catch (e: Exception) {
-            Timber.e(e, "Error al lanzar instalación")
-            context.getString(R.string.update_error_instalador, e.localizedMessage ?: "desconocido")
+            Timber.e(e, "Error al abrir la sesión de instalación")
+            sessionId?.let { runCatching { installer.abandonSession(it) } }
+            InstallStart.Error(
+                context.getString(
+                    R.string.update_error_instalador,
+                    e.localizedMessage ?: "desconocido",
+                ),
+            )
         }
     }
 
