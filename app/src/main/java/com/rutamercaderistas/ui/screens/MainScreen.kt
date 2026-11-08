@@ -165,6 +165,9 @@ fun MainScreen(
             marcasConPromo = routeUiState.marcasConPromo,
             hasPlanillaChanges = syncUiState.syncChanges?.isEmpty == false,
             modifier = Modifier.fillMaxSize(),
+            // Cada entrada de navegación devuelve la barra: si quedó escondida
+            // por scroll en una ruta, la siguiente no hereda ese estado.
+            navigationResetKey = backStackEntry?.id,
         ) {
             NavHost(
                 navController = navController,

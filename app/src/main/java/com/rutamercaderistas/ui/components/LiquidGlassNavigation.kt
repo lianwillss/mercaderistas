@@ -5,6 +5,7 @@ import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -60,6 +61,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -85,6 +87,7 @@ import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -131,6 +134,9 @@ import kotlin.math.roundToInt
 // del sistema, así que el contenido se ve por debajo y el vidrio tiene algo
 // que mostrar. [BottomBarScrollInset] es justo lo que la barra ocupa sobre
 // el contenido (márgenes incluidos) y se suma al padding de scroll.
+// Se mantiene aunque el scroll aparte la barra: quitarlo a mitad del gesto
+// cambiaría el alto útil de la lista y el contenido saltaría. El precio es
+// un pequeño espacio al final de la lista cuando la barra está escondida.
 val BottomBarScrollInset: Dp = 82.dp
 
 private val BarHeight = 64.dp
@@ -151,6 +157,10 @@ private val RailSlotWidth: Dp = RailWidth + RailMargin * 2
  *
  * El contenido NO se condiciona a la visibilidad del vidrio: la navegación
  * se oculta en la ruta EAN, pero el NavHost sigue siendo el mismo.
+ *
+ * En compacto la barra inferior además se aparta al hacer scroll hacia
+ * adelante y vuelve al retroceder (o al cambiar [navigationResetKey]): así
+ * deja ver las tarjetas que quedaban debajo sin tocar el padding de la lista.
  */
 @Composable
 fun LiquidGlassNavigationScaffold(
@@ -160,10 +170,12 @@ fun LiquidGlassNavigationScaffold(
     marcasConPromo: Int,
     hasPlanillaChanges: Boolean,
     modifier: Modifier = Modifier,
+    navigationResetKey: Any? = null,
     content: @Composable () -> Unit,
 ) {
     val items = glassNavItems(marcasConPromo, hasPlanillaChanges)
     val reducedMotion = LocalReducedMotionEnabled.current
+    val autoHide = rememberBottomBarAutoHideState()
     // Capa del contenido para el vidrio: la barra no reproduce el fondo
     // inventado, muestrea lo que de verdad pasa por debajo y lo difumina.
     val backdropLayer = rememberGraphicsLayer()
@@ -171,13 +183,29 @@ fun LiquidGlassNavigationScaffold(
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val useRail = appWindowWidth(maxWidth) != AppWindowWidth.Compact
         val railVisible = navigationVisible && useRail
-        val barVisible = navigationVisible && !useRail
+        // "Disponible" = hay barra en esta ruta y ancho; "visible" además
+        // depende de si el scroll la apartó. El inset sigue a disponible, no
+        // a visible: si cambiara con cada gesto, la lista saltaría a mitad
+        // del scroll (ver AGENTS: no cambiar el viewport durante el gesto).
+        val barAvailable = navigationVisible && !useRail
+        val barShown = barAvailable && !autoHide.hidden
+        // Estado mutable (en vez de visible =) para saber cuándo termina la
+        // salida: mientras el vidrio se va hay que seguir muestreando el fondo
+        // o el blur desaparece antes que la barra.
+        val barVisibility = remember { MutableTransitionState(false) }
+        barVisibility.targetState = barShown
+
+        // Al cambiar de pantalla, volver del riel o entrar a compacto, la
+        // barra vuelve: ninguna ruta puede quedar “heredando” el scroll de otra.
+        LaunchedEffect(navigationResetKey, navigationVisible, useRail) {
+            if (navigationVisible && !useRail) autoHide.show()
+        }
 
         val dimens = LocalAppDimens.current
         // El inset se anima con la misma spec que el alto del vidrio para que
         // la lista no salte al entrar o salir de una ruta sin barra (EAN).
         val barInset by animateDpAsState(
-            targetValue = if (barVisible) BottomBarScrollInset else 0.dp,
+            targetValue = if (barAvailable) BottomBarScrollInset else 0.dp,
             animationSpec = MotionSprings.default(),
             label = "glassBarInset",
         )
@@ -189,9 +217,11 @@ fun LiquidGlassNavigationScaffold(
         val contentDimens = remember(dimens, barInset) {
             dimens.copy(scrollBottomPadding = dimens.scrollBottomPadding + barInset)
         }
-        // En riel o EAN no hay vidrio inferior que muestrear: no se graba la
-        // capa del contenido (evita el costo de un offscreen que nadie usa).
-        val captureBackdrop = barVisible && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+        // En riel, en EAN o con la barra ya escondida y quieta no hay vidrio
+        // que muestrear: no se graba la capa (evita un offscreen que nadie usa).
+        val captureBackdrop = barAvailable &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            (barVisibility.currentState || !barVisibility.isIdle)
 
         CompositionLocalProvider(LocalAppDimens provides contentDimens) {
             Box(
@@ -201,6 +231,10 @@ fun LiquidGlassNavigationScaffold(
                         WindowInsets.safeDrawing.only(WindowInsetsSides.Start),
                     )
                     .padding(start = railInset)
+                    // Se engancha al contenido y no a cada lista: el scaffold
+                    // observa el scroll ya consumido, sin robar gestos ni
+                    // interferir con el header colapsable ni con pull-to-refresh.
+                    .nestedScroll(autoHide.nestedScrollConnection)
                     .onGloballyPositioned { backdropCoordinates = it }
                     .drawWithContent {
                         if (captureBackdrop) {
@@ -228,7 +262,7 @@ fun LiquidGlassNavigationScaffold(
             )
         }
         AnimatedVisibility(
-            visible = barVisible,
+            visibleState = barVisibility,
             enter = bottomBarEnter(reducedMotion),
             exit = bottomBarExit(reducedMotion),
             modifier = Modifier.align(Alignment.BottomCenter),
@@ -733,10 +767,11 @@ private fun bottomBarEnter(reducedMotion: Boolean): EnterTransition =
     if (reducedMotion) {
         fadeIn(animationSpec = tween(durationMillis = 120))
     } else {
-        fadeIn(animationSpec = tween(durationMillis = 200)) +
+        // Entra desde abajo del todo: es la misma salida, al revés.
+        fadeIn(animationSpec = tween(durationMillis = 160)) +
             slideInVertically(
                 animationSpec = MotionSprings.default<IntOffset>(),
-                initialOffsetY = { it / 3 },
+                initialOffsetY = { it },
             )
     }
 
@@ -744,10 +779,12 @@ private fun bottomBarExit(reducedMotion: Boolean): ExitTransition =
     if (reducedMotion) {
         fadeOut(animationSpec = tween(durationMillis = 120))
     } else {
-        fadeOut(animationSpec = tween(durationMillis = 200)) +
+        // Sale completa: si solo se corriera un tercio seguiría tapando la
+        // última tarjeta, que es justo lo que el scroll quiere despejar.
+        fadeOut(animationSpec = tween(durationMillis = 160)) +
             slideOutVertically(
                 animationSpec = MotionSprings.default<IntOffset>(),
-                targetOffsetY = { it / 3 },
+                targetOffsetY = { it },
             )
     }
 
