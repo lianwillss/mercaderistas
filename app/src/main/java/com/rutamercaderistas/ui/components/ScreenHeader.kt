@@ -35,7 +35,11 @@ fun ScreenHeader(
         title = {
             Text(
                 text = title,
-                style = MaterialTheme.typography.headlineLarge,
+                // titleLarge (22 sp) es el título estándar de top app bar y
+                // el que ya usan Ajustes y Cód. EAN. headlineLarge (34 sp)
+                // rompía la densidad y hacía que Promociones pareciera otra
+                // pantalla distinta al resto.
+                style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,

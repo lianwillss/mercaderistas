@@ -50,7 +50,6 @@ import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -93,6 +92,7 @@ import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.BrandCountResult
 import com.rutamercaderistas.data.local.CajaCountResult
 import com.rutamercaderistas.data.local.EanProductEntity
+import com.rutamercaderistas.ui.components.AppFilterChip
 import com.rutamercaderistas.ui.components.IosModal
 import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.ui.theme.LocalReducedMotionEnabled
@@ -646,7 +646,7 @@ private fun EanFilterChips(
         if (brandFacets.size > 1) {
             item(key = "ean_brand_all") {
                 Box(modifier = Modifier.heightIn(min = dimens.touchMin)) {
-                    FilterChip(
+                    AppFilterChip(
                         selected = brandFilter == null,
                         onClick = { onBrandFilter(null) },
                         label = { Text(stringResource(R.string.todas)) },
@@ -655,7 +655,7 @@ private fun EanFilterChips(
             }
             items(brandFacets, key = { "ean_brand_${it.marca}" }) { facet ->
                 Box(modifier = Modifier.heightIn(min = dimens.touchMin)) {
-                    FilterChip(
+                    AppFilterChip(
                         selected = brandFilter == facet.marca,
                         onClick = { onBrandFilter(facet.marca) },
                         label = {
@@ -671,7 +671,7 @@ private fun EanFilterChips(
         if (cajaFacets.isNotEmpty()) {
             item(key = "ean_caja_all") {
                 Box(modifier = Modifier.heightIn(min = dimens.touchMin)) {
-                    FilterChip(
+                    AppFilterChip(
                         selected = cajaFilter == null,
                         onClick = { onCajaFilter(null) },
                         label = { Text(stringResource(R.string.todas_cajas)) },
@@ -680,7 +680,7 @@ private fun EanFilterChips(
             }
             items(cajaFacets, key = { "ean_caja_${it.conversion}" }) { facet ->
                 Box(modifier = Modifier.heightIn(min = dimens.touchMin)) {
-                    FilterChip(
+                    AppFilterChip(
                         selected = cajaFilter == facet.conversion,
                         onClick = { onCajaFilter(facet.conversion) },
                         label = { Text("CAJA ×${facet.conversion} · ${facet.count}") },

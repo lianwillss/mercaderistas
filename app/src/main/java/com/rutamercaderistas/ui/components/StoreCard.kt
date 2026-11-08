@@ -63,7 +63,6 @@ import com.rutamercaderistas.models.ClienteInfo
 import com.rutamercaderistas.models.LocalDelDia
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.LocalAppDimens
-import com.rutamercaderistas.ui.theme.PriceBlue
 import com.rutamercaderistas.ui.theme.pressScale
 import com.rutamercaderistas.ui.theme.rememberPressInteractionSource
 import com.rutamercaderistas.ui.theme.rs
@@ -89,6 +88,12 @@ fun StoreCard(
     val context = LocalContext.current
     val cardPadding = if (dimens.isCompact) dimens.spacingMd else dimens.spacingLg
     val copyAddressLabel = stringResource(R.string.compartir_copiar_direccion)
+    // Si el local no trae dirección, el pill muestra la comuna: la etiqueta
+    // accesible debe nombrar lo mismo que se ve.
+    val openMapsLabel = stringResource(
+        R.string.abrir_maps_cd,
+        local.direccion.ifBlank { local.comuna },
+    )
     var visible by remember { mutableStateOf(false) }
     val reducedMotion = LocalReducedMotionEnabled.current
     val animAlpha by animateFloatAsState(
@@ -223,13 +228,14 @@ fun StoreCard(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.primaryContainer)
+                                // Dirección = dato: neutro + icono índigo.
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                                 .pressScale(addressPress)
                                 .combinedClickable(
                                     interactionSource = addressPress,
                                     indication = LocalIndication.current,
                                     role = androidx.compose.ui.semantics.Role.Button,
-                                    onClickLabel = "Abrir ${local.direccion} en Maps",
+                                    onClickLabel = openMapsLabel,
                                     onLongClickLabel = copyAddressLabel,
                                     onLongClick = {
                                         val addressText = buildString {
@@ -252,7 +258,7 @@ fun StoreCard(
                                     onClick = { onAddressClick(local.direccion) },
                                 )
                                 .semantics {
-                                    contentDescription = "Abrir ${local.direccion} en Maps"
+                                    contentDescription = openMapsLabel
                                 }
                                 .padding(horizontal = 10.dp, vertical = 2.dp)
                                 .heightIn(min = 48.dp),
@@ -271,7 +277,7 @@ fun StoreCard(
                                         text = local.direccion,
                                         style = MaterialTheme.typography.bodySmall,
                                         fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -280,7 +286,7 @@ fun StoreCard(
                                     Text(
                                         text = local.comuna,
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -370,7 +376,7 @@ fun StoreCard(
                     modifier = Modifier
                         .size(dimens.iconXl)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                         .semantics {
                             contentDescription = "${local.totalClientes} $contadorMarcasCd"
                         },
@@ -382,12 +388,12 @@ fun StoreCard(
                         Text(
                             text = "${local.totalClientes}",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = PriceBlue,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
                         )
                         Text(
                             text = stringResource(R.string.storecard_marcas),
                             style = MaterialTheme.typography.bodySmall,
-                            color = PriceBlue,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }

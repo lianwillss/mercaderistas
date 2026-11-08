@@ -66,6 +66,9 @@ import com.rutamercaderistas.ui.theme.rs
 import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.delay
 
+// Compilado una vez: se usa en cada tecla del buscador.
+private val SPACES = Regex("\\s+")
+
 data class CodProvItem(val nameRes: Int, val code: String)
 
 val CodProvItems = listOf(
@@ -105,7 +108,7 @@ fun filterCodProvItems(
     query: String,
     nameOf: (CodProvItem) -> String,
 ): List<CodProvItem> {
-    val tokens = normalizeSearch(query).split(Regex("\\s+")).filter { it.isNotBlank() }
+    val tokens = normalizeSearch(query).split(SPACES).filter { it.isNotBlank() }
     if (tokens.isEmpty()) return items
     return items.filter { item ->
         val hay = normalizeSearch("${nameOf(item)} ${item.code}")

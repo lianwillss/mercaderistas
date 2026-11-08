@@ -73,7 +73,7 @@ import com.rutamercaderistas.ui.theme.AccentOrangeSoft
 import com.rutamercaderistas.ui.theme.StoreColorPurple
 import com.rutamercaderistas.ui.theme.StoreColorPurpleSoft
 
-enum class BottomBarKey { MAIN, MARCAS, LOCALES, CODPROV, EAN }
+enum class BottomBarKey { MAIN, MARCAS, LOCALES, STOCK, CODPROV, EAN }
 
 @Composable
 fun AppBottomBar(

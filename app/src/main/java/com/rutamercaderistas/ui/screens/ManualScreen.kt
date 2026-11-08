@@ -44,21 +44,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.rutamercaderistas.ui.components.ScreenHeader
-import com.rutamercaderistas.ui.theme.AccentBlue
-import com.rutamercaderistas.ui.theme.AccentBlueSoft
-import com.rutamercaderistas.ui.theme.AccentGreen
-import com.rutamercaderistas.ui.theme.AccentGreenSoft
 import com.rutamercaderistas.ui.theme.AccentGreenText
 import com.rutamercaderistas.ui.theme.ComponentShapes
-import com.rutamercaderistas.ui.theme.StoreColorFuchsia
-import com.rutamercaderistas.ui.theme.StoreColorFuchsiaSoft
-import com.rutamercaderistas.ui.theme.StoreColorPurple
-import com.rutamercaderistas.ui.theme.StoreColorPurpleSoft
-import com.rutamercaderistas.ui.theme.StoreColorRed
-import com.rutamercaderistas.ui.theme.StoreColorRedSoft
-import com.rutamercaderistas.ui.theme.StoreColorYellow
-import com.rutamercaderistas.ui.theme.StoreColorYellowSoft
 import com.rutamercaderistas.ui.theme.LocalAppDimens
+import com.rutamercaderistas.ui.theme.storeColor
+import com.rutamercaderistas.ui.theme.storeSoftColor
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -162,12 +152,12 @@ fun ManualScreen(
                 icon = Icons.Outlined.Store,
                 color = MaterialTheme.colorScheme.primary
             ) {
-                ChainColorRow("Jumbo", AccentGreen, AccentGreenSoft)
-                ChainColorRow("Lider", AccentBlue, AccentBlueSoft)
-                ChainColorRow("Santa Isabel / SISA", StoreColorFuchsia, StoreColorFuchsiaSoft)
-                ChainColorRow("Unimarc", StoreColorRed, StoreColorRedSoft)
-                ChainColorRow("Tottus", StoreColorYellow, StoreColorYellowSoft)
-                ChainColorRow("Alvi", StoreColorPurple, StoreColorPurpleSoft)
+                ChainColorRow("Jumbo", storeColor("Jumbo"), storeSoftColor("Jumbo"))
+                ChainColorRow("Lider", storeColor("Lider"), storeSoftColor("Lider"))
+                ChainColorRow("Santa Isabel / SISA", storeColor("Santa Isabel"), storeSoftColor("Santa Isabel"))
+                ChainColorRow("Unimarc", storeColor("Unimarc"), storeSoftColor("Unimarc"))
+                ChainColorRow("Tottus", storeColor("Tottus"), storeSoftColor("Tottus"))
+                ChainColorRow("Alvi", storeColor("Alvi"), storeSoftColor("Alvi"))
             }
 
             // ── La tarjeta de local ──

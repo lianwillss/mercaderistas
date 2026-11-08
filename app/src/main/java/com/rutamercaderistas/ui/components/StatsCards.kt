@@ -190,7 +190,10 @@ private fun StatCard(
                             }
                             Text(
                                 text = stringResource(R.string.promociones_word),
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                // Era labelSmall.copy(fontSize = 9.sp): por debajo
+                                // del piso de 11sp el texto deja de ser legible a
+                                // 1 m. El token mantiene el tamaño sin inventar uno.
+                                style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1,
                             )

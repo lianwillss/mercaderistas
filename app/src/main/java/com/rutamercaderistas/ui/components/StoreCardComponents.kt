@@ -29,6 +29,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,10 +48,14 @@ import androidx.compose.ui.unit.dp
 import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.models.ClienteInfo
+import com.rutamercaderistas.ui.theme.AvatarPalette
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.AccentGreen
 import com.rutamercaderistas.ui.theme.PriceGreen
 import kotlin.math.abs
+
+// Compilado una vez: initials() corre por cada fila de la lista.
+private val WHITESPACE = Regex("\\s+")
 
 @Composable
 fun BrandItem(
@@ -97,8 +102,10 @@ private fun PriorityBrandCard(
         onClick = onClick,
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
+            // El foco de búsqueda es una selección secundaria: superficie
+            // neutra, no otra capa lavanda.
             containerColor = if (isHighlighted)
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.18f)
+                MaterialTheme.colorScheme.surfaceContainer
             else MaterialTheme.colorScheme.surfaceContainerLow
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
@@ -192,10 +199,13 @@ private fun NormalBrandRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                // Objetivo táctil de 48dp: la fila medía ~30dp (avatar 24dp +
+                // 3dp de padding) y se tocaba con el dedo justo en el borde.
+                .minimumInteractiveComponentSize()
                 .clip(RoundedCornerShape(10.dp))
                 .then(
                     if (isHighlighted) Modifier.background(
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                        MaterialTheme.colorScheme.surfaceContainer
                     ) else Modifier
                 )
                 .clickable(onClick = onClick)
@@ -253,17 +263,10 @@ private fun NormalBrandRow(
     }
 }
 
-private val avatarColors = listOf(
-    Color(0xFFE53935), Color(0xFFD81B60), Color(0xFF8E24AA),
-    Color(0xFF5E35B1), Color(0xFF3949AB), Color(0xFF1E88E5),
-    Color(0xFF039BE5), Color(0xFF00897B), Color(0xFF43A047),
-    Color(0xFF7CB342), Color(0xFFFDD835), Color(0xFFFFB300),
-    Color(0xFFFB8C00), Color(0xFFF4511E), Color(0xFF6D4C41),
-    Color(0xFF546E7A),
-)
+private val avatarPalette = AvatarPalette
 
 private fun avatarColor(text: String): Color {
-    return avatarColors[abs(text.hashCode()) % avatarColors.size]
+    return avatarPalette[abs(text.hashCode()) % avatarPalette.size]
 }
 
 private fun avatarSoftColor(text: String): Color {
@@ -271,7 +274,7 @@ private fun avatarSoftColor(text: String): Color {
 }
 
 private fun initials(text: String): String {
-    val parts = text.trim().split("\\s+".toRegex()).filter { it.isNotBlank() }
+    val parts = text.trim().split(WHITESPACE).filter { it.isNotBlank() }
     return when {
         parts.isEmpty() -> "?"
         parts.size == 1 -> parts.first().take(2).uppercase()

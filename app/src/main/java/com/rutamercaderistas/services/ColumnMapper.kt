@@ -3,17 +3,20 @@ package com.rutamercaderistas.services
 import java.text.Normalizer
 import java.util.regex.Pattern
 
+// Compilado una vez: normalize() corre por cada encabezado y valor del rutero.
+private val SPACES = Regex("\\s+")
+private val DIACRITICS_PATTERN = Pattern.compile("\\p{InCombiningDiacriticalMarks}+")
+
 class ColumnMapper {
 
     companion object {
         fun normalize(text: String): String {
             val nrc = Normalizer.normalize(text, Normalizer.Form.NFD)
-            val pattern = Pattern.compile("\\p{InCombiningDiacriticalMarks}+")
-            return pattern.matcher(nrc).replaceAll("")
+            return DIACRITICS_PATTERN.matcher(nrc).replaceAll("")
                 .uppercase()
                 .trim()
                 .replace("\uFEFF", "")
-                .replace("\\s+".toRegex(), " ")
+                .replace(SPACES, " ")
         }
     }
 

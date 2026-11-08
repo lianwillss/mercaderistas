@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -86,6 +87,14 @@ fun DaySelector(
 ) {
     val dimens = LocalAppDimens.current
     val hoy = diaDeHoy()
+    // Ancla de encabezado para TalkBack: en compacto no hay título de día
+    // aparte, así que el selector es el título de la sección.
+    val selectedDay = days.getOrNull(selectedIndex)
+    val selectedNumber = dayNumbers.getOrNull(selectedIndex)
+    val dayTitle = selectedDay?.let { dia ->
+        if (selectedNumber != null) "Día ${dia.nombreCompleto} $selectedNumber"
+        else "Día ${dia.nombreCompleto}"
+    }
     val gap = 4.dp
     val innerPadding = 4.dp
     val borderWidth = 1.dp
@@ -105,7 +114,11 @@ fun DaySelector(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = dimens.touchMin),
+                .heightIn(min = dimens.touchMin)
+                .semantics {
+                    heading()
+                    if (dayTitle != null) contentDescription = dayTitle
+                },
             horizontalArrangement = Arrangement.spacedBy(gap),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -127,14 +140,17 @@ fun DaySelector(
                         .weight(1f)
                         .heightIn(min = dimens.touchMin)
                         .clip(ComponentShapes.pill)
+                        // Selección secundaria: superficie neutra + borde
+                        // índigo. El relleno lavanda queda solo para la
+                        // píldora de navegación (selección principal).
                         .background(
-                            if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                            if (isSelected) MaterialTheme.colorScheme.surfaceContainer
                             else MaterialTheme.colorScheme.surfaceContainerLow
                         )
                         .border(
                             width = borderWidth,
                             color = if (isSelected) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.outlineVariant,
+                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
                             shape = ComponentShapes.pill,
                         )
                         .clickable(onClick = { onDaySelected(index) })

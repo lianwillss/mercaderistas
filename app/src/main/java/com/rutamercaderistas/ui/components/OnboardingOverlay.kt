@@ -97,12 +97,14 @@ fun OnboardingOverlay(
     val step = steps[index]
     val isLast = index == steps.lastIndex
     val titleForCd = stringResource(step.titleRes)
+    val guideCd = stringResource(R.string.onboarding_paso_cd, index + 1, steps.size, titleForCd)
+    val cerrarCd = stringResource(R.string.onboarding_cerrar_cd)
 
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .semantics {
-                contentDescription = "Guía de inicio, paso ${index + 1} de ${steps.size}: $titleForCd"
+                contentDescription = guideCd
             }
     ) {
         val density = LocalDensity.current
@@ -136,7 +138,7 @@ fun OnboardingOverlay(
                     onClick = { onDismiss() },
                     role = Role.Button,
                 )
-                .semantics { contentDescription = "Cerrar guía" }
+                .semantics { contentDescription = cerrarCd }
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 drawRect(Color.Black.copy(alpha = 0.62f))

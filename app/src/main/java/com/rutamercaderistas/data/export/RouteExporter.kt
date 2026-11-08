@@ -25,6 +25,9 @@ import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
+// Compilado una vez: sanitize() se llama por cada archivo exportado.
+private val NON_SAFE = Regex("[^a-zA-Z0-9_\\-]")
+
 @Singleton
 class RouteExporter @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -126,7 +129,7 @@ class RouteExporter @Inject constructor(
         context.startActivity(chooser)
     }
 
-    private fun sanitize(name: String) = name.replace(Regex("[^a-zA-Z0-9_\\-]"), "_").trim('_')
+    private fun sanitize(name: String) = name.replace(NON_SAFE, "_").trim('_')
 
     private fun cleanupOldExports() {
         File(context.cacheDir, "route_exports")

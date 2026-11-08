@@ -27,6 +27,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
@@ -39,6 +41,9 @@ import com.rutamercaderistas.ui.theme.PriceBlue
 import com.rutamercaderistas.ui.theme.PriceGreen
 import com.rutamercaderistas.ui.theme.PriceOrange
 import com.rutamercaderistas.ui.theme.PricePurple
+
+// Compilado una vez: classifyPrice() corre por cada línea de promoción.
+private val MULTI_BUY_REGEX = Regex("""\d+X\d+""")
 
 @Composable
 fun PromotionBadge(
@@ -60,7 +65,9 @@ fun PromotionBadge(
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(50))
-                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f))
+                // Conteo de promos = metadato: superficie neutra + icono
+                // índigo. El lavanda queda para la selección principal.
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .padding(horizontal = 5.dp, vertical = 2.dp),
         ) {
             Row(
@@ -70,19 +77,19 @@ fun PromotionBadge(
                 Icon(
                     imageVector = Icons.Outlined.LocalFireDepartment,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.size(12.dp),
                 )
                 Text(
                     text = pluralStringResource(R.plurals.promos_count_plural, count, count),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
                 if (expanded) {
                     Text(
                         text = "▲",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                 }
             }
@@ -97,7 +104,7 @@ private fun classifyPrice(price: String): PriceType {
     return when {
         t.startsWith("$") -> PriceType.MONEY
         t.contains("%") -> PriceType.PERCENT
-        Regex("""\d+X\d+""").containsMatchIn(t) -> PriceType.MULTI_BUY
+        MULTI_BUY_REGEX.containsMatchIn(t) -> PriceType.MULTI_BUY
         else -> PriceType.TEXT
     }
 }
@@ -155,6 +162,8 @@ fun PromotionList(
                 text = promosTitle,
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary,
+                // Permite saltar de marca en marca por encabezados.
+                modifier = Modifier.semantics { heading() },
             )
         }
 

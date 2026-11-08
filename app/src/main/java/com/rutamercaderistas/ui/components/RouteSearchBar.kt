@@ -50,6 +50,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -58,9 +61,11 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
+private val MARKS_DASH_SPACE = Regex("[\\p{M}\\-\\s]")
+
 private fun normalizar(s: String): String {
     val nfkd = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD)
-    return nfkd.replace(Regex("[\\p{M}\\-\\s]"), "").lowercase()
+    return nfkd.replace(MARKS_DASH_SPACE, "").lowercase()
 }
 
 private data class RutaResult(val nombre: String, val score: Int)
@@ -127,7 +132,10 @@ fun RouteSearchBar(
                     Text(
                         stringResource(R.string.buscar_ruta),
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        // Sin alpha: al 60 % el placeholder caía a 2,1–2,6:1
+                        // sobre el campo y no cumplía AA. A opacidad plena
+                        // queda en 6,1:1 sobre el contenedor sin foco.
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 },
                 leadingIcon = {
@@ -159,22 +167,30 @@ fun RouteSearchBar(
                 },
                 shape = ComponentShapes.textField,
                 colors = TextFieldDefaults.colors(
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                    // Contenedores opacos: con alpha 0,4 la sombra del campo
+                    // se veía a través del relleno y lo dejaba gris (#D3D4D9)
+                    // en vez del gris azulado del tema. Al enfocar se aclara.
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                     unfocusedIndicatorColor = Color.Transparent,
                     focusedIndicatorColor = Color.Transparent,
                     cursorColor = MaterialTheme.colorScheme.primary,
                     focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = if (selectedRoute != null && text == selectedRoute)
-                        MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                    // La ruta seleccionada se pintaba con colorScheme.error: rojo
+                    // de error para un estado normal y sin alternativa textual.
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                 ),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(
                     onSearch = {
                         if (text.isNotBlank()) {
+                            // Sin coincidencia exacta Enter toma la mejor sugerencia
+                            // (antes no pasaba nada y no había feedback).
                             val matched = routes.firstOrNull { normalizar(it) == normalizar(text) }
+                                ?: suggestions.firstOrNull()
                             if (matched != null) {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                text = matched
                                 onRouteSelected(matched)
                                 focusManager.clearFocus()
                             }
@@ -254,7 +270,12 @@ fun RouteSearchBar(
                                         Text(
                                             text = stringResource(R.string.sin_rutas),
                                             style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                            // El "sin rutas" aparece tras escribir: se
+                                            // anuncia para no depender de verlo.
+                                            modifier = Modifier.semantics {
+                                                liveRegion = LiveRegionMode.Polite
+                                            },
                                         )
                                     }
                                 }

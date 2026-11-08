@@ -20,11 +20,30 @@ android {
         applicationId "com.rutamercaderistas"
         minSdk 26
         targetSdk 35
-        versionCode 12038
-        versionName "12.38"
+        versionCode 12042
+        versionName "12.42"
         resConfigs "es"
         def sentryDsn = keystoreProperties['SENTRY_DSN']?.toString()?.trim() ?: ""
         buildConfigField "String", "SENTRY_DSN", "\"$sentryDsn\""
+
+        // Credenciales de KPI One para el login automático. Viven en
+        // keystore.properties (gitignored) o en variables de entorno del CI;
+        // nunca en el repositorio.
+        def escapar = { String valor ->
+            valor.replace("\\", "\\\\").replace("\"", "\\\"")
+        }
+        def kpEmail = escapar(
+            (keystoreProperties['KP_EMAIL']?.toString()?.trim()
+                ?: System.getenv("KP_EMAIL")
+                ?: "") as String
+        )
+        def kpPassword = escapar(
+            (keystoreProperties['KP_PASSWORD']?.toString()
+                ?: System.getenv("KP_PASSWORD")
+                ?: "") as String
+        )
+        buildConfigField "String", "KP_EMAIL", "\"$kpEmail\""
+        buildConfigField "String", "KP_PASSWORD", "\"$kpPassword\""
     }
 
     // ── Signing config (CI env vars only) ──
@@ -177,6 +196,8 @@ dependencies {
     // ── Hilt ────────────────────────────────────────────────
     implementation libs.hilt.android
     ksp libs.hilt.compiler
+    // Genera el mapa de WorkerAssistedFactory para @HiltWorker (WorkManager).
+    ksp libs.androidx.hilt.compiler
     implementation libs.hilt.navigation.compose
     implementation libs.hilt.work
 

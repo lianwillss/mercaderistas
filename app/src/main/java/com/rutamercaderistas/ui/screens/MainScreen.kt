@@ -16,22 +16,7 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ShoppingBag
-import androidx.compose.material.icons.filled.Storefront
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.outlined.Badge
-import androidx.compose.material.icons.outlined.ShoppingBag
-import androidx.compose.material.icons.outlined.Storefront
-import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldValue
-import androidx.compose.material3.adaptive.navigationsuite.rememberNavigationSuiteScaffoldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -43,11 +28,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.res.painterResource
 import androidx.core.view.WindowCompat
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -57,7 +37,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.NavHostController
 import androidx.navigation.toRoute
-import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.data.preferences.PreferencesRepository
 import androidx.datastore.preferences.preferencesDataStore
@@ -69,8 +48,11 @@ import com.rutamercaderistas.ui.navigation.MainRoute
 import com.rutamercaderistas.ui.navigation.ManualRoute
 import com.rutamercaderistas.ui.navigation.PromotionsRoute
 import com.rutamercaderistas.ui.navigation.SettingsRoute
+import com.rutamercaderistas.ui.navigation.StockRoute
+import com.rutamercaderistas.ui.screens.stock.StockScreen
 import androidx.compose.ui.platform.LocalConfiguration
 import com.rutamercaderistas.ui.components.BottomBarKey
+import com.rutamercaderistas.ui.components.LiquidGlassNavigationScaffold
 import com.rutamercaderistas.ui.components.OnboardingOverlay
 import com.rutamercaderistas.models.DiaSemana
 import com.rutamercaderistas.ui.theme.AppWindowWidth
@@ -78,6 +60,8 @@ import com.rutamercaderistas.ui.theme.appWindowWidth
 
 import com.rutamercaderistas.viewmodel.RouteUiState
 import com.rutamercaderistas.viewmodel.SyncUiState
+import com.rutamercaderistas.viewmodel.UpdateCardUiState
+import androidx.compose.foundation.isSystemInDarkTheme
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import androidx.datastore.preferences.core.Preferences
@@ -114,18 +98,25 @@ fun MainScreen(
     onSharePromo: (PromotionEntity) -> Unit,
     onDismissSyncChanges: () -> Unit = {},
     showUpdateBanner: Boolean = false,
-    pendingVersionName: String = "",
+    updateCardState: UpdateCardUiState? = null,
     onUpdateNow: () -> Unit = {},
     onUpdateLater: () -> Unit = {},
+    onCancelUpdate: () -> Unit = {},
+    onRetryUpdate: () -> Unit = {},
+    onInstallUpdate: () -> Unit = {},
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val context = LocalContext.current
 
     val isMainRoute = backStackEntry?.destination?.hasRoute<MainRoute>() ?: true
+    // Stock pinta su banner morado hasta el borde superior: iconos claros.
+    val isStockRoute = backStackEntry?.destination?.hasRoute<StockRoute>() == true
+    val darkTheme = isSystemInDarkTheme()
     SystemBarAppearance(
-        lightIcons = !isMainRoute,
-        lightNavIcons = true,
+        // Header/stock siempre oscuros; el resto sigue al tema.
+        lightIcons = if (isMainRoute || isStockRoute) false else !darkTheme,
+        lightNavIcons = !darkTheme,
     )
 
     val onGlobalSearch = { navController.navigate(GlobalSearchRoute) }
@@ -146,6 +137,7 @@ fun MainScreen(
     val currentKey = when {
         dest?.hasRoute<PromotionsRoute>() == true -> BottomBarKey.MARCAS
         dest?.hasRoute<AllLocalesRoute>() == true -> BottomBarKey.LOCALES
+        dest?.hasRoute<StockRoute>() == true -> BottomBarKey.STOCK
         dest?.hasRoute<CodProvRoute>() == true -> BottomBarKey.CODPROV
         dest?.hasRoute<EanSearchRoute>() == true -> BottomBarKey.EAN
         else -> BottomBarKey.MAIN
@@ -156,86 +148,24 @@ fun MainScreen(
             BottomBarKey.MAIN -> navController.navigateTopLevel(MainRoute)
             BottomBarKey.MARCAS -> navController.navigateTopLevel(PromotionsRoute)
             BottomBarKey.LOCALES -> navController.navigateTopLevel(AllLocalesRoute())
+            BottomBarKey.STOCK -> navController.navigateTopLevel(StockRoute)
             BottomBarKey.CODPROV -> navController.navigateTopLevel(CodProvRoute)
             BottomBarKey.EAN -> navController.navigateTopLevel(EanSearchRoute)
         }
     }
 
     // El catálogo EAN se abre como pantalla completa (tiene su propio título y
-    // botón volver): se oculta la barra inferior para darle todo el alto a la
-    // lista. snapTo evita que la barra se vea un frame antes de esconderse.
-    val navigationSuiteState = rememberNavigationSuiteScaffoldState()
-    LaunchedEffect(isEanRoute) {
-        navigationSuiteState.snapTo(
-            if (isEanRoute) NavigationSuiteScaffoldValue.Hidden
-            else NavigationSuiteScaffoldValue.Visible,
-        )
-    }
+    // botón volver): el vidrio inferior se oculta para darle todo el alto a la
+    // lista. El NavHost no se condiciona a la visibilidad de la navegación.
+    val navigationVisible = !isEanRoute
 
     Box(modifier = modifier.fillMaxSize()) {
-        NavigationSuiteScaffold(
-            state = navigationSuiteState,
-            navigationSuiteItems = {
-                item(
-                    selected = currentKey == BottomBarKey.MAIN,
-                    onClick = { onBottomNav(BottomBarKey.MAIN) },
-                    icon = {
-                        BadgedBox(
-                            badge = {
-                                if (syncUiState.syncChanges?.isEmpty == false) Badge()
-                            },
-                        ) {
-                            Icon(
-                                imageVector = if (currentKey == BottomBarKey.MAIN) Icons.Filled.Storefront else Icons.Outlined.Storefront,
-                                contentDescription = null,
-                            )
-                        }
-                    },
-                    label = { Text(stringResource(R.string.rutero_title)) },
-                )
-                item(
-                    selected = currentKey == BottomBarKey.MARCAS,
-                    onClick = { onBottomNav(BottomBarKey.MARCAS) },
-                    icon = {
-                        BadgedBox(
-                            badge = {
-                                if (routeUiState.marcasConPromo > 0) {
-                                    Badge { Text(routeUiState.marcasConPromo.toString()) }
-                                }
-                            },
-                        ) {
-                            Icon(
-                                imageVector = if (currentKey == BottomBarKey.MARCAS) Icons.Filled.ShoppingBag else Icons.Outlined.ShoppingBag,
-                                contentDescription = null,
-                            )
-                        }
-                    },
-                    label = { Text(stringResource(R.string.stats_marcas_label)) },
-                )
-                item(
-                    selected = currentKey == BottomBarKey.LOCALES,
-                    onClick = { onBottomNav(BottomBarKey.LOCALES) },
-                    icon = {
-                        Icon(
-                            imageVector = if (currentKey == BottomBarKey.LOCALES) Icons.Filled.Visibility else Icons.Outlined.Visibility,
-                            contentDescription = null,
-                        )
-                    },
-                    label = { Text(stringResource(R.string.stats_locales_label)) },
-                )
-                item(
-                    selected = currentKey == BottomBarKey.CODPROV,
-                    onClick = { onBottomNav(BottomBarKey.CODPROV) },
-                    icon = { Icon(Icons.Outlined.Badge, contentDescription = null) },
-                    label = { Text(stringResource(R.string.stats_cod_prov_label)) },
-                )
-                item(
-                    selected = currentKey == BottomBarKey.EAN,
-                    onClick = { onBottomNav(BottomBarKey.EAN) },
-                    icon = { Icon(painterResource(R.drawable.ic_barcode), contentDescription = null) },
-                    label = { Text(stringResource(R.string.stats_cod_ean_label)) },
-                )
-            },
+        LiquidGlassNavigationScaffold(
+            selectedKey = currentKey,
+            onNavigate = onBottomNav,
+            navigationVisible = navigationVisible,
+            marcasConPromo = routeUiState.marcasConPromo,
+            hasPlanillaChanges = syncUiState.syncChanges?.isEmpty == false,
             modifier = Modifier.fillMaxSize(),
         ) {
             NavHost(
@@ -270,9 +200,19 @@ fun MainScreen(
                          onOpenSettings = { navController.navigate(SettingsRoute) },
                         onRefreshPositioned = { refreshCenter = it },
                         showUpdateBanner = showUpdateBanner,
-                        pendingVersionName = pendingVersionName,
+                        updateCardState = updateCardState,
                         onUpdateNow = onUpdateNow,
                         onUpdateLater = onUpdateLater,
+                        onCancelUpdate = onCancelUpdate,
+                        onRetryUpdate = onRetryUpdate,
+                        onInstallUpdate = onInstallUpdate,
+                    )
+                }
+                composable<StockRoute> {
+                    StockScreen(
+                        onAbrirAjustes = {
+                            navController.navigate(SettingsRoute) { launchSingleTop = true }
+                        },
                     )
                 }
                 composable<AllLocalesRoute>(

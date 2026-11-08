@@ -381,7 +381,7 @@ internal fun EanBarcodeView(ean: String, modifier: Modifier = Modifier) {
         } else {
             CircularProgressIndicator(
                 modifier = Modifier.size(28.dp),
-                color = Color.Gray,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 strokeWidth = 2.dp,
             )
         }

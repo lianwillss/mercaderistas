@@ -17,6 +17,12 @@ object Elevation {
     val dialog: Dp = level3
     val dropdown: Dp = level4
     val modal: Dp = level5
+
+    // El vidrio flota: una sombra amplia y suave lo separa del contenido que
+    // pasa por debajo. La píldora seleccionada solo necesita un relieve sutil.
+    val glassBar: Dp = 18.dp
+    val glassRail: Dp = 14.dp
+    val glassPill: Dp = 3.dp
 }
 
 enum class ElevationLevel(val value: Dp) {

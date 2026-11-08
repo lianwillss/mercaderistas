@@ -84,4 +84,14 @@ class UpdateCheckerTest {
         assertTrue(UpdateChecker.isPendingNewer("", 12021, 12020))
         assertFalse(UpdateChecker.isPendingNewer("", 12020, 12020))
     }
+
+    @Test
+    fun `el versionCode del release manda sobre el tag`() {
+        // El body del release puede declarar un code distinto al del tag.
+        assertTrue(UpdateChecker.isRemoteNewer("v12.41", 12041, 12042))
+        assertFalse(UpdateChecker.isRemoteNewer("v12.41", 12041, 12040))
+        // Si empatan, el tag resuelve el patch.
+        assertTrue(UpdateChecker.isRemoteNewer("v12.20.1", 12020, 12020))
+        assertFalse(UpdateChecker.isRemoteNewer("v12.20", 12020, 12020))
+    }
 }

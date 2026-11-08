@@ -52,10 +52,14 @@ private val CHAIN_QUERY_ALIASES = mapOf(
     "walmart" to "lider",
 )
 
+// Un Regex por alias, compilado una vez (antes se compilaba en cada búsqueda).
+private val CHAIN_ALIAS_REGEXES: List<Pair<Regex, String>> = CHAIN_QUERY_ALIASES
+    .map { (alias, canonical) -> Regex("\\b" + Regex.escape(alias) + "\\b") to canonical }
+
 private fun expandChainAliases(query: String): String {
     var q = normalizeSearch(query)
-    for ((alias, canonical) in CHAIN_QUERY_ALIASES) {
-        q = q.replace(Regex("\\b$alias\\b"), canonical)
+    for ((pattern, canonical) in CHAIN_ALIAS_REGEXES) {
+        q = q.replace(pattern, canonical)
     }
     return q
 }

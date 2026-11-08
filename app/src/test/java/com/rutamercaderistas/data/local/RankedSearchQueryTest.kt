@@ -23,8 +23,9 @@ class RankedSearchQueryTest {
         assertTrue(q.sql.contains("descripcion_norm LIKE ?"))
         assertTrue(q.sql.contains("marca_norm_nospace LIKE ?"))
         assertTrue(q.sql.contains("ltrim(p.eanPrincipal,'0') LIKE ?"))
-        // 10 LIKE + 4 ltrim por token en WHERE; 2 brandHits; 13 en score.
-        assertEquals(14 + 2 + 13, q.args.size)
+        // WHERE: 10 LIKE + 4 ltrim por token; score: 13; brandHits: 2
+        // placeholders × 2 apariciones en el CASE.
+        assertEquals(14 + 13 + 4, q.args.size)
     }
 
     @Test
@@ -53,8 +54,8 @@ class RankedSearchQueryTest {
         val q = checkNotNull(buildRankedSearch("658325654776", listOf("658325654776")))
         assertTrue(q.sql.contains("ltrim(p.eanPrincipal,'0') = ?"))
         assertTrue(q.sql.contains("ltrim(p.codigoBarra,'0') = ?"))
-        // WHERE (14) + brandHits (2): el tier 1 exacto arranca en args[16] con q crudo.
-        assertEquals("658325654776", q.args[16])
+        // WHERE (14): el tier 1 exacto arranca en args[14] con q crudo.
+        assertEquals("658325654776", q.args[14])
     }
 
     @Test
@@ -75,8 +76,9 @@ class RankedSearchQueryTest {
     @Test
     fun `args bind in placeholder order`() {
         val q = checkNotNull(buildRankedSearch("Bacio 500", listOf("bacio", "500")))
-        // WHERE: 14 args por token × 2 = 28; brandHits: 4; score: 4+2+3+2+2 = 13.
-        assertEquals(28 + 4 + 13, q.args.size)
+        // WHERE: 14 args por token × 2 = 28; score: 4+2+3+2+2 = 13;
+        // brandHits: 2 tokens × 2 placeholders × 2 apariciones = 8.
+        assertEquals(28 + 13 + 8, q.args.size)
         // Primeros args del WHERE del token 1.
         assertEquals("%bacio%", q.args[0])
         // ltrim del token 1 (offset 10).
@@ -93,12 +95,12 @@ class RankedSearchQueryTest {
         val where = q.sql.substringBefore(" ORDER BY ")
         assertTrue(where.contains("p.marca = ?"))
         assertTrue(where.contains("p.conversion = ?"))
-        // 14 args del token, marca en 14, caja en 15, brandHits en 16/17 y el
-        // score (q crudo) arranca en 18.
+        // 14 args del token, marca en 14, caja en 15 y el score (q crudo)
+        // arranca en 16; los golpes de marca van al final.
         assertEquals("KEYFOOD", q.args[14])
         assertEquals("12", q.args[15])
-        assertEquals("%bacio%", q.args[16])
-        assertEquals("bacio", q.args[18])
+        assertEquals("bacio", q.args[16])
+        assertEquals("%bacio%", q.args.last())
     }
 
     @Test
@@ -142,6 +144,19 @@ class RankedSearchQueryTest {
         val catalog = buildCountSearch(emptyList())
         assertEquals("SELECT COUNT(*) AS total FROM ean_products p", catalog.sql)
         assertTrue(catalog.args.isEmpty())
+    }
+
+    @Test
+    fun `every placeholder has an argument`() {
+        listOf("bacio", "Bacio 500", "caso&cia", "caso y cia", "7804690890292").forEach { query ->
+            val tokens = eanTokens(query)
+            listOf(
+                buildRankedSearch(query, tokens),
+                buildRankedSearch(query, tokens, brand = "KEYFOOD", caja = "12"),
+            ).filterNotNull().forEach { q ->
+                assertEquals("'$query' desalinea ? y args", q.sql.count { it == '?' }, q.args.size)
+            }
+        }
     }
 
     private fun checkNotNull(q: RankedQuery?): RankedQuery {

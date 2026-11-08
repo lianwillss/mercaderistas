@@ -37,8 +37,10 @@ private const val TOKEN_MATCHES = "p.eanPrincipal LIKE ? OR p.codCencosud LIKE ?
 
 private const val TOKEN_ARG_COUNT = 14
 
+private val SPACES = Regex("\\s+")
+
 internal fun eanTokens(query: String): List<String> =
-    query.split(Regex("\\s+"))
+    query.split(SPACES)
         .map { compactNorm(it) }
         .filter { it.isNotBlank() }
 
@@ -56,13 +58,17 @@ private fun whereClause(
 ): Pair<String, List<Any?>> {
     val parts = mutableListOf<String>()
     val args = mutableListOf<Any?>()
-    tokens.forEach { token ->
-        parts.add("($TOKEN_MATCHES)")
+    // Args de un token en el orden de [TOKEN_MATCHES] (10 LIKE + 4 ltrim).
+    fun addTokenArgs(token: String) {
         val like = "%$token%"
         repeat(TOKEN_ARG_COUNT - 4) { args.add(like) }
         // Token sin ceros: "0658…" y "658…" deben encontrarse igual.
         val likeTrimmed = "%${token.trimStart('0')}%"
         repeat(4) { args.add(likeTrimmed) }
+    }
+    tokens.forEach { token ->
+        parts.add("($TOKEN_MATCHES)")
+        addTokenArgs(token)
     }
     if (brand != null) {
         parts.add("p.marca = ?")
@@ -99,14 +105,11 @@ fun buildRankedSearch(
     sql.append(where)
     val args = whereArgs.toMutableList()
 
-    // Golpes de marca por token para el tier 4 (suma 0..N).
+    // Golpes de marca por token para el tier 4 (suma 0..N). Sus args se
+    // agregan al final, después de los tiers: el binding es posicional y el
+    // CASE repite la expresión, así que cada placeholder necesita su arg.
     val brandHits = clean.joinToString(" + ") {
         "(CASE WHEN p.marca_norm LIKE ? OR p.marca_norm_nospace LIKE ? THEN 1 ELSE 0 END)"
-    }
-    clean.forEach {
-        val like = "%$it%"
-        args.add(like)
-        args.add(like)
     }
 
     sql.append(" ORDER BY (")
@@ -135,6 +138,14 @@ fun buildRankedSearch(
     args.add(qc)
     // Tier 4: golpes de marca (todos=2, algunos=1, ninguno=0).
     sql.append(" + CASE WHEN ($brandHits) = ${clean.size} THEN 2 WHEN ($brandHits) > 0 THEN 1 ELSE 0 END")
+    // Dos veces: $brandHits aparece dos veces en el CASE.
+    repeat(2) {
+        clean.forEach {
+            val like = "%$it%"
+            args.add(like)
+            args.add(like)
+        }
+    }
     sql.append(") DESC, p.marca ASC, p.descripcionProducto ASC, p.id ASC")
 
     return RankedQuery(sql.toString(), args)

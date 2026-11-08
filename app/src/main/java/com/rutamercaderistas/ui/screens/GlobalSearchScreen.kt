@@ -38,7 +38,6 @@ import com.rutamercaderistas.utils.matchedBrands
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -75,6 +74,7 @@ import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.domain.model.normalizeChain
 import com.rutamercaderistas.models.LocalDelDia
+import com.rutamercaderistas.ui.components.AppFilterChip
 import com.rutamercaderistas.ui.components.CodigoChip
 import com.rutamercaderistas.ui.components.ScreenHeader
 import com.rutamercaderistas.ui.theme.LocalAppDimens
@@ -291,14 +291,14 @@ fun GlobalSearchScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (promoBrands.isNotEmpty()) {
-                    FilterChip(
+                    AppFilterChip(
                         selected = soloConPromos,
                         onClick = { soloConPromos = !soloConPromos },
                         label = { Text(stringResource(R.string.busqueda_solo_promos), style = MaterialTheme.typography.labelLarge) },
                     )
                 }
                 chains.forEach { chain ->
-                    FilterChip(
+                    AppFilterChip(
                         selected = selectedChain == chain,
                         onClick = { selectedChain = if (selectedChain == chain) null else chain },
                         label = { Text(chain, style = MaterialTheme.typography.labelLarge) },

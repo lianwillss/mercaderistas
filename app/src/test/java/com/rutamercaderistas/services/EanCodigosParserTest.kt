@@ -50,6 +50,9 @@ class EanCodigosParserTest {
         assertTrue(brandFromFilename("ean_fermen.xlsx") == "FERMENTISTA")
         assertTrue(brandFromFilename("ean_pett.xlsx") == "PET KITCHEN")
         assertTrue(brandFromFilename("ean_patpot.xlsx") == "PATPOT")
+        assertTrue(brandFromFilename("ean_pet_kitchen.xlsx") == "PET KITCHEN")
+        assertTrue(brandFromFilename("ean_indomitable.xlsx") == "PET KITCHEN")
+        assertTrue(brandFromFilename("ean_caso_cia.xlsx") == "CASO Y CIA")
     }
 
     @Test
@@ -265,7 +268,7 @@ class EanCodigosParserTest {
     }
 
     @Test
-    fun `pett xlsx parses 3 PET KITCHEN products via alias`() = runTest {
+    fun `pett xlsx parses 2 galletas PET KITCHEN via alias`() = runTest {
         val dao = mockk<EanProductDao>(relaxed = true)
         coEvery { dao.clearAll() } returns Unit
         val slot = io.mockk.slot<List<com.rutamercaderistas.data.local.EanProductEntity>>()
@@ -279,24 +282,26 @@ class EanCodigosParserTest {
         )
 
         assertTrue("parser should succeed", result.isSuccess)
-        assertTrue("debe importar 3 productos, got ${result.getOrNull()}", result.getOrNull() == 3)
+        // La TWIST STICKS (2094117) se movió a ean_indomitable.xlsx con su EAN real.
+        assertTrue("debe importar 2 productos, got ${result.getOrNull()}", result.getOrNull() == 2)
         val inserted = slot.captured
         assertTrue("marca debe ser PET KITCHEN, got ${inserted.map { it.marca }}", inserted.all { it.marca == "PET KITCHEN" })
-        // EAN con 0 inicial se conservan tal cual y los SKU no pierden ceros.
+        assertEquals(listOf("2094107", "2094114"), inserted.map { it.codCencosud }.sorted())
+        // EAN con 0 inicial se conserva tal cual.
         assertTrue(
-            "EAN deben ser los 3 de Pet Kitchen, got ${inserted.map { it.eanPrincipal }}",
-            inserted.map { it.eanPrincipal }.containsAll(
-                listOf("7116218365596", "0628693826303", "0628693826013")
-            ),
+            "EAN de la TASTE SALMON, got ${inserted.map { it.eanPrincipal }}",
+            inserted.any { it.eanPrincipal == "0628693826303" },
         )
-        assertTrue(
-            "SKU deben conservarse, got ${inserted.map { it.codCencosud }}",
-            inserted.map { it.codCencosud }.containsAll(listOf("2094107", "2094114", "2094117")),
+        // El 7116218365596 quedó liberado para la TWIST STICKS; la CLASSIC BEEF
+        // recuperó el EAN que le corresponde (0628693826013, con cero inicial).
+        assertEquals(
+            "0628693826013",
+            inserted.single { it.codCencosud == "2094107" }.eanPrincipal,
         )
     }
 
     @Test
-    fun `ean_pett_xlsx_parse_3_pet_kitchen_products_via_alias`() = runTest {
+    fun `ean_pett_xlsx_parse_2_galletas_pet_kitchen_via_alias`() = runTest {
         val dao = mockk<EanProductDao>(relaxed = true)
         coEvery { dao.clearAll() } returns Unit
         val slot = io.mockk.slot<List<com.rutamercaderistas.data.local.EanProductEntity>>()
@@ -309,19 +314,45 @@ class EanCodigosParserTest {
         )
 
         assertTrue("parser should succeed", result.isSuccess)
-        assertTrue("debe importar 3 productos, got ${result.getOrNull()}", result.getOrNull() == 3)
+        assertTrue("debe importar 2 productos, got ${result.getOrNull()}", result.getOrNull() == 2)
         val inserted = slot.captured
         assertTrue("marca debe ser PET KITCHEN, got ${inserted.map { it.marca }}", inserted.all { it.marca == "PET KITCHEN" })
         assertTrue(
-            "EAN deben ser los 3 de PET KITCHEN, got ${inserted.map { it.eanPrincipal }}",
-            inserted.map { it.eanPrincipal }.containsAll(
-                listOf("7116218365596", "0628693826303", "0628693826013")
-            ),
+            "EAN de las galletas, got ${inserted.map { it.eanPrincipal }}",
+            inserted.map { it.eanPrincipal }.containsAll(listOf("0628693826013", "0628693826303")),
         )
         assertTrue(
             "SKU deben conservarse, got ${inserted.map { it.codCencosud }}",
-            inserted.map { it.codCencosud }.containsAll(listOf("2094107", "2094114", "2094117")),
+            inserted.map { it.codCencosud }.containsAll(listOf("2094107", "2094114")),
         )
+        // 2094117 salió de este archivo: su fila tenía un EAN que no corresponde.
+        assertTrue(
+            "2094117 no debe quedar en ean_pett.xlsx, got ${inserted.map { it.codCencosud }}",
+            inserted.none { it.codCencosud == "2094117" },
+        )
+    }
+
+    @Test
+    fun `ean_indomitable_xlsx_imports_twist_sticks_with_real_ean`() = runTest {
+        val dao = mockk<EanProductDao>(relaxed = true)
+        coEvery { dao.clearAll() } returns Unit
+        val insertedSlot = slot<List<EanProductEntity>>()
+        coEvery { dao.insertAll(capture(insertedSlot)) } returns Unit
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
+
+        val result = parser.loadFromFile(
+            "src/main/assets/ean_indomitable.xlsx",
+            brandFromFilename("ean_indomitable.xlsx"),
+        )
+
+        assertTrue("parser should succeed: ${result.exceptionOrNull()}", result.isSuccess)
+        assertEquals(1, result.getOrNull())
+        val product = insertedSlot.captured.single()
+        // Sin columna Marca en el Excel: la marca sale del nombre del asset.
+        assertEquals("PET KITCHEN", product.marca)
+        assertEquals("7116218365596", product.eanPrincipal)
+        assertEquals("2094117", product.codCencosud)
+        assertEquals("SNACK BITE TWIST STICKS 4UN INDOMITABLE", product.descripcionProducto)
     }
 
     @Test
@@ -377,6 +408,97 @@ class EanCodigosParserTest {
     }
 
     @Test
+    fun `ean_pet_kitchen_xlsx_imports_snack_bite`() = runTest {
+        val dao = mockk<EanProductDao>(relaxed = true)
+        coEvery { dao.clearAll() } returns Unit
+        val insertedSlot = slot<List<EanProductEntity>>()
+        coEvery { dao.insertAll(capture(insertedSlot)) } returns Unit
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
+
+        val result = parser.loadFromFile(
+            "src/main/assets/ean_pet_kitchen.xlsx",
+            brandFromFilename("ean_pet_kitchen.xlsx"),
+        )
+
+        assertTrue("parser should succeed: ${result.exceptionOrNull()}", result.isSuccess)
+        assertEquals(1, result.getOrNull())
+        val product = insertedSlot.captured.single()
+        // El Excel no trae columna Marca: se toma del nombre del asset.
+        assertEquals("PET KITCHEN", product.marca)
+        assertEquals("7116218365428", product.eanPrincipal)
+        assertEquals("2094116", product.codCencosud)
+        assertEquals("SNACK BITE JUMBO STICKS 2UN INDOMITABLE", product.descripcionProducto)
+        // La columna "Código de Barras (imagen)" no debe tapar el EAN real.
+        assertEquals("7116218365428", product.codigoBarra)
+    }
+
+    @Test
+    fun `ningun EAN se repite en dos SKU distintos entre assets`() = runTest {
+        // Guarda contra el error real: un EAN copiado a la fila de otro producto.
+        // Sí se permite el mismo EAN con el mismo SKU (catálogos solapados:
+        // ean_caso_cia/ean_casoy, ean_codigos/ean_loveco), pero no dos SKU distintos.
+        val assetsDir = java.io.File("src/main/assets")
+        val files = assetsDir.listFiles { f -> f.name.startsWith("ean") && f.name.endsWith(".xlsx") }
+            ?.sortedBy { it.name }
+            ?: error("no se encontraron assets EAN en ${assetsDir.absolutePath}")
+        assertTrue("debe haber assets EAN", files.isNotEmpty())
+
+        val porEan = mutableMapOf<String, MutableList<Pair<String, String>>>()
+        for (file in files) {
+            val dao = mockk<EanProductDao>(relaxed = true)
+            val inserted = slot<List<EanProductEntity>>()
+            coEvery { dao.clearAll() } returns Unit
+            coEvery { dao.insertAll(capture(inserted)) } returns Unit
+            val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
+            val result = parser.loadFromFile(file.path, brandFromFilename(file.name))
+            assertTrue("no se pudo parsear ${file.name}: ${result.exceptionOrNull()}", result.isSuccess)
+            for (p in inserted.captured.filter { it.eanPrincipal.isNotBlank() }) {
+                porEan.getOrPut(p.eanPrincipal) { mutableListOf() }.add(file.name to p.codCencosud)
+            }
+        }
+
+        val choques = porEan
+            .mapValues { (_, v) -> v.filter { it.second.isNotBlank() } }
+            .filter { (_, v) -> v.map { it.second }.distinct().size > 1 }
+        assertTrue("un EAN no puede estar en dos SKU distintos: $choques", choques.isEmpty())
+    }
+
+    @Test
+    fun `caso_cia xlsx agrupa JUMEX y SUPERZINGS bajo CASO Y CIA`() = runTest {
+        val dao = mockk<EanProductDao>(relaxed = true)
+        coEvery { dao.clearAll() } returns Unit
+        val insertedSlot = slot<List<EanProductEntity>>()
+        coEvery { dao.insertAll(capture(insertedSlot)) } returns Unit
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
+
+        val result = parser.loadFromFile(
+            "src/main/assets/ean_caso_cia.xlsx",
+            brandFromFilename("ean_caso_cia.xlsx"),
+        )
+
+        assertTrue("parser should succeed: ${result.exceptionOrNull()}", result.isSuccess)
+        assertEquals(37, result.getOrNull())
+        val inserted = insertedSlot.captured
+        // Las submarcas del proveedor quedan dentro de CASO Y CIA (15
+        // SUPERZINGS + 8 JUMEX + 1 propia), sin chips sueltos.
+        val marcas = inserted.map { it.marca }.toSet()
+        assertTrue("JUMEX/SUPERZINGS no deben quedar sueltos: $marcas", "JUMEX" !in marcas && "SUPERZINGS" !in marcas)
+        assertEquals(24, inserted.count { it.marca == "CASO Y CIA" })
+        // La submarca sigue en la descripción: buscar "jumex"/"superzings" funciona.
+        assertEquals(15, inserted.count { it.descripcionProducto.contains("SUPERZINGS") })
+        assertEquals(9, inserted.count { it.descripcionProducto.contains("JUMEX") })
+        // Fila agregada: el néctar llega con sus datos completos.
+        val product = inserted.single { it.eanPrincipal == "7501013118193" }
+        assertEquals("CASO Y CIA", product.marca)
+        assertEquals("263998", product.codCencosud)
+        assertEquals("NECTAR JUMEX MANZANA LATA 335CC", product.descripcionProducto)
+        assertEquals("UN", product.unBase)
+        assertEquals("CS", product.unPedido)
+        assertEquals("12", product.conversion)
+        assertEquals("ACTIVO", product.estado)
+    }
+
+    @Test
     fun `image barcode column does not override the real ean`() = runTest {
         val dao = mockk<EanProductDao>(relaxed = true)
         coEvery { dao.clearAll() } returns Unit
@@ -407,6 +529,62 @@ class EanCodigosParserTest {
         val product = insertedSlot.captured.single()
         assertEquals("0799192728020", product.eanPrincipal)
         assertEquals("PAPAS FRITAS MERKEN PATPOT 150GR", product.descripcionProducto)
+    }
+
+    @Test
+    fun `marca dada de baja no entra al catalogo EAN`() = runTest {
+        val dao = mockk<EanProductDao>(relaxed = true)
+        coEvery { dao.clearAll() } returns Unit
+        val insertedSlot = slot<List<EanProductEntity>>()
+        coEvery { dao.insertAll(capture(insertedSlot)) } returns Unit
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
+
+        val workbook = XSSFWorkbook()
+        val sheet = workbook.createSheet("Catálogo")
+        sheet.createRow(0).apply {
+            createCell(0).setCellValue("Nombre")
+            createCell(1).setCellValue("Marca")
+            createCell(2).setCellValue("SKU")
+            createCell(3).setCellValue("Código EAN")
+        }
+        sheet.createRow(1).apply {
+            createCell(0).setCellValue("BATIDO BERRYSUR AVENA Y CRANBERRY 300ML")
+            createCell(1).setCellValue("BERRY SUR")
+            createCell(2).setCellValue("1990127")
+            createCell(3).setCellValue("5912345678880")
+        }
+        sheet.createRow(2).apply {
+            createCell(0).setCellValue("SNACK BITE JUMBO STICKS 2UN INDOMITABLE")
+            createCell(1).setCellValue("PET KITCHEN")
+            createCell(2).setCellValue("2094116")
+            createCell(3).setCellValue("7116218365428")
+        }
+        val bytes = ByteArrayOutputStream().also { workbook.write(it) }.toByteArray()
+        workbook.close()
+
+        val result = parser.parseAndSave(bytes.inputStream())
+
+        assertTrue("parser should succeed: ${result.exceptionOrNull()}", result.isSuccess)
+        val inserted = insertedSlot.captured
+        // BERRY SUR está en EXCLUDED_BRANDS: su fila no llega a la base.
+        assertEquals(1, result.getOrNull())
+        assertTrue("BERRY SUR no debe entrar: ${inserted.map { it.marca }}", inserted.none { it.marca.contains("BERRY") })
+        assertEquals("PET KITCHEN", inserted.single().marca)
+    }
+
+    @Test
+    fun `ean_codigos xlsx ya no trae BERRY SUR`() = runTest {
+        val dao = mockk<EanProductDao>(relaxed = true)
+        coEvery { dao.clearAll() } returns Unit
+        val insertedSlot = slot<List<EanProductEntity>>()
+        coEvery { dao.insertAll(capture(insertedSlot)) } returns Unit
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
+
+        val result = parser.loadFromFile("src/main/assets/ean_codigos.xlsx")
+
+        assertTrue("parser should succeed: ${result.exceptionOrNull()}", result.isSuccess)
+        val conMarca = insertedSlot.captured.filter { it.marca.contains("BERRY", ignoreCase = true) }
+        assertEquals("BERRY SUR debe quedar fuera del catálogo: $conMarca", 0, conMarca.size)
     }
 
     @Test

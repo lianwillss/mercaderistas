@@ -38,6 +38,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.PromotionEntity
+import com.rutamercaderistas.ui.theme.PromoGradientEnd
 import com.rutamercaderistas.ui.theme.UrgencyOrange
 import com.rutamercaderistas.ui.theme.UrgencyOrangeSoft
 import java.time.LocalDate
@@ -63,7 +64,7 @@ fun PromoExpiringSoonModal(
                 .clip(RoundedCornerShape(16.dp))
                 .background(
                     Brush.horizontalGradient(
-                        colors = listOf(UrgencyOrange, Color(0xFFEF4444))
+                        colors = listOf(UrgencyOrange, PromoGradientEnd)
                     )
                 )
                 .padding(horizontal = 16.dp, vertical = 14.dp),
@@ -79,7 +80,7 @@ fun PromoExpiringSoonModal(
                     Icon(
                         imageVector = Icons.Filled.LocalFireDepartment,
                         contentDescription = null,
-                        tint = Color(0xFFEF4444),
+                        tint = PromoGradientEnd,
                         modifier = Modifier.size(22.dp),
                     )
                 }
@@ -140,12 +141,14 @@ private fun ExpiringPromoRow(promo: PromotionEntity) {
     val urgencyColor = when {
         endDate.daysRemaining < 0 -> MaterialTheme.colorScheme.error
         endDate.daysRemaining <= 1 -> UrgencyOrange
-        else -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onPrimaryContainer
     }
     val urgencyBg = when {
         endDate.daysRemaining < 0 -> MaterialTheme.colorScheme.errorContainer
         endDate.daysRemaining <= 1 -> UrgencyOrangeSoft
-        else -> MaterialTheme.colorScheme.primaryContainer
+        // Sin urgencia inmediata es un dato de fecha: superficie neutra,
+        // no otra capa lavanda. El naranja queda para hoy/mañana.
+        else -> MaterialTheme.colorScheme.surfaceContainerHigh
     }
     val daysText = when {
         endDate.daysRemaining < 0 -> stringResource(R.string.vencio)

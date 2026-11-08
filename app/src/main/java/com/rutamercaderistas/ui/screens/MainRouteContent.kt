@@ -1,6 +1,7 @@
 package com.rutamercaderistas.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -64,18 +65,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.rutamercaderistas.R
 import com.rutamercaderistas.models.DiaSemana
 import com.rutamercaderistas.ui.components.DaySelector
+import com.rutamercaderistas.ui.components.HeaderCollapseState
 import com.rutamercaderistas.ui.components.HeaderSection
+import com.rutamercaderistas.ui.components.rememberHeaderCollapseState
 import com.rutamercaderistas.ui.components.IosModal
 import com.rutamercaderistas.ui.components.PromoExpiringSoonModal
 import com.rutamercaderistas.ui.components.RouteSearchBar
+import com.rutamercaderistas.ui.components.UpdateCard
 import com.rutamercaderistas.ui.components.ShimmerDaySelector
 import com.rutamercaderistas.ui.components.ShimmerLoadingContent
 import com.rutamercaderistas.ui.components.StoreCard
@@ -88,9 +96,11 @@ import com.rutamercaderistas.ui.theme.AppWindowWidth
 import com.rutamercaderistas.ui.theme.appWindowWidth
 import com.rutamercaderistas.ui.theme.rs
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import com.rutamercaderistas.viewmodel.RouteUiState
 import com.rutamercaderistas.viewmodel.SyncUiState
 import com.rutamercaderistas.viewmodel.PlanillaChanges
+import com.rutamercaderistas.viewmodel.UpdateCardUiState
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -116,9 +126,12 @@ fun MainRouteContent(
     onOpenSettings: () -> Unit = {},
     onRefreshPositioned: (Offset) -> Unit = {},
     showUpdateBanner: Boolean = false,
-    pendingVersionName: String = "",
+    updateCardState: UpdateCardUiState? = null,
     onUpdateNow: () -> Unit = {},
     onUpdateLater: () -> Unit = {},
+    onCancelUpdate: () -> Unit = {},
+    onRetryUpdate: () -> Unit = {},
+    onInstallUpdate: () -> Unit = {},
 ) {
     val entries = routeState.entries
     val selectedRoute = routeState.selectedRoute
@@ -140,6 +153,14 @@ fun MainRouteContent(
     val scope = rememberCoroutineScope()
     val s = rs()
     val dimens = LocalAppDimens.current
+    // El header sigue al dedo; la conexión de nestedScroll vive en la grilla
+    // del día (DayContent) para que el pull-to-refresh no se coma la expansión.
+    val headerState = rememberHeaderCollapseState(
+        hasPromos = routeState.promosExpiringSoon.isNotEmpty(),
+    )
+    LaunchedEffect(selectedRoute) {
+        headerState.expandir()
+    }
 
     LaunchedEffect(entries) {
         if (entries.isNotEmpty() && routeState.selectedRoute == null) {
@@ -186,6 +207,7 @@ fun MainRouteContent(
                 isOnline = syncState.isOnline,
                 lastSyncRelative = routeState.lastSyncRelative,
                 onRefresh = onHeaderRefresh,
+                estado = headerState,
                 onOpenManual = onNavigateToManual,
                 onShare = onExportRoute,
                 onCheckUpdate = onCheckUpdate,
@@ -208,7 +230,10 @@ fun MainRouteContent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = dimens.spacingLg, vertical = dimens.spacingXs),
+                            .padding(horizontal = dimens.spacingLg, vertical = dimens.spacingXs)
+                            // La fase cambia mientras se sincroniza; se anuncia sin
+                            // robar foco (antes solo era visible).
+                            .semantics { liveRegion = LiveRegionMode.Polite },
                     )
                 }
             }
@@ -227,11 +252,20 @@ fun MainRouteContent(
                     shrinkVertically(animationSpec = MotionSprings.default()) + fadeOut()
                 },
             ) {
-                UpdateBanner(
-                    versionName = pendingVersionName,
-                    onUpdateNow = onUpdateNow,
-                    onUpdateLater = onUpdateLater,
-                )
+                updateCardState?.let { card ->
+                    UpdateCard(
+                        state = card,
+                        onUpdate = onUpdateNow,
+                        onLater = onUpdateLater,
+                        onCancel = onCancelUpdate,
+                        onRetry = onRetryUpdate,
+                        onInstall = onInstallUpdate,
+                        modifier = Modifier.padding(
+                            horizontal = dimens.spacingLg,
+                            vertical = dimens.spacingXs,
+                        ),
+                    )
+                }
             }
 
             if (syncState.syncError != null && !isSyncing) {
@@ -303,6 +337,7 @@ fun MainRouteContent(
                                 routeState = routeState,
                                 syncState = syncState,
                                 isSyncing = isSyncing,
+                                headerState = headerState,
                                 onPullRefresh = onPullRefresh,
                             onBrandClick = onBrandClick,
                             onAddressClick = onAddressClick,
@@ -320,6 +355,7 @@ fun MainRouteContent(
                         routeState = routeState,
                         syncState = syncState,
                         isSyncing = isSyncing,
+                        headerState = headerState,
                         onPullRefresh = onPullRefresh,
                         onBrandClick = onBrandClick,
                         onAddressClick = onAddressClick,
@@ -379,7 +415,11 @@ private fun SyncErrorBanner(message: String, onRetry: () -> Unit) {
             .padding(horizontal = dimens.spacingLg, vertical = dimens.spacingXs)
             .clip(MaterialTheme.shapes.medium)
             .background(MaterialTheme.colorScheme.errorContainer)
-            .semantics { contentDescription = "$cd: $message" }
+            // Error de sync: interrumpe para que no pase inadvertido.
+            .semantics {
+                contentDescription = "$cd: $message"
+                liveRegion = LiveRegionMode.Assertive
+            }
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -401,54 +441,6 @@ private fun SyncErrorBanner(message: String, onRetry: () -> Unit) {
             Text(
                 text = stringResource(R.string.reintentar),
                 color = MaterialTheme.colorScheme.onErrorContainer,
-                fontWeight = FontWeight.Bold,
-            )
-        }
-    }
-}
-
-@Composable
-private fun UpdateBanner(
-    versionName: String,
-    onUpdateNow: () -> Unit,
-    onUpdateLater: () -> Unit,
-) {
-    val dimens = LocalAppDimens.current
-    val cd = stringResource(R.string.update_notif_disponible)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = dimens.spacingLg, vertical = dimens.spacingXs)
-            .clip(MaterialTheme.shapes.medium)
-            .background(MaterialTheme.colorScheme.primaryContainer)
-            .semantics { contentDescription = "$cd: $versionName" }
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            imageVector = Icons.Outlined.SystemUpdate,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-            modifier = Modifier.size(18.dp),
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = stringResource(R.string.update_banner_title, versionName),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.weight(1f),
-        )
-        TextButton(onClick = onUpdateLater) {
-            Text(
-                text = stringResource(R.string.mas_tarde),
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-        }
-        TextButton(onClick = onUpdateNow) {
-            Text(
-                text = stringResource(R.string.actualizar_btn),
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
                 fontWeight = FontWeight.Bold,
             )
         }
@@ -687,6 +679,7 @@ private fun DayContent(
     routeState: RouteUiState,
     syncState: SyncUiState,
     isSyncing: Boolean,
+    headerState: HeaderCollapseState,
     onPullRefresh: () -> Unit,
     onBrandClick: (String) -> Unit,
     onAddressClick: (String) -> Unit,
@@ -694,6 +687,15 @@ private fun DayContent(
 ) {
     val dimens = LocalAppDimens.current
     val gridState = rememberLazyGridState()
+    // El selector de días es fijo: cuando la grilla ya está scrolleada, el
+    // contenido se cortaba seco contra su borde. Un fade corto bajo el
+    // selector suaviza el corte y desaparece al volver al tope.
+    val topFade by animateFloatAsState(
+        targetValue = if (gridState.canScrollBackward) 1f else 0f,
+        animationSpec = tween(180),
+        label = "dayTopFade",
+    )
+    val fadeColor = MaterialTheme.colorScheme.background
     val scrollProgress by remember {
         derivedStateOf {
             val info = gridState.layoutInfo
@@ -737,7 +739,26 @@ private fun DayContent(
                 horizontalArrangement = Arrangement.spacedBy(dimens.spacingLg),
                 modifier = Modifier
                     .fillMaxSize()
-                    .weight(1f),
+                    .weight(1f)
+                    // El header se colapsa/expande desde la grilla, no desde
+                    // el Column externo: así el gesto de bajar en el tope
+                    // expande el header antes de que PullToRefresh lo tome.
+                    .nestedScroll(headerState.nestedScrollConnection)
+                    // El fade vive dentro de la grilla: queda debajo del
+                    // selector y del progreso, sin robar alto ni toques.
+                    .drawWithCache {
+                        val fadeBrush = Brush.verticalGradient(
+                            colors = listOf(fadeColor, fadeColor.copy(alpha = 0f)),
+                            startY = 0f,
+                            endY = dimens.spacingMd.toPx(),
+                        )
+                        onDrawWithContent {
+                            drawContent()
+                            if (topFade > 0.01f) {
+                                drawRect(brush = fadeBrush, alpha = topFade)
+                            }
+                        }
+                    },
             ) {
             val locales = routeState.currentDayLocales
             if (locales.isEmpty()) {
@@ -824,6 +845,15 @@ private fun DayList(
     onDaySelected: (Int) -> Unit,
 ) {
     val dimens = LocalAppDimens.current
+    val selectedDay = days.getOrNull(selectedIndex)
+    val selectedNumber = dayNumbers.getOrNull(selectedIndex)
+    // Ancla de encabezado para TalkBack: en tablet el riel de días es el
+    // título de la sección; sin esto la navegación por encabezados salta del
+    // header a cada local, sin decir qué día se está viendo.
+    val dayTitle = selectedDay?.let {
+        if (selectedNumber != null) "Día ${it.nombreCompleto} $selectedNumber"
+        else "Día ${it.nombreCompleto}"
+    }
     LazyColumn(
         contentPadding = PaddingValues(
             start = dimens.spacingMd,
@@ -835,7 +865,11 @@ private fun DayList(
         modifier = Modifier
             .fillMaxHeight()
             .width(180.dp)
-            .background(MaterialTheme.colorScheme.surfaceContainerLowest),
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .semantics {
+                heading()
+                if (dayTitle != null) contentDescription = dayTitle
+            },
     ) {
         items(days.size) { index ->
             val dia = days[index]
@@ -859,12 +893,13 @@ private fun DayListChip(
     onClick: () -> Unit,
 ) {
     val dimens = LocalAppDimens.current
-    val bg = if (isSelected) MaterialTheme.colorScheme.primaryContainer
+    // Selección secundaria: neutra + borde índigo, sin relleno lavanda.
+    val bg = if (isSelected) MaterialTheme.colorScheme.surfaceContainer
         else MaterialTheme.colorScheme.surface
     val textColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
         else MaterialTheme.colorScheme.onSurface
     val borderColor = if (isSelected) MaterialTheme.colorScheme.primary
-        else MaterialTheme.colorScheme.outline
+        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -906,12 +941,14 @@ fun RecentRoutesRow(
     ) {
         routes.forEach { route ->
             val isSelected = route == selectedRoute
-            val bg = if (isSelected) MaterialTheme.colorScheme.primaryContainer
+            // La ruta activa es una selección, no una acción principal:
+            // superficie neutra + borde/texto índigo.
+            val bg = if (isSelected) MaterialTheme.colorScheme.surfaceContainer
                 else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
             val textColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
                 else MaterialTheme.colorScheme.onSurfaceVariant
-            val borderColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                else MaterialTheme.colorScheme.outline
+            val borderColor = if (isSelected) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
 
             Box(
                 modifier = Modifier

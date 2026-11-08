@@ -1,30 +1,24 @@
 package com.rutamercaderistas
 
 import android.Manifest
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.ui.res.stringResource
 import com.rutamercaderistas.R
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,7 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.map
 import androidx.work.BackoffPolicy
@@ -46,11 +39,10 @@ import com.rutamercaderistas.models.BrandReference
 import com.rutamercaderistas.services.PromotionRepository
 import com.rutamercaderistas.util.openMaps
 import com.rutamercaderistas.ui.screens.MainScreen
-import com.rutamercaderistas.ui.components.IosModal
+import com.rutamercaderistas.ui.components.UpdateModal
 import com.rutamercaderistas.ui.theme.MercaderistasTheme
 import com.rutamercaderistas.viewmodel.RouteViewModel
 import com.rutamercaderistas.viewmodel.SyncViewModel
-import com.rutamercaderistas.viewmodel.UpdateUiState
 import com.rutamercaderistas.viewmodel.UpdateViewModel
 import com.rutamercaderistas.worker.DailyPromotionNotificationWorker
 import com.rutamercaderistas.worker.SyncWorker
@@ -77,6 +69,8 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var preferencesRepository: PreferencesRepository
 
+    private var firstResumeHandled = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -85,16 +79,15 @@ class MainActivity : ComponentActivity() {
             promotionRepository.schedulePeriodicRefresh()
             scheduleDailyPromotionNotification()
             schedulePeriodicUpdateCheck()
-            if (intent.getBooleanExtra(UpdateViewModel.EXTRA_SHOW_UPDATE, false)) {
-                updateViewModel.checkForUpdate(force = true, showFeedback = false)
-            }
         }
+        handleUpdateIntent(intent, checkNetwork = false)
 
         setContent {
 
-            val updateState by updateViewModel.state.collectAsStateWithLifecycle()
             val showUpdateBanner by updateViewModel.showUpdateBanner.collectAsStateWithLifecycle()
-            val pendingUpdate by updateViewModel.pendingUpdate.collectAsStateWithLifecycle()
+            val updateCard by updateViewModel.card.collectAsStateWithLifecycle()
+            val showUpdateSheet by updateViewModel.showUpdateSheet.collectAsStateWithLifecycle()
+            val updateMessage by updateViewModel.message.collectAsStateWithLifecycle()
             val routeUiState by routeViewModel.uiState.collectAsStateWithLifecycle()
             val syncUiState by syncViewModel.state.collectAsStateWithLifecycle()
 
@@ -125,10 +118,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            LaunchedEffect(updateState) {
-                val msg = (updateState as? UpdateUiState.Message)?.text ?: return@LaunchedEffect
+            LaunchedEffect(updateMessage) {
+                val msg = updateMessage ?: return@LaunchedEffect
                 snackbarHostState.showSnackbar(msg)
-                updateViewModel.clearSnackbar()
+                updateViewModel.clearMessage()
             }
 
             LaunchedEffect(Unit) {
@@ -178,9 +171,12 @@ class MainActivity : ComponentActivity() {
                         routeUiState = routeUiState,
                         syncUiState = syncUiState,
                         showUpdateBanner = showUpdateBanner,
-                        pendingVersionName = pendingUpdate?.versionName.orEmpty(),
-                        onUpdateNow = { updateViewModel.showPendingDialog() },
+                        updateCardState = updateCard,
+                        onUpdateNow = { updateViewModel.startUpdate() },
                         onUpdateLater = { updateViewModel.suppressUntilTomorrow() },
+                        onCancelUpdate = { updateViewModel.cancelDownload() },
+                        onRetryUpdate = { updateViewModel.retryDownload() },
+                        onInstallUpdate = { updateViewModel.installApk() },
                         onCheckUpdate = { updateViewModel.checkForUpdate(force = true) },
                         onSetCurrentDay = { routeViewModel.setCurrentDay(it) },
                         onSelectRoute = { routeViewModel.selectRoute(it) },
@@ -233,47 +229,57 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                when (val state = updateState) {
-                    is UpdateUiState.Dialog -> {
-                        var visible by remember { mutableStateOf(false) }
-                        LaunchedEffect(Unit) { visible = true }
+                UpdateModal(
+                    visible = showUpdateSheet,
+                    state = updateCard,
+                    onDismiss = { updateViewModel.dismissSheet() },
+                    onUpdate = { updateViewModel.startUpdate() },
+                    onLater = { updateViewModel.suppressUntilTomorrow() },
+                    onCancel = { updateViewModel.cancelDownload() },
+                    onRetry = { updateViewModel.retryDownload() },
+                    onInstall = { updateViewModel.installApk() },
+                )
+            }
+        }
+    }
 
-                        IosModal(
-                            visible = visible,
-                            onDismiss = { updateViewModel.dismissDialog() },
-                            title = stringResource(R.string.actualizacion_disponible),
-                            confirmText = if (!state.downloading) stringResource(R.string.actualizar_btn) else null,
-                            onConfirm = { updateViewModel.downloadAndInstall() },
-                            dismissText = if (!state.downloading) stringResource(R.string.mas_tarde) else null,
-                            onDismissAction = { updateViewModel.suppressUntilTomorrow() },
-                        ) {
-                            if (state.downloading) {
-                                Text(
-                                    text = stringResource(R.string.descargando_version, state.versionName),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                LinearProgressIndicator(
-                                    progress = { state.downloadProgress / 100f },
-                                    modifier = Modifier.fillMaxWidth().height(6.dp),
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = stringResource(R.string.download_progress_percent, state.downloadProgress),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            } else {
-                                Text(
-                                    text = stringResource(R.string.version_disponible, state.versionName),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
-                    else -> Unit
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleUpdateIntent(intent, checkNetwork = true)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateViewModel.onActivityResumed()
+        // El arranque frío ya consulta en LaunchedEffect(Unit); al volver
+        // desde segundo plano se revisa con throttle de 15 min.
+        if (firstResumeHandled) {
+            updateViewModel.checkForUpdateIfStale()
+        } else {
+            firstResumeHandled = true
+        }
+    }
+
+    override fun onPause() {
+        updateViewModel.onActivityPaused()
+        super.onPause()
+    }
+
+    private fun handleUpdateIntent(intent: Intent?, checkNetwork: Boolean) {
+        if (intent == null) return
+        val showUpdate = intent.getBooleanExtra(UpdateViewModel.EXTRA_SHOW_UPDATE, false)
+        val installUpdate = intent.getBooleanExtra(UpdateViewModel.EXTRA_INSTALL_UPDATE, false)
+        intent.removeExtra(UpdateViewModel.EXTRA_SHOW_UPDATE)
+        intent.removeExtra(UpdateViewModel.EXTRA_INSTALL_UPDATE)
+        when {
+            installUpdate -> updateViewModel.onInstallRequested()
+            showUpdate -> {
+                updateViewModel.showPendingDialog()
+                // En arranque frío LaunchedEffect(Unit) ya consulta; al
+                // recibir el intent con la app abierta sí hace falta refrescar.
+                if (checkNetwork) {
+                    updateViewModel.checkForUpdate(force = true, showFeedback = false)
                 }
             }
         }
@@ -311,14 +317,14 @@ class MainActivity : ComponentActivity() {
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
 
-        val request = PeriodicWorkRequestBuilder<UpdateCheckWorker>(6, TimeUnit.HOURS)
+        val request = PeriodicWorkRequestBuilder<UpdateCheckWorker>(4, TimeUnit.HOURS)
             .setConstraints(constraints)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.SECONDS)
             .build()
 
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
             "periodic_update_check",
-            ExistingPeriodicWorkPolicy.KEEP,
+            ExistingPeriodicWorkPolicy.UPDATE,
             request,
         )
     }

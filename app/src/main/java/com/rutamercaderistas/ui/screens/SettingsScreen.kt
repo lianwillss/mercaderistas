@@ -2,6 +2,7 @@ package com.rutamercaderistas.ui.screens
 
 import android.widget.Toast
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -22,6 +24,8 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +50,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -53,6 +59,7 @@ import com.rutamercaderistas.R
 import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.viewmodel.SettingsViewModel
+import com.rutamercaderistas.viewmodel.StockAccessViewModel
 
 private val TRANSPORT_OPTIONS = listOf(
     "transit" to R.string.settings_transit,
@@ -65,6 +72,7 @@ private val TRANSPORT_OPTIONS = listOf(
 fun SettingsScreen(
     onBack: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
+    accessViewModel: StockAccessViewModel = hiltViewModel(),
 ) {
     val dimens = LocalAppDimens.current
     val context = LocalContext.current
@@ -105,6 +113,59 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(dimens.spacingMd),
         ) {
+            val acceso by accessViewModel.state.collectAsStateWithLifecycle()
+            // El acceso manual es el respaldo si falla el login automático.
+            SettingsCard(title = "Acceso a KPI One (Stock)") {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = acceso.email,
+                        onValueChange = accessViewModel::onEmail,
+                        label = { Text("Correo") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OutlinedTextField(
+                        value = acceso.password,
+                        onValueChange = accessViewModel::onPassword,
+                        label = { Text("Clave") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Button(
+                            onClick = accessViewModel::conectar,
+                            enabled = !acceso.trabajando,
+                        ) {
+                            Text(if (acceso.conectado) "Reconectar" else "Conectar")
+                        }
+                        if (acceso.conectado) {
+                            Spacer(Modifier.width(8.dp))
+                            TextButton(onClick = accessViewModel::desconectar) {
+                                Text("Desconectar")
+                            }
+                        }
+                        if (acceso.trabajando) {
+                            Spacer(Modifier.width(12.dp))
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        }
+                    }
+                    acceso.mensaje?.let { texto ->
+                        Text(
+                            text = texto,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (acceso.error) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+            }
+
             SettingsCard(title = stringResource(R.string.settings_font_size)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { viewModel.setFontScale((fontScale - 0.1f).coerceIn(0.8f, 1.8f)) }) {

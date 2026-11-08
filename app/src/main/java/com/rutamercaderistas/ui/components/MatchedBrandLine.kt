@@ -29,6 +29,9 @@ import com.rutamercaderistas.R
 import com.rutamercaderistas.models.ClienteInfo
 import com.rutamercaderistas.services.compactNorm
 
+// Se reutiliza en cada fila de la lista: nunca crear el Regex dentro del Composable.
+private val NON_ALNUM_SPLIT = Regex("[^a-z0-9]+")
+
 /**
  * Línea de marca encontrada por búsqueda: nombre resaltado + badge de
  * frecuencia, y días de visita debajo (ya no se truncan). Al tocar filtra
@@ -43,7 +46,7 @@ fun MatchedBrandLine(
     modifier: Modifier = Modifier,
 ) {
     val tokens = remember(query) {
-        compactNorm(query).split(Regex("[^a-z0-9]+")).filter { it.isNotBlank() }
+        compactNorm(query).split(NON_ALNUM_SPLIT).filter { it.isNotBlank() }
     }
     val rowDescription = buildString {
         append(stringResource(R.string.marca_filtrar_cd, cliente.nombre))

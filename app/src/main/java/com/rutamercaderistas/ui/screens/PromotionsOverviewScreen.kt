@@ -38,7 +38,6 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.material3.Icon
@@ -70,6 +69,7 @@ import androidx.compose.ui.res.stringResource
 import com.rutamercaderistas.R
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.data.local.PromotionEntity
+import com.rutamercaderistas.ui.components.AppFilterChip
 import com.rutamercaderistas.ui.components.BrandCard
 import com.rutamercaderistas.ui.components.GlobalSearchAction
 import com.rutamercaderistas.ui.components.ScreenHeader
@@ -287,20 +287,20 @@ fun PromotionsOverviewScreen(
                     exit = shrinkHorizontally(animationSpec = tween(300)) + fadeOut(tween(200)),
                 ) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(
+                        AppFilterChip(
                             selected = soloMisMarcas,
                             onClick = { soloMisMarcas = !soloMisMarcas },
                             label = { Text(stringResource(R.string.solo_mis_marcas), style = MaterialTheme.typography.labelLarge) },
                         )
                     }
                 }
-                FilterChip(
+                AppFilterChip(
                     selected = soloHoy,
                     onClick = { soloHoy = !soloHoy },
                     label = { Text(stringResource(R.string.solo_hoy), style = MaterialTheme.typography.labelLarge) },
                 )
                 allChains.forEach { chain ->
-                    FilterChip(
+                    AppFilterChip(
                         selected = selectedChain == chain,
                         onClick = {
                             selectedChain = if (selectedChain == chain) "Todas" else chain

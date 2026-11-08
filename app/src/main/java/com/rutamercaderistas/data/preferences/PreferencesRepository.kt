@@ -45,6 +45,9 @@ class PreferencesRepository @Inject constructor(
         private val KEY_TRANSPORT_MODE = stringPreferencesKey("transport_mode")
         private val KEY_LAST_VERSION_CODE = intPreferencesKey("last_version_code")
         internal val KEY_FONT_SCALE = floatPreferencesKey("font_scale")
+        private val KEY_STOCK_LOCAL = stringPreferencesKey("stock_local")
+        private val KEY_STOCK_MARCA = stringPreferencesKey("stock_marca")
+        private val KEY_STOCK_RUTA = stringPreferencesKey("stock_ruta")
         private val KEY_SEARCH_HISTORY = stringPreferencesKey("ean_search_history")
         val KEY_LOCALES_SEARCH_HISTORY = stringPreferencesKey("locales_search_history")
         val KEY_ONBOARDING_DONE = stringPreferencesKey("onboarding_done")
@@ -59,6 +62,7 @@ class PreferencesRepository @Inject constructor(
         private val KEY_LAST_NOTIFIED_UPDATE = intPreferencesKey("last_notified_update_code")
         private val KEY_LAST_NOTIFIED_TAG = stringPreferencesKey("last_notified_update_tag")
         private val KEY_UPDATE_NOTIF_ASKED = stringPreferencesKey("update_notif_asked")
+        private val KEY_LAST_UPDATE_CHECK = longPreferencesKey("last_update_check")
         private val KEY_SYNC_HISTORY = stringPreferencesKey("sync_history")
         private const val SEARCH_HISTORY_MAX = 8
         private const val LOCALES_SEARCH_HISTORY_MAX = 8
@@ -72,6 +76,23 @@ class PreferencesRepository @Inject constructor(
         context.prefsDataStore.edit { prefs ->
             if (value == null) prefs.remove(KEY_SELECTED_ROUTE)
             else prefs[KEY_SELECTED_ROUTE] = value
+        }
+    }
+
+    suspend fun getStockLocal(): String =
+        context.prefsDataStore.data.first()[KEY_STOCK_LOCAL] ?: ""
+
+    suspend fun getStockMarca(): String =
+        context.prefsDataStore.data.first()[KEY_STOCK_MARCA] ?: ""
+
+    suspend fun getStockRuta(): String =
+        context.prefsDataStore.data.first()[KEY_STOCK_RUTA] ?: ""
+
+    suspend fun setStockFilters(local: String, marca: String, ruta: String = "") {
+        context.prefsDataStore.edit { prefs ->
+            if (local.isBlank()) prefs.remove(KEY_STOCK_LOCAL) else prefs[KEY_STOCK_LOCAL] = local
+            if (marca.isBlank()) prefs.remove(KEY_STOCK_MARCA) else prefs[KEY_STOCK_MARCA] = marca
+            if (ruta.isBlank()) prefs.remove(KEY_STOCK_RUTA) else prefs[KEY_STOCK_RUTA] = ruta
         }
     }
 
@@ -313,5 +334,13 @@ class PreferencesRepository @Inject constructor(
 
     suspend fun setUpdateNotifAsked() {
         context.prefsDataStore.edit { it[KEY_UPDATE_NOTIF_ASKED] = "true" }
+    }
+
+    /** Última consulta exitosa a GitHub; se usa para no repetir al volver. */
+    suspend fun getLastUpdateCheck(): Long =
+        context.prefsDataStore.data.first()[KEY_LAST_UPDATE_CHECK] ?: 0L
+
+    suspend fun setLastUpdateCheck(value: Long) {
+        context.prefsDataStore.edit { it[KEY_LAST_UPDATE_CHECK] = value }
     }
 }

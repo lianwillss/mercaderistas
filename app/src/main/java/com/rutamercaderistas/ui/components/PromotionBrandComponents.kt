@@ -36,8 +36,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
@@ -52,8 +50,6 @@ import com.rutamercaderistas.data.local.PromotionEntity
 import com.rutamercaderistas.ui.DateFormatters
 import com.rutamercaderistas.ui.theme.DiscountRed
 import com.rutamercaderistas.ui.theme.DiscountSoft
-import com.rutamercaderistas.ui.theme.PromoGradientEnd
-import com.rutamercaderistas.ui.theme.PromoGradientStart
 import com.rutamercaderistas.ui.theme.UrgencyBadgeSoft
 import com.rutamercaderistas.ui.theme.UrgencyOrange
 import com.rutamercaderistas.ui.theme.ComponentShapes
@@ -137,13 +133,15 @@ fun BrandCard(
                     modifier = Modifier
                         .size(dimens.iconXxl)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer),
+                        // Identidad de marca = metadato: neutro + inicial
+                        // índigo, sin sumar otra superficie lavanda.
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = brand.take(1),
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                 }
 
@@ -151,7 +149,9 @@ fun BrandCard(
 
                 Text(
                     text = brand,
-                    style = MaterialTheme.typography.headlineSmall,
+                    // Mismo nivel que el encabezado de marca de Locales:
+                    // headlineSmall (24 sp) competía con el título de pantalla.
+                    style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f),
                     maxLines = 2,
@@ -163,9 +163,10 @@ fun BrandCard(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(50))
-                        .background(
-                            Brush.horizontalGradient(listOf(PromoGradientStart, PromoGradientEnd))
-                        )
+                        // "N promos" es un conteo, no una urgencia: el naranja
+                        // competía con el índigo del chrome. Superficie neutra
+                        // + icono índigo; el naranja queda para "por vencer".
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                         .padding(horizontal = dimens.spacingMd, vertical = 6.dp * rs()),
                 ) {
                     val promocionesCd = stringResource(R.string.promociones_cd)
@@ -173,14 +174,14 @@ fun BrandCard(
                         Icon(
                             imageVector = Icons.Outlined.LocalFireDepartment,
                             contentDescription = promocionesCd,
-                            tint = Color.White,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.size(14.dp),
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = pluralStringResource(R.plurals.promos_count_plural, promos.size, promos.size),
                             style = MaterialTheme.typography.labelMedium,
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
                         )
                     }
                 }

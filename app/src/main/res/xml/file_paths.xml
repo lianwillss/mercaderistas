@@ -3,6 +3,7 @@
     <files-path name="docs" path="thumbnails/"/>
     <files-path name="pdfs" path="manual_marcas.pdf"/>
     <files-path name="manual" path="manual.pdf"/>
+    <files-path name="updates" path="updates/"/>
     <cache-path name="apk" path="apk/"/>
     <cache-path name="exports" path="route_exports/"/>
     <cache-path name="share_images" path="share_images/"/>

@@ -21,8 +21,9 @@ Capas y flujo de datos: `README.md` §3. Acá solo lo que no se puede romper:
 - Único módulo `:app`; entrada `MainActivity`, aplicación Hilt `MercaderistasApp`.
 - Estado de pantalla: ViewModels + `StateFlow`; Compose recolecta con `collectAsStateWithLifecycle()`.
 - `AppDatabase` NO tiene `fallbackToDestructiveMigration`: todo cambio de esquema exige `Migration` explícita (plantilla: `MIGRATION_4_5`).
-- Navegación con `NavigationSuiteScaffold` (`AppBottomBar` es legacy, solo se reutiliza `BottomBarKey`); `AppWindowWidth` centraliza Compact `<600dp`, Medium `<840dp` y Expanded.
-- La barra inferior se oculta en la ruta EAN (`snapTo(Hidden)`) y reaparece al salir. No condicionar el `NavHost` a la visibilidad de la barra (se perdería el estado de navegación).
+- Navegación con `LiquidGlassNavigationScaffold` (`ui/components/LiquidGlassNavigation.kt`): barra de vidrio flotante en Compact y riel en Medium/Expanded. Reemplaza a `NavigationSuiteScaffold`; `AppBottomBar` es legacy y solo se reutiliza `BottomBarKey`. `AppWindowWidth` centraliza Compact `<600dp`, Medium `<840dp` y Expanded.
+- La barra flota sobre el contenido, así que el scaffold suma `BottomBarScrollInset` a `scrollBottomPadding` (copia de `LocalAppDimens`) cuando está visible. Las listas siguen usando `dimens.scrollBottomPadding`; no agregar padding manual ni condicionar el `NavHost` a la visibilidad de la barra.
+- La barra/riel se ocultan en la ruta EAN con `AnimatedVisibility` y reaparecen al salir. No condicionar el `NavHost` a la visibilidad de la barra (se perdería el estado de navegación).
 
 ## Tests
 
@@ -53,6 +54,8 @@ Capas y flujo de datos: `README.md` §3. Acá solo lo que no se puede romper:
 - Búsqueda: LIKE sobre las columnas normalizadas + ranking por tiers en SQL; no hay FTS5 (el sidecar `ean_product_fts` y su rebuild se eliminaron porque el catálogo ronda los 800 productos y el índice solo encarecía cada importación). No reintroducir FTS sin medir tamaño del catálogo y tiempo de importación.
 - Filtros de marca/caja: los chips salen de facetas SQL (marca se cuenta sin su propio filtro, caja sin el suyo) y al tocarlos se re-consulta el Pager con el filtro en el WHERE; el "%d resultados" usa `buildCountSearch` (total real), no los ítems ya paginados.
 - Sub-marcas de un proveedor: `BRAND_ALIASES` agrupa las submarcas bajo la marca del proveedor (JUMEX y SUPERZINGS → CASO Y CIA). Así el chip de marca, la búsqueda y el conteo las incluyen; la submarca sigue en la descripción, por eso "jumex"/"superzings" se siguen encontrando. Requiere subir `EAN_DATA_VERSION` para que instalados reimporten.
+- Marcas dadas de baja: se excluyen en el import, nunca editando el Excel fuente. EAN: `EXCLUDED_BRANDS` en `EanExcelParser.kt` (CINNABON, BERRY SUR/"BERRYSUR"). Stock: `MARCAS_EXCLUIDAS` en `StockModels.kt`, aplicado en `DemoStockRepository` (cubre assets, URL y KPI One) y replicado en `tools/stock-sync.mjs`. Manual: la marca sale de `brandPages` y su página queda en `excludedBrandPages` para que no la absorba la marca anterior. Toda baja de marca exige subir `EAN_DATA_VERSION`.
+- Rendimiento: ningún `Regex(...)` dentro de funciones que corren por ítem, por fila o por tecla — se declaran `private val` arriba del archivo. `normalizarStock` creaba un `Pattern` por llamada y con 13k items de stock bloqueó el hilo principal >5 s (ANR "Input dispatching timed out" al tocar la barra inferior, visto en `anr_*/traces` como `PatternNative.compileImpl` dentro de `DemoStockRepository`). Mismo criterio en `normalizeSearch`/`compactNorm`, `HighlightedText`, `MatchedBrandLine`, `RouteSearchBar`, `Extensions.normalizeMarca` y `eanTokens`.
 - Marcas cubiertas: ver `EAN_FILE_BRANDS` + assets `ean*.xlsx` (fuente de verdad, no esta lista). Los Excel/CSV/PDF originales viven en `fuentes-locales/` (gitignored, con CI que lo verifica) y no se commitean salvo petición explícita.
 
 ## PDF de marcas
@@ -64,6 +67,8 @@ Capas y flujo de datos: `README.md` §3. Acá solo lo que no se puede romper:
 ## Compose y diseño
 
 - Solo tema claro; Inter está empaquetada. Usar `MaterialTheme.colorScheme`, `.typography`, `.shapes` y `AppDimens`; no introducir `fontSize`/`fontWeight` ni colores crudos en nuevos composables.
+- Vidrio 2026: reutilizar `GlassTint*`, `GlassShapes`, `GlassShadow*`, `Elevation.glass*` y el scaffold de `LiquidGlassNavigation`. El blur del fondo solo corre en API 31+ y se degrada al vidrio translúcido; no inventar blancos/alfas ad-hoc en pantallas.
+- Header principal: `HeaderSection` colapsa con `HeaderCollapseState` (sigue al dedo, no usa tween de alto). El `nestedScroll` va en el `LazyVerticalGrid` de `DayContent`, no en el `Column` externo: así el gesto de bajar en el tope expande el header antes de que `PullToRefreshBox` lo consuma. Al cambiar de ruta se expande.
 - Densidad primero: la interfaz debe mostrar mucha información; nunca agrandar tipografía para "mejorar diseño" (tracking más cerrado sí, tamaño no). Elevaciones nuevas usan tokens de `Elevation`.
 - Contraste: `AccentGreen` como texto/icono sobre claro falla AA (2.2:1); para foreground usar `AccentGreenText` (≥4.5:1, verificado en `ContrastTest`). Los rellenos de marca siguen verdes.
 - `touchMin = 48.dp`; no reducir targets interactivos para compactar la interfaz.

@@ -13,9 +13,11 @@ import timber.log.Timber
 import java.io.InputStream
 import java.text.Normalizer
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.withContext
 
-const val EAN_DATA_VERSION = 39
+const val EAN_DATA_VERSION = 46
 
 // Prefijo/sufijo de los archivos Excel de catálogo EAN en assets.
 // Para agregar más productos basta con soltar otro archivo "ean*.xlsx"
@@ -53,6 +55,9 @@ private val EAN_FILE_BRANDS = mapOf(
     "pett" to "PET KITCHEN",
     "producto_bwild_gel_pomelo" to "BWILD",
     "patpot" to "PATPOT",
+    "pet_kitchen" to "PET KITCHEN",
+    "indomitable" to "PET KITCHEN",
+    "sangria_candela" to "SANGRIA CANDELA",
 )
 
 // Alias de marca: la empresa ve algunas marcas con un nombre distinto al del
@@ -65,11 +70,21 @@ private val BRAND_ALIASES = mapOf(
     "caso&cia" to "CASO Y CIA",
     "caso & cia" to "CASO Y CIA",
     "indomitable" to "PET KITCHEN",
+    // Sub-marcas del proveedor CASO&CIA: se agrupan bajo la marca del proveedor
+    // para que el chip y la búsqueda de CASO Y CIA las incluyan. La submarca
+    // sigue en la descripción ("NECTAR JUMEX…", "JUGUETE SUPERZINGS…"), así que
+    // buscar por ella sigue funcionando.
+    "jumex" to "CASO Y CIA",
+    "superzings" to "CASO Y CIA",
 )
 
 // Marcas excluidas del catálogo EAN (ya no se comercializan).
 private val EXCLUDED_BRANDS = setOf(
     "cinnabon",
+    // Baja pedida por el cliente (nov-2026): el Excel de origen la trae como
+    // "BERRY SUR". Se excluye al importar para no depender de editar el xlsx.
+    "berry sur",
+    "berrysur",
 )
 
 // Nota aclaratoria para marcas canónicas (p. ej. "Kobbo" es la representación
@@ -90,16 +105,24 @@ internal fun brandFromFilename(fileName: String): String {
         ?: base.replace("_", " ").replaceFirstChar { it.uppercase() }.trim()
 }
 
+// Patrones compilados una sola vez: normalizar se llama por cada producto del
+// catálogo (y por cada fila al pintar), así que crear el Regex en cada llamada
+// costaba miles de Pattern.compile.
+private val DIACRITICS_REGEX = Regex("\\p{InCombiningDiacriticalMarks}+")
+private val NON_ALNUM_REGEX = Regex("[^a-z0-9]")
+private val SPACES_REGEX = Regex("\\s+")
+private val NON_DIGITS_REGEX = Regex("\\D")
+
 fun normalizeSearch(text: String): String {
     val normalized = Normalizer.normalize(text, Normalizer.Form.NFD)
-        .replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
+        .replace(DIACRITICS_REGEX, "")
     return normalized.lowercase().trim()
 }
 
 // Normalización compacta: igual que normalizeSearch pero sin espacios ni
 // signos, para que "bymaria" coincida con "by maria" y viceversa.
 fun compactNorm(text: String): String =
-    normalizeSearch(text).replace(Regex("[^a-z0-9]"), "")
+    normalizeSearch(text).replace(NON_ALNUM_REGEX, "")
 
 class EanExcelParser @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -139,20 +162,24 @@ class EanExcelParser @Inject constructor(
     )
 
     suspend fun parseAndSave(inputStream: InputStream, defaultBrand: String? = null): Result<Int> {
+        // POI (XML + zip) es CPU puro: en el caller (viewModelScope = Main)
+        // congelaba la app al abrir Cod. EAN con un import pendiente.
         return withImportLock {
-            try {
-                val products = parse(inputStream, defaultBrand)
-                val dedupeResult = dedupeEanProducts(products)
-                logDedupe(dedupeResult)
-                val deduped = dedupeResult.products
-                if (deduped.isNotEmpty()) {
-                    eanProductDao.clearAll()
-                    eanProductDao.insertAll(deduped)
+            withContext(Dispatchers.IO) {
+                try {
+                    val products = parse(inputStream, defaultBrand)
+                    val dedupeResult = dedupeEanProducts(products)
+                    logDedupe(dedupeResult)
+                    val deduped = dedupeResult.products
+                    if (deduped.isNotEmpty()) {
+                        eanProductDao.clearAll()
+                        eanProductDao.insertAll(deduped)
+                    }
+                    Result.success(deduped.size)
+                } catch (e: Exception) {
+                    Timber.e(e, "Error parsing EAN Excel file")
+                    Result.failure(e)
                 }
-                Result.success(deduped.size)
-            } catch (e: Exception) {
-                Timber.e(e, "Error parsing EAN Excel file")
-                Result.failure(e)
             }
         }
     }
@@ -360,7 +387,7 @@ class EanExcelParser @Inject constructor(
         val marca = BRAND_ALIASES[normalizeSearch(marcaRaw)] ?: marcaRaw
         // Colapsar espacios duplicados (p. ej. "DE  RAIZ" → "DE RAIZ") para que
         // la marca se muestre y agrupe correctamente.
-        val marcaClean = marca.replace(Regex("\\s+"), " ").trim()
+        val marcaClean = marca.replace(SPACES_REGEX, " ").trim()
         if (normalizeSearch(marcaClean) in EXCLUDED_BRANDS) return null
         val unBase = map.unBase?.let { getStringCellValue(row.getCell(it)) } ?: ""
         val unPedido = map.unPedido?.let { getStringCellValue(row.getCell(it)) } ?: ""
@@ -387,7 +414,7 @@ class EanExcelParser @Inject constructor(
 
         // El EAN real suele estar en "Código de Barra" (a veces con ceros
         // iniciales y asteriscos). Si está presente y es numérico, se prefiere.
-        val cleanedBarra = codigoBarra.replace(Regex("""\D"""), "")
+        val cleanedBarra = codigoBarra.replace(NON_DIGITS_REGEX, "")
         val eanRaw = if (cleanedBarra.isNotBlank()) cleanedBarra else rawEan
         // Un EAN de 12 dígitos suele ser un UPC-A; se normaliza a EAN-13 anteponiendo
         // 0 para que el código de barras se genere correctamente y la búsqueda por el
@@ -454,7 +481,10 @@ class EanExcelParser @Inject constructor(
 
     // Cargar desde assets (todos los archivos "ean_*.xlsx" se combinan)
     suspend fun loadFromAssets(): Result<Int> {
+        // Abre y parsea ~31 xlsx: fuera del hilo principal o la pantalla se
+        // congela mientras dura el import (ANR al navegar a Cod. EAN).
         return withImportLock {
+            withContext(Dispatchers.IO) {
             try {
                 lastDiagnostics = EanDiagnostics()
             val assetFiles = (context.assets.list("") ?: emptyArray())
@@ -464,7 +494,7 @@ class EanExcelParser @Inject constructor(
                 }
                 .sorted()
             if (assetFiles.isEmpty()) {
-                return@withImportLock Result.failure(IllegalStateException("No se encontraron archivos EAN en assets"))
+                return@withContext Result.failure(IllegalStateException("No se encontraron archivos EAN en assets"))
             }
             val all = mutableListOf<EanProductEntity>()
             for (file in assetFiles) {
@@ -490,6 +520,7 @@ class EanExcelParser @Inject constructor(
             } catch (e: Exception) {
                 Timber.e(e, "Error loading EAN file from assets")
                 Result.failure(e)
+            }
             }
         }
     }

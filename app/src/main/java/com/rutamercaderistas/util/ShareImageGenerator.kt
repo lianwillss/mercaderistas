@@ -11,6 +11,9 @@ import com.google.zxing.BarcodeFormat
 import com.journeyapps.barcodescanner.BarcodeEncoder
 import java.io.File
 
+// Compilado una vez: se usa al partir los textos de cada tarjeta.
+private val WHITESPACE = Regex("\\s+")
+
 object ShareImageGenerator {
 
     fun generateForEanProduct(
@@ -66,7 +69,7 @@ object ShareImageGenerator {
     }
 
     private fun wrapText(text: String, paint: Paint, maxWidth: Int): List<String> {
-        val words = text.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+        val words = text.trim().split(WHITESPACE).filter { it.isNotBlank() }
         if (words.isEmpty()) return listOf("")
         val lines = mutableListOf<String>()
         var current = ""

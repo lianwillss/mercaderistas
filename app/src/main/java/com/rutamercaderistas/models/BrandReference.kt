@@ -33,7 +33,7 @@ class BrandReference @Inject constructor(
 
     private val brandPages = mapOf(
         "ABEJA DORADA" to 8, "ALUSWEET" to 9, "TAGATOSA" to 10, "ASMODEE" to 11,
-        "BAGNO" to 16, "BERRYSUR" to 18, "BESHOS" to 19, "BIGU" to 20,
+        "BAGNO" to 16, "BESHOS" to 19, "BIGU" to 20,
         "BREDEN MASTER" to 24, "BY MARIA" to 26, "CALIFORNIA" to 27, "CALLAQUI" to 28,
         "CASO Y CIA" to 32, "CASO & CIA" to 32, "JUMEX" to 32, "SCRUB" to 32, "SCRUB DADDY" to 32,
         "SUPERZINGS" to 32, "APPLIED NUTRITION" to 32,
@@ -66,9 +66,14 @@ class BrandReference @Inject constructor(
         brandPages.mapKeys { it.key.normalizeMarca() }
     }
 
+    // Páginas de marcas dadas de baja (BERRY SUR, pág. 18): siguen impresas en
+    // el PDF empaquetado, así que cortan el rango de la marca anterior pero no
+    // se ofrecen ni se alcanzan al abrir el manual.
+    private val excludedBrandPages = setOf(18)
+
     private val brandRanges: Map<String, IntRange> by lazy {
         val sorted = brandPages.entries.sortedBy { it.value }
-        val distinctStarts = sorted.map { it.value }.distinct().sorted()
+        val distinctStarts = (sorted.map { it.value } + excludedBrandPages).distinct().sorted()
         val result = mutableMapOf<String, IntRange>()
         for ((name, start) in sorted) {
             val end = distinctStarts.firstOrNull { it > start }?.minus(1)
@@ -79,7 +84,7 @@ class BrandReference @Inject constructor(
     }
 
     private val knownBrandStarts: List<Int> by lazy {
-        brandPages.values.distinct().sorted()
+        (brandPages.values + excludedBrandPages).distinct().sorted()
     }
 
     private val detectedPages = ConcurrentHashMap<String, Int>()

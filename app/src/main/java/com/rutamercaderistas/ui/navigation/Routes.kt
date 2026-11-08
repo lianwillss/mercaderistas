@@ -28,3 +28,6 @@ data object SettingsRoute
 
 @Serializable
 data object CodProvRoute
+
+@Serializable
+data object StockRoute

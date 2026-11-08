@@ -202,6 +202,40 @@
     <string name="update_notif_nueva">Nueva versión %s disponible</string>
     <string name="update_notif_lista">Actualización lista para instalar</string>
     <string name="update_notif_toca">Versión %s — toca para instalar</string>
+    <string name="update_notif_canal_nombre">Actualizaciones</string>
+    <string name="update_notif_canal_desc">Avisos de nuevas versiones y descargas</string>
+    <string name="update_notif_descargando">Descargando actualización</string>
+    <string name="update_notif_progreso">%1$d %% descargado</string>
+    <string name="update_notif_error_titulo">Descarga interrumpida</string>
+    <string name="update_notif_error_texto">Toca para reintentar la actualización</string>
+
+    <string name="update_card_title">Actualización disponible</string>
+    <string name="update_card_subtitle">La versión %1$s está disponible.</string>
+    <string name="update_card_subtitle_expanded">La versión %1$s está disponible. La descarga se puede reanudar si sales de la app.</string>
+    <string name="update_version_chip">v%1$s</string>
+    <string name="update_downloading_title">Descargando %1$s</string>
+    <string name="update_downloading_subtitle">Puedes salir de la app; la descarga continúa.</string>
+    <string name="update_download_percent">%1$d %%</string>
+    <string name="update_download_mb">%1$s / %2$s MB</string>
+    <string name="update_download_mb_unknown">%1$s MB descargados</string>
+    <string name="update_cancelar">Cancelar</string>
+    <string name="update_reintentar">Reintentar</string>
+    <string name="update_instalar">Instalar</string>
+    <string name="update_ready_title">Lista para instalar</string>
+    <string name="update_ready_subtitle">La versión %1$s está descargada.</string>
+    <string name="update_error_titulo">No se pudo actualizar</string>
+    <string name="update_descarga_error">No se pudo descargar la actualización</string>
+    <string name="update_sin_internet">Sin conexión a internet. Revisa tu red e inténtalo de nuevo.</string>
+    <string name="update_descarga_interrumpida">La descarga se interrumpió. Reintenta y se reanudará.</string>
+    <string name="update_poco_espacio">No hay espacio suficiente. Libera %1$s MB e inténtalo de nuevo.</string>
+    <string name="update_apk_corrupto">El archivo descargado está dañado. Inténtalo de nuevo.</string>
+    <string name="update_error_servidor">El servidor no respondió (HTTP %1$d). Inténtalo más tarde.</string>
+    <string name="update_error_guardar">No se pudo guardar la actualización en el dispositivo.</string>
+    <string name="update_archivo_faltante">El archivo de actualización ya no está. Descárgalo de nuevo.</string>
+    <string name="update_permiso_instalar">Activa “Instalar apps desconocidas” para continuar.</string>
+    <string name="update_permiso_no_concedido">No se concedió el permiso. Toca Instalar para reintentar.</string>
+    <string name="update_error_abrir_ajustes">No se pudieron abrir los ajustes de instalación.</string>
+    <string name="update_error_instalador">No se pudo abrir el instalador: %1$s</string>
 
     <!-- Manual screen -->
     <string name="manual_que_es">¿Qué es Mercaderistas?</string>
@@ -403,7 +437,13 @@
         <item quantity="one">%1$d local</item>
         <item quantity="other">%1$d locales</item>
     </plurals>
+    <plurals name="locales_mas_marcas">
+        <item quantity="one">+%1$d marca</item>
+        <item quantity="other">+%1$d marcas</item>
+    </plurals>
     <string name="locale_clientes">Clientes</string>
+    <string name="onboarding_cerrar_cd">Cerrar guía</string>
+    <string name="onboarding_paso_cd">Guía de inicio, paso %1$d de %2$d: %3$s</string>
     <string name="onboarding_rutero_title">Aquí está tu ruta</string>
     <string name="onboarding_rutero_desc">Tu ruta del día con todos los locales asignados. Cambia de día arriba y toca un local para ver sus marcas.</string>
     <string name="onboarding_promociones_title">Aquí ves promociones</string>
@@ -430,4 +470,8 @@
     <string name="direccion_copiada">Dirección copiada al portapapeles</string>
     <string name="compartir_incluir_maps">Incluir link de Maps</string>
     <string name="compartir_cancelar">Cancelar</string>
+
+    <!-- Stock -->
+    <string name="stock_title">Stock</string>
+    <string name="nav_promos_label">Promos</string>
 </resources>

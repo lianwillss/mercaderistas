@@ -28,7 +28,8 @@ fun CodigoChip(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(6.dp))
-            .background(MaterialTheme.colorScheme.primaryContainer)
+            // Código de local = metadato: neutro + texto/índigo.
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .padding(horizontal = 8.dp, vertical = 2.dp)
             .semantics { contentDescription = cd },
     ) {

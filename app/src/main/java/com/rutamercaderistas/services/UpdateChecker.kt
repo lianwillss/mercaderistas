@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import timber.log.Timber
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -14,29 +15,40 @@ data class UpdateInfo(
     val apkUrl: String,
     /** Tag crudo ("v12.20.1"): clave de dedupe, versionCode colisiona en patch. */
     val tag: String = "",
+    /**
+     * null = la consulta terminó bien y no hay versión nueva.
+     * Mensaje en español = no se pudo consultar (red, servidor, JSON).
+     * Nunca borrar un pendiente cuando esto no es null.
+     */
+    val error: String? = null,
 )
 
 object UpdateChecker {
 
     private const val API_URL = "https://api.github.com/repos/lianwillss/mercaderistas/releases/latest"
+    private const val APK_ASSET_NAME = "app-universal-release.apk"
+
+    // Se declara una sola vez: se evalúa por release, no por ítem de lista.
+    private val VERSION_CODE_IN_BODY = Regex("""versionCode\s*[:=]\s*(\d+)""", RegexOption.IGNORE_CASE)
 
     suspend fun check(currentVersionCode: Int): UpdateInfo = withContext(Dispatchers.IO) {
         try {
             val json = fetchLatestRelease()
             if (json == null) {
                 Timber.w("No se pudo obtener el release")
-                return@withContext noUpdate()
+                return@withContext checkError("No se pudo comprobar la actualización")
             }
 
             val tagName = json.optString("tag_name", "")
             val versionName = tagName.removePrefix("v")
+            val body = json.optString("body", "")
 
             val assets = json.optJSONArray("assets")
             var apkUrl: String? = null
             if (assets != null) {
                 for (i in 0 until assets.length()) {
                     val asset = assets.optJSONObject(i)
-                        if (asset?.optString("name", "") == "app-universal-release.apk") {
+                    if (asset?.optString("name", "") == APK_ASSET_NAME) {
                         apkUrl = asset.optString("browser_download_url").takeIf { it.isNotBlank() }
                         break
                     }
@@ -45,25 +57,31 @@ object UpdateChecker {
 
             if (apkUrl == null) {
                 Timber.w("No se encontró APK en el release")
+                return@withContext checkError("El release no incluye el APK universal")
+            }
+
+            // El release puede declarar el versionCode real en el cuerpo. Si
+            // no lo hace, se deriva del tag con el esquema major*1000+minor.
+            val remoteCode = VERSION_CODE_IN_BODY.find(body)?.groupValues?.getOrNull(1)?.toIntOrNull()
+                ?: tagToVersionCode(tagName)
+                ?: 0
+
+            if (!isRemoteNewer(tagName, currentVersionCode, remoteCode)) {
+                Timber.i("Sin actualizaciones: remote=%s (%d), local=%d", tagName, remoteCode, currentVersionCode)
                 return@withContext noUpdate()
             }
 
-            if (!isRemoteNewer(tagName, currentVersionCode)) {
-                Timber.i("Sin actualizaciones: remote=%s, local=%d", tagName, currentVersionCode)
-                return@withContext noUpdate()
-            }
-
-            Timber.i("Actualización disponible: %s > %d", tagName, currentVersionCode)
+            Timber.i("Actualización disponible: %s (%d) > %d", tagName, remoteCode, currentVersionCode)
             UpdateInfo(
                 available = true,
-                versionCode = tagToVersionCode(tagName) ?: 0,
+                versionCode = remoteCode,
                 versionName = versionName,
                 apkUrl = apkUrl,
                 tag = tagName,
             )
         } catch (e: Exception) {
             Timber.e(e, "Error checking update")
-            noUpdate()
+            checkError("No se pudo comprobar la actualización")
         }
     }
 
@@ -79,15 +97,15 @@ object UpdateChecker {
 
             if (conn.responseCode != 200) {
                 Timber.w("GitHub API status: %d", conn.responseCode)
-                return null
+                if (conn.responseCode == 404) return null
+                throw IOException("GitHub HTTP ${conn.responseCode}")
             }
 
             val bytes = conn.inputStream.use { it.readBytes() }
             return JSONObject(String(bytes))
-        } catch (e: Exception) {
-            Timber.w(e, "Error fetching release")
-            return null
-        } finally { conn?.disconnect() }
+        } finally {
+            conn?.disconnect()
+        }
     }
 
     /** Parse "12.02.1" → [12, 2, 1]. Null si alguna parte no es número. */
@@ -119,6 +137,20 @@ object UpdateChecker {
     }
 
     /**
+     * Decisión principal: primero compara el versionCode numérico del release;
+     * si empatan (un patch v12.20.1 contra v12.20), el tag decide.
+     */
+    internal fun isRemoteNewer(
+        remoteTag: String,
+        localVersionCode: Int,
+        remoteVersionCode: Int,
+    ): Boolean {
+        if (remoteVersionCode > localVersionCode) return true
+        if (remoteVersionCode < localVersionCode) return false
+        return isRemoteNewer(remoteTag, localVersionCode)
+    }
+
+    /**
      * Convierte un tag "v12.01" al esquema de versionCode
      * (major * 1000 + minor) solo para informar. La decisión de
      * actualizar la toma [isRemoteNewer]. Visible para tests.
@@ -134,7 +166,15 @@ object UpdateChecker {
         available = false,
         versionCode = 0,
         versionName = "",
-        apkUrl = ""
+        apkUrl = "",
+    )
+
+    private fun checkError(message: String) = UpdateInfo(
+        available = false,
+        versionCode = 0,
+        versionName = "",
+        apkUrl = "",
+        error = message,
     )
 
     /**

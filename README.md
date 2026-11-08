@@ -69,7 +69,7 @@ Decisiones clave:
 - **Offline-first**: Room es la fuente de la UI; la red solo actualiza.
 - **Sin migraciones destructivas**: `AppDatabase` no usa `fallbackToDestructiveMigration`; cada cambio de esquema requiere `Migration` explícita.
 - **Sync atómico**: el Excel se escribe en temporal, se valida y recién entonces se reemplaza; el índice de Room se actualiza en una transacción.
-- **Rutas type-safe** con `@Serializable`; navegación principal con `NavigationSuiteScaffold`.
+- **Rutas type-safe** con `@Serializable`; navegación principal con `LiquidGlassNavigationScaffold` (barra inferior de vidrio en Compact, riel en Medium/Expanded).
 - **El código manda sobre la documentación** si esta difiere; el material histórico está en [`docs/archive/`](docs/archive/).
 
 ---

@@ -1,10 +1,10 @@
 package com.rutamercaderistas.ui.theme
 
-import android.os.Build
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
-import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -21,10 +21,12 @@ import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.data.preferences.prefsDataStore
 
 private val LightColorScheme = lightColorScheme(
-    primary = AccentBlue,
+    // El chrome usa el índigo aurora para continuar el banner morado. El azul
+    // queda para enlaces, Lider y las categorías (AccentBlue*).
+    primary = BrandIndigo,
     onPrimary = Color.White,
-    primaryContainer = AccentBlueSoft,
-    onPrimaryContainer = AccentBlue,
+    primaryContainer = BrandIndigoSoft,
+    onPrimaryContainer = BrandIndigoText,
     secondary = AccentGreen,
     onSecondary = Color.White,
     secondaryContainer = AccentGreenSoft,
@@ -40,10 +42,10 @@ private val LightColorScheme = lightColorScheme(
     surfaceVariant = SurfaceVariant,
     onSurfaceVariant = TextSecondary,
     surfaceContainerLowest = Color.White,
-    surfaceContainerLow = Color(0xFFF5F6F8),
-    surfaceContainer = Color(0xFFF0F2F4),
-    surfaceContainerHigh = Color(0xFFEAEDF0),
-    surfaceContainerHighest = Color(0xFFE4E7EB),
+    surfaceContainerLow = Color(0xFFF4F6FA),
+    surfaceContainer = Color(0xFFEEF1F7),
+    surfaceContainerHigh = Color(0xFFE7EBF3),
+    surfaceContainerHighest = Color(0xFFDFE4EE),
     outline = Outline,
     outlineVariant = OutlineVariant,
     error = ErrorRed,
@@ -51,6 +53,44 @@ private val LightColorScheme = lightColorScheme(
     errorContainer = RedSoft,
     onErrorContainer = ErrorRed,
     scrim = Scrim
+)
+
+/**
+ * Modo oscuro: mismos roles semánticos que el tema claro para que las
+ * superficies nuevas (tarjeta de actualización, modales, vidrio) se adapten
+ * sin colores crudos. La identidad sigue siendo índigo.
+ */
+private val DarkColorScheme = darkColorScheme(
+    primary = Color(0xFFB9A7FF),
+    onPrimary = Color(0xFF241A66),
+    primaryContainer = Color(0xFF3B2AA8),
+    onPrimaryContainer = Color(0xFFE7E0FF),
+    secondary = Color(0xFF7EE2A8),
+    onSecondary = Color(0xFF003919),
+    secondaryContainer = Color(0xFF1E5E3A),
+    onSecondaryContainer = Color(0xFFB8F5CE),
+    tertiary = Color(0xFFFFB77C),
+    onTertiary = Color(0xFF4A2800),
+    tertiaryContainer = Color(0xFF6B3B00),
+    onTertiaryContainer = Color(0xFFFFDCC2),
+    background = Color(0xFF0E1016),
+    onBackground = Color(0xFFE6E9F2),
+    surface = Color(0xFF12151C),
+    onSurface = Color(0xFFE6E9F2),
+    surfaceVariant = Color(0xFF262B36),
+    onSurfaceVariant = Color(0xFFB6BECC),
+    surfaceContainerLowest = Color(0xFF0A0C11),
+    surfaceContainerLow = Color(0xFF161A22),
+    surfaceContainer = Color(0xFF1B202A),
+    surfaceContainerHigh = Color(0xFF222833),
+    surfaceContainerHighest = Color(0xFF2A313D),
+    outline = Color(0xFF7D8797),
+    outlineVariant = Color(0xFF3A424F),
+    error = Color(0xFFFFB4AB),
+    onError = Color(0xFF690005),
+    errorContainer = Color(0xFF93000A),
+    onErrorContainer = Color(0xFFFFDAD6),
+    scrim = Color(0xCC000000),
 )
 
 /** Tope de escala de fuente efectiva (sistema x usuario). Ver [MercaderistasTheme]. */
@@ -68,11 +108,11 @@ private val AppShapes = Shapes(
 fun MercaderistasTheme(content: @Composable () -> Unit) {
     val dimens = rememberAppDimens()
     val context = LocalContext.current
-    val colorScheme = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        dynamicLightColorScheme(context)
-    } else {
-        LightColorScheme
-    }
+    // Paleta curada: dynamicColorScheme pintaba botones, enlaces y la barra
+    // inferior con el color del wallpaper, así que la identidad (y el vidrio
+    // índigo) cambiaba de teléfono en teléfono. El tema sigue el modo del
+    // sistema, pero con los roles de marca.
+    val colorScheme = if (isSystemInDarkTheme()) DarkColorScheme else LightColorScheme
     val userScale by context.prefsDataStore.data
         .map { it[PreferencesRepository.KEY_FONT_SCALE] ?: 1f }
         .collectAsStateWithLifecycle(initialValue = 1f)

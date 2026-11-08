@@ -14,6 +14,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Color
 import com.rutamercaderistas.services.compactNorm
 
+// Se reutiliza en cada fila de la lista: nunca crear el Regex dentro del Composable.
+private val NON_ALNUM_SPLIT = Regex("[^a-z0-9]+")
+
 /**
  * Texto con la parte coincidente resaltada (tolerante a tildes y espacios,
  * misma lógica que la búsqueda). Lo coincidente va en primario + bold.
@@ -29,7 +32,7 @@ fun HighlightedText(
     overflow: TextOverflow = TextOverflow.Clip,
 ) {
     val tokens = remember(query) {
-        compactNorm(query).split(Regex("[^a-z0-9]+")).filter { it.isNotBlank() }
+        compactNorm(query).split(NON_ALNUM_SPLIT).filter { it.isNotBlank() }
     }
     if (tokens.isEmpty() || text.isBlank()) {
         Text(text = text, style = style, color = color, modifier = modifier, maxLines = maxLines, overflow = overflow)

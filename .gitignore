@@ -18,3 +18,13 @@ local.properties
 # Fuentes locales: Excel/CSV/PDF fuente de catálogos; nunca se commitean
 # (los assets trackeados viven en app/src/main/assets/ean*.xlsx).
 /fuentes-locales/
+
+# Archivo de stock generado por tools/stock-sync.mjs (pesa MB)
+stock.json
+
+# Runner local con credenciales de KPI One (no se commitea)
+actualizar-stock.sh
+/Actualizar stock.command
+
+# Excel fuente sueltos en la raíz (usar fuentes-locales/)
+/*.xlsx

@@ -1,10 +1,12 @@
 package com.rutamercaderistas.ui.screens
 
+import android.widget.Toast
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import com.rutamercaderistas.ui.theme.MotionSprings
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -15,6 +17,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -40,12 +43,12 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.FilterChip
 import androidx.compose.ui.semantics.heading
 import com.rutamercaderistas.models.DiaSemana
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.CalendarMonth
@@ -64,6 +67,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -85,12 +89,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.R
 import com.rutamercaderistas.models.LocalDelDia
+import com.rutamercaderistas.ui.components.AppFilterChip
 import com.rutamercaderistas.ui.components.CodigoChip
 import com.rutamercaderistas.ui.components.GlobalSearchAction
 import com.rutamercaderistas.ui.theme.pressScale
@@ -104,6 +108,7 @@ import com.rutamercaderistas.models.diasVisita
 import com.rutamercaderistas.ui.components.ScreenHeader
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.semantics.Role
@@ -178,46 +183,69 @@ fun AllLocalesScreen(
         }
     }
 
-    val isWide = appWindowWidth(LocalConfiguration.current.screenWidthDp.dp) == AppWindowWidth.Expanded
-
     // Toast-gota de copiado: hermano en Box (nunca hijo de un Column con peso).
     var copyToast by remember { mutableStateOf<String?>(null) }
+    // Detalle en teléfono: la tarjeta abre una hoja con todas las marcas.
+    var detailLocal by remember { mutableStateOf<LocalDelDia?>(null) }
     val copiedMessage = stringResource(R.string.direccion_copiada)
-    Box(modifier = Modifier.fillMaxSize()) {
-    if (isWide) {
-        AllLocalesTwoPane(
-            locales = filteredLocales,
-            searchQuery = searchQuery,
-            onSearchChange = { searchQuery = it },
-            onClose = onClose,
-            onAddressClick = onAddressClick,
-            onCopyAddress = { copyToast = copiedMessage },
-            onBrandSearch = { searchQuery = it },
-            onGlobalSearch = onGlobalSearch,
-            searchHistory = searchHistory,
-            onHistoryClick = { searchQuery = it },
-            routeName = routeName,
-        )
-    } else {
-        AllLocalesSinglePane(
-            locales = filteredLocales,
-            searchQuery = searchQuery,
-            onSearchChange = { searchQuery = it },
-            onClose = onClose,
-            onAddressClick = onAddressClick,
-            onCopyAddress = { copyToast = copiedMessage },
-            onBrandSearch = { searchQuery = it },
-            onGlobalSearch = onGlobalSearch,
-            scrollBehavior = scrollBehavior,
-            searchHistory = searchHistory,
-            onHistoryClick = { searchQuery = it },
-            routeName = routeName,
+    // maxWidth del contenedor en lugar de screenWidthDp: en ventana dividida o
+    // plegables el ancho disponible es el que decide una o dos columnas.
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val isWide = appWindowWidth(maxWidth) == AppWindowWidth.Expanded
+        if (isWide) {
+            AllLocalesTwoPane(
+                locales = filteredLocales,
+                searchQuery = searchQuery,
+                onSearchChange = { searchQuery = it },
+                onClose = onClose,
+                onAddressClick = onAddressClick,
+                onCopyAddress = { copyToast = copiedMessage },
+                onBrandSearch = { searchQuery = it },
+                onGlobalSearch = onGlobalSearch,
+                searchHistory = searchHistory,
+                onHistoryClick = { searchQuery = it },
+                routeName = routeName,
+            )
+        } else {
+            AllLocalesSinglePane(
+                locales = filteredLocales,
+                searchQuery = searchQuery,
+                onSearchChange = { searchQuery = it },
+                onClose = onClose,
+                onAddressClick = onAddressClick,
+                onCopyAddress = { copyToast = copiedMessage },
+                onBrandSearch = { searchQuery = it },
+                onGlobalSearch = onGlobalSearch,
+                scrollBehavior = scrollBehavior,
+                searchHistory = searchHistory,
+                onHistoryClick = { searchQuery = it },
+                routeName = routeName,
+                onLocaleClick = { detailLocal = it },
+            )
+        }
+        DropletToast(
+            message = copyToast,
+            onTimeout = { copyToast = null },
         )
     }
-    DropletToast(
-        message = copyToast,
-        onTimeout = { copyToast = null },
-    )
+
+    detailLocal?.let { local ->
+        LocaleDetailSheet(
+            local = local,
+            searchQuery = searchQuery,
+            onDismiss = { detailLocal = null },
+            onAddressClick = onAddressClick,
+            // La hoja es otra ventana: el DropletToast de la pantalla queda
+            // detrás del scrim, así que la confirmación va como Toast del sistema.
+            onCopyAddress = {
+                Toast.makeText(context, R.string.direccion_copiada, Toast.LENGTH_SHORT).show()
+            },
+            onBrandSearch = { brand ->
+                // Tocar una marca en el detalle filtra la lista y cierra la hoja.
+                searchQuery = brand
+                detailLocal = null
+            },
+        )
     }
 }
 
@@ -236,6 +264,7 @@ private fun AllLocalesSinglePane(
     searchHistory: List<String> = emptyList(),
     onHistoryClick: (String) -> Unit = {},
     routeName: String? = null,
+    onLocaleClick: (LocalDelDia) -> Unit = {},
 ) {
     val dimens = LocalAppDimens.current
     Column(
@@ -267,6 +296,7 @@ private fun AllLocalesSinglePane(
             dimens = dimens,
             modifier = Modifier.weight(1f),
             routeName = routeName,
+            onLocaleClick = onLocaleClick,
         )
     }
 }
@@ -288,6 +318,14 @@ private fun AllLocalesTwoPane(
 ) {
     val dimens = LocalAppDimens.current
     var selected by remember { mutableStateOf<LocalDelDia?>(null) }
+    // Si el filtro deja fuera el local seleccionado, el panel derecho vuelve al
+    // placeholder en vez de mostrar un detalle que ya no está en la lista.
+    LaunchedEffect(locales) {
+        val current = selected ?: return@LaunchedEffect
+        if (locales.none { it.codigo == current.codigo && it.local == current.local }) {
+            selected = null
+        }
+    }
     Row(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding()) {
         Column(modifier = Modifier.fillMaxHeight().fillMaxWidth(0.5f)) {
             ScreenHeader(
@@ -554,6 +592,7 @@ private fun CountAndGrid(
     dimens: AppDimens,
     modifier: Modifier = Modifier,
     routeName: String? = null,
+    onLocaleClick: (LocalDelDia) -> Unit = {},
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
@@ -613,10 +652,19 @@ private fun CountAndGrid(
                         key = { _, local -> "brand_${section.brand}|${local.codigo}|${local.local}" },
                         contentType = { _, _ -> "locale" },
                     ) { _, local ->
+                        val verDetalleCd = stringResource(
+                            R.string.busqueda_ver_detalle,
+                            local.local.ifBlank { stringResource(R.string.sin_numero) },
+                        )
                         Card(
                             modifier = Modifier
                                 .animateItem()
-                                .fillMaxWidth(),
+                                .fillMaxWidth()
+                                .clickable(
+                                    role = Role.Button,
+                                    onClickLabel = verDetalleCd,
+                                    onClick = { onLocaleClick(local) },
+                                ),
                             shape = MaterialTheme.shapes.medium,
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
                             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
@@ -655,11 +703,20 @@ private fun CountAndGrid(
                         visible = true
                     }
                     val density = LocalDensity.current
+                    val verDetalleCd = stringResource(
+                        R.string.busqueda_ver_detalle,
+                        local.local.ifBlank { stringResource(R.string.sin_numero) },
+                    )
 
                     Card(
                         modifier = Modifier
                             .animateItem()
                             .fillMaxWidth()
+                            .clickable(
+                                role = Role.Button,
+                                onClickLabel = verDetalleCd,
+                                onClick = { onLocaleClick(local) },
+                            )
                             .graphicsLayer {
                                 alpha = animAlpha
                                 translationY = animOffsetY.value * density.density
@@ -801,8 +858,15 @@ private fun LocaleCard(
             },
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
+            // La selección de un local es secundaria: superficie neutra y
+            // borde índigo, no una tarjeta entera lavanda.
+            containerColor = if (selected) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.surfaceContainerLow,
         ),
+        border = if (selected) {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+        } else {
+            null
+        },
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         LocaleCardContent(
@@ -859,7 +923,7 @@ private fun DayFilterChips(
     ) {
         item(key = "day_all") {
             Box(modifier = Modifier.heightIn(min = 48.dp)) {
-                FilterChip(
+                AppFilterChip(
                     selected = selectedDay == null,
                     onClick = { onDaySelected(null) },
                     label = { Text(stringResource(R.string.todas)) },
@@ -874,7 +938,7 @@ private fun DayFilterChips(
         items(DiaSemana.todos(), key = { it.name }) { dia ->
             val diaSeleccionadoStr = stringResource(R.string.dia_seleccionado_cd, dia.nombreCompleto)
             Box(modifier = Modifier.heightIn(min = 48.dp)) {
-                FilterChip(
+                AppFilterChip(
                     selected = selectedDay == dia,
                     onClick = { onDaySelected(if (selectedDay == dia) null else dia) },
                     label = { Text(dia.abreviacion) },
@@ -910,31 +974,26 @@ private fun LocaleCardContent(
 ) {
     val dimens = LocalAppDimens.current
     val context = LocalContext.current
-    val matched = remember(local, searchQuery, focusBrand) {
-        val all = matchedBrands(local, searchQuery)
-        if (focusBrand != null) all.filter { it.nombre == focusBrand } else all
+    // Todas las coincidencias para poder avisar cuántas marcas quedan fuera
+    // de la tarjeta; en la sección de una marca solo interesa esa marca.
+    val allMatched = remember(local, searchQuery) {
+        matchedBrands(local, searchQuery, limit = Int.MAX_VALUE)
     }
-    val localTitle = local.local.ifBlank { stringResource(R.string.sin_numero) }
+    val matched = remember(allMatched, focusBrand) {
+        if (focusBrand != null) allMatched.filter { it.nombre == focusBrand }
+        else allMatched.take(2)
+    }
+    val hiddenBrands = if (focusBrand != null) 0
+    else (allMatched.size - matched.size).coerceAtLeast(0)
     val dias = remember(local) { local.diasVisita() }
     val diasTexto = diasLabel(dias)
-    val seVisitaCd = if (dias.isNotEmpty()) stringResource(R.string.locale_se_visita, diasTexto) else ""
+    // La tarjeta completa es clickeable (abre el detalle): se deja que TalkBack
+    // lea sus textos y que la dirección/copiar sigan siendo nodos aparte, en
+    // vez de fusionar todo en un contentDescription que los tapaba.
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(dimens.spacingMd)
-            .semantics(mergeDescendants = true) {
-                contentDescription = buildString {
-                    append(localTitle)
-                    if (local.codigo.isNotBlank()) append(", código ${local.codigo}")
-                    if (seVisitaCd.isNotEmpty()) append(". $seVisitaCd")
-                    if (local.direccion.isNotBlank()) append(", ${local.direccion}")
-                    if (local.comuna.isNotBlank()) append(", ${local.comuna}")
-                    if (matched.isNotEmpty()) {
-                        append(". Marcas: ")
-                        append(matched.joinToString(", ") { it.nombre })
-                    }
-                }
-            },
+            .padding(dimens.spacingMd),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
@@ -954,7 +1013,7 @@ private fun LocaleCardContent(
 
         Spacer(modifier = Modifier.width(10.dp * rs()))
 
-        Column(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = local.local.ifBlank { stringResource(R.string.sin_numero) },
                 style = MaterialTheme.typography.titleMedium,
@@ -995,6 +1054,18 @@ private fun LocaleCardContent(
                     onBrandSearch = onBrandSearch,
                 )
             }
+            if (hiddenBrands > 0) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = pluralStringResource(
+                        R.plurals.locales_mas_marcas,
+                        hiddenBrands,
+                        hiddenBrands,
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
             if (local.direccion.isNotBlank() || local.comuna.isNotBlank()) {
                 Spacer(modifier = Modifier.height(2.dp))
                 val addressPress = rememberPressInteractionSource()
@@ -1012,7 +1083,9 @@ private fun LocaleCardContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        // La dirección es dato: superficie neutra con el
+                        // icono en índigo, no una superficie lavanda.
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                         .heightIn(min = 48.dp)
                         .pressScale(addressPress)
                         .combinedClickable(
@@ -1043,7 +1116,7 @@ private fun LocaleCardContent(
                         text = addressText,
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
@@ -1073,6 +1146,15 @@ private fun LocaleCardContent(
                 }
             }
         }
+
+        // Afordancia de que la tarjeta abre el detalle (decorativa).
+        Spacer(modifier = Modifier.width(4.dp))
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+            modifier = Modifier.size(dimens.iconSm),
+        )
     }
 }
 
@@ -1085,36 +1167,61 @@ private fun LocaleDetailPane(
     onBrandSearch: (String) -> Unit = {},
 ) {
     val dimens = LocalAppDimens.current
-    val context = LocalContext.current
-    val detailPress = rememberPressInteractionSource()
-    val matched = remember(local, searchQuery) { matchedBrands(local, searchQuery) }
-    val localTitle = local.local.ifBlank { stringResource(R.string.sin_numero) }
-    val dias = remember(local) { local.diasVisita() }
-    val diasTexto = diasLabel(dias)
-    val seVisitaCd = if (dias.isNotEmpty()) stringResource(R.string.locale_se_visita, diasTexto) else ""
-    val detalleCd = stringResource(R.string.locale_detalle_cd, localTitle)
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(dimens.spacingLg)
             .verticalScroll(rememberScrollState())
-            .semantics(mergeDescendants = true) {
-                contentDescription = buildString {
-                    append(detalleCd)
-                    if (local.codigo.isNotBlank()) append(", código ${local.codigo}")
-                    if (seVisitaCd.isNotEmpty()) append(". $seVisitaCd")
-                    if (matched.isNotEmpty()) {
-                        append(". Marcas: ")
-                        append(matched.joinToString(", ") { it.nombre })
-                    }
-                }
-            },
-        verticalArrangement = Arrangement.spacedBy(dimens.spacingMd)
+            .padding(dimens.spacingLg),
+    ) {
+        LocaleDetailContent(
+            local = local,
+            onAddressClick = onAddressClick,
+            onCopyAddress = onCopyAddress,
+            searchQuery = searchQuery,
+            onBrandSearch = onBrandSearch,
+        )
+    }
+}
+
+/**
+ * Detalle compartido por el panel de tablet y la hoja de teléfono. Muestra
+ * **una sola** lista de marcas (las que coinciden con la búsqueda primero),
+ * sin la sección "Clientes" aparte que repetía las mismas marcas.
+ *
+ * Sin `mergeDescendants`: la dirección y el botón de copiar deben seguir
+ * siendo nodos propios de TalkBack.
+ */
+@Composable
+private fun LocaleDetailContent(
+    local: LocalDelDia,
+    onAddressClick: (String) -> Unit,
+    onCopyAddress: () -> Unit = {},
+    searchQuery: String = "",
+    onBrandSearch: (String) -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
+    val dimens = LocalAppDimens.current
+    val context = LocalContext.current
+    val detailPress = rememberPressInteractionSource()
+    val matched = remember(local, searchQuery) {
+        matchedBrands(local, searchQuery, limit = Int.MAX_VALUE)
+    }
+    val brands = remember(local, matched) {
+        val rest = local.clientes.filter { cliente -> matched.none { it.nombre == cliente.nombre } }
+        (matched + rest).distinctBy { it.nombre }
+    }
+    val dias = remember(local) { local.diasVisita() }
+    val diasTexto = diasLabel(dias)
+    val localTitle = local.local.ifBlank { stringResource(R.string.sin_numero) }
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(dimens.spacingMd),
     ) {
         Text(
-            text = local.local.ifBlank { stringResource(R.string.sin_numero) },
+            text = localTitle,
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.semantics { heading() },
         )
         if (local.codigo.isNotBlank()) {
             CodigoChip(codigo = local.codigo)
@@ -1136,14 +1243,6 @@ private fun LocaleDetailPane(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-        }
-        matched.forEach { cliente ->
-            MatchedBrandLine(
-                cliente = cliente,
-                daysLabel = diasLabel(local.marcasDias[cliente.nombre].orEmpty()),
-                query = searchQuery,
-                onBrandSearch = onBrandSearch,
-            )
         }
         if (local.direccion.isNotBlank() || local.comuna.isNotBlank()) {
             val addressText = buildString {
@@ -1208,19 +1307,52 @@ private fun LocaleDetailPane(
                 }
             }
         }
-        if (local.clientes.isNotEmpty()) {
+        if (brands.isNotEmpty()) {
             Text(
                 text = stringResource(R.string.locale_clientes),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            local.clientes.forEach { cliente ->
-                Text(
-                    text = cliente.nombre,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+            brands.forEach { cliente ->
+                MatchedBrandLine(
+                    cliente = cliente,
+                    daysLabel = diasLabel(local.marcasDias[cliente.nombre].orEmpty()),
+                    query = searchQuery,
+                    onBrandSearch = onBrandSearch,
                 )
             }
+        }
+    }
+}
+
+/** Detalle en teléfono: hoja inferior con scroll, mismo contenido que la tablet. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LocaleDetailSheet(
+    local: LocalDelDia,
+    searchQuery: String,
+    onDismiss: () -> Unit,
+    onAddressClick: (String) -> Unit,
+    onCopyAddress: () -> Unit,
+    onBrandSearch: (String) -> Unit,
+) {
+    val dimens = LocalAppDimens.current
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = dimens.spacingLg)
+                .padding(bottom = dimens.spacingXl),
+        ) {
+            LocaleDetailContent(
+                local = local,
+                onAddressClick = onAddressClick,
+                onCopyAddress = onCopyAddress,
+                searchQuery = searchQuery,
+                onBrandSearch = onBrandSearch,
+            )
         }
     }
 }

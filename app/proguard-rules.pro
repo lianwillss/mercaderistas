@@ -69,3 +69,11 @@
 -dontwarn org.tukaani.xz.MemoryLimitException
 -dontwarn org.tukaani.xz.SingleXZInputStream
 -dontwarn org.tukaani.xz.XZInputStream
+
+# WorkManager crea los InputMerger por reflexión (por ejemplo
+# OverwritingInputMerger). Sin el constructor, el worker falla antes de doWork.
+-keep class * extends androidx.work.InputMerger {
+    public <init>();
+}
+-keep class androidx.work.OverwritingInputMerger { *; }
+-keep class androidx.work.ArrayCreatingInputMerger { *; }
