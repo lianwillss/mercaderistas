@@ -24,6 +24,8 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -102,6 +104,9 @@ internal fun EanProductCard(
     product: EanProductEntity,
     query: String = "",
     onBarcodeClick: (EanProductEntity) -> Unit = {},
+    selectionMode: Boolean = false,
+    selected: Boolean = false,
+    onSelectChange: (Boolean) -> Unit = {},
 ) {
     val dimens = LocalAppDimens.current
     Card(
@@ -112,15 +117,44 @@ internal fun EanProductCard(
         shape = MaterialTheme.shapes.medium,
     ) {
         Column(modifier = Modifier.padding(dimens.spacingMd)) {
-            HighlightedText(
-                text = product.descripcionProducto.ifBlank { product.eanPrincipal },
-                query = query,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.semantics { heading() },
-            )
+            if (selectionMode) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val canSelect = product.eanPrincipal.isNotBlank()
+                    Checkbox(
+                        checked = selected,
+                        enabled = canSelect,
+                        onCheckedChange = if (canSelect) onSelectChange else null,
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = MaterialTheme.colorScheme.primary,
+                            uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                    )
+                    HighlightedText(
+                        text = product.descripcionProducto.ifBlank { product.eanPrincipal },
+                        query = query,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .weight(1f)
+                            .semantics { heading() },
+                    )
+                }
+            } else {
+                HighlightedText(
+                    text = product.descripcionProducto.ifBlank { product.eanPrincipal },
+                    query = query,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.semantics { heading() },
+                )
+            }
 
             if (product.eanPrincipal.isNotBlank()) {
                 Spacer(modifier = Modifier.height(dimens.spacingSm))

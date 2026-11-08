@@ -407,6 +407,14 @@
     <string name="ean_share_list_title">Búsqueda EAN: %1$s (%2$d)</string>
     <string name="ean_share_catalog_title">Catálogo EAN (%1$d)</string>
     <string name="ean_share_more">…y %1$d más</string>
+    <!-- Selección en lotes (P3: usuario experto) -->
+    <string name="ean_seleccionar">Seleccionar</string>
+    <string name="ean_seleccionar_cd">Seleccionar productos para compartir o copiar</string>
+    <string name="ean_seleccionados">%1$d seleccionados</string>
+    <string name="ean_seleccionar_todo">Seleccionar todo</string>
+    <string name="ean_deseleccionar_todo">Ninguno</string>
+    <string name="ean_compartir_seleccionados">Compartir seleccionados (%1$d)</string>
+    <string name="ean_copiar_seleccionados">Copiar EANs (%1$d)</string>
     <string name="ean_empty_catalog">Catálogo vacío — toca para recargar</string>
     <string name="ean_reload_catalog">Recargar catálogo</string>
     <string name="ean_no_results_hint">Revisa la ortografía o prueba con menos palabras.</string>

@@ -46,6 +46,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.CheckBox
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -54,6 +55,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
@@ -297,6 +299,13 @@ private fun EanSearchContent(
     val browsing = state.query.isBlank()
     val hasFilters = state.brandFilter != null || state.cajaFilter != null
 
+    // Selección en lotes: se mantiene mientras el usuario navega el catálogo.
+    // Se usan var delegados a mutableStateOf para que reasignar el conjunto
+    // (no mutar el set interno) disponga recomposición.
+    var selectionMode by remember { mutableStateOf(false) }
+    var selectedEans by remember { mutableStateOf(emptySet<String>()) }
+    val selectPress = rememberPressInteractionSource()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -347,50 +356,113 @@ private fun EanSearchContent(
                     buildEanRows(snapshot.items, showBrandHeaders = browsing)
                 }
                 val shareCd = stringResource(R.string.ean_share_list_cd)
+                val selectCd = stringResource(R.string.ean_seleccionar_cd)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        text = stringResource(R.string.ean_results_count, total ?: itemCount),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(vertical = dimens.spacingXs)
-                            .semantics { liveRegion = LiveRegionMode.Polite },
-                    )
-                    IconButton(
-                        onClick = {
-                            val products = rows.filterIsInstance<EanResultRow.Product>()
-                                .map { it.product }
-                            val q = state.query.trim()
-                            val title = if (q.isBlank()) {
-                                context.getString(R.string.ean_share_catalog_title, products.size)
-                            } else {
-                                context.getString(R.string.ean_share_list_title, q, products.size)
-                            }
-                            val text = buildEanListShareText(
-                                title = title,
-                                products = products,
-                            ) { n ->
-                                context.getString(R.string.ean_share_more, n)
-                            }
-                            val intent = Intent(Intent.ACTION_SEND).apply {
-                                type = "text/plain"
-                                putExtra(Intent.EXTRA_TEXT, text)
-                            }
-                            context.startActivity(
-                                Intent.createChooser(intent, context.getString(R.string.compartir)),
-                            )
-                        },
-                        modifier = Modifier.size(dimens.touchMin),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Share,
-                            contentDescription = shareCd,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    if (selectionMode) {
+                        Text(
+                            text = stringResource(R.string.ean_seleccionados, selectedEans.size),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(vertical = dimens.spacingXs)
+                                .semantics { liveRegion = LiveRegionMode.Polite },
                         )
+                        Spacer(modifier = Modifier.width(dimens.spacingSm))
+                        val visibleEans = rows.filterIsInstance<EanResultRow.Product>()
+                            .map { it.product.eanPrincipal }
+                            .toSet()
+                        TextButton(
+                            onClick = {
+                                selectedEans = visibleEans
+                            },
+                        ) {
+                            Text(stringResource(R.string.ean_seleccionar_todo))
+                        }
+                        Spacer(modifier = Modifier.width(dimens.spacingXs))
+                        TextButton(
+                            onClick = { selectedEans = emptySet() },
+                        ) {
+                            Text(stringResource(R.string.ean_deseleccionar_todo))
+                        }
+                        Spacer(modifier = Modifier.width(dimens.spacingSm))
+                        IconButton(
+                            onClick = { selectionMode = false; selectedEans = emptySet() },
+                            modifier = Modifier.size(dimens.touchMin),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = stringResource(R.string.cerrar_cd),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = stringResource(R.string.ean_results_count, total ?: itemCount),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(vertical = dimens.spacingXs)
+                                .semantics { liveRegion = LiveRegionMode.Polite },
+                        )
+                        Spacer(modifier = Modifier.width(dimens.spacingSm))
+                        Box(
+                            modifier = Modifier
+                                .size(dimens.touchMin)
+                                .pressScale(selectPress)
+                                .clickable(
+                                    interactionSource = selectPress,
+                                    indication = LocalIndication.current,
+                                    onClick = { selectionMode = true },
+                                    role = Role.Button,
+                                    onClickLabel = selectCd,
+                                )
+                                .semantics { contentDescription = selectCd },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.CheckBox,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(dimens.spacingSm))
+                        IconButton(
+                            onClick = {
+                                val products = rows.filterIsInstance<EanResultRow.Product>()
+                                    .map { it.product }
+                                val q = state.query.trim()
+                                val title = if (q.isBlank()) {
+                                    context.getString(R.string.ean_share_catalog_title, products.size)
+                                } else {
+                                    context.getString(R.string.ean_share_list_title, q, products.size)
+                                }
+                                val text = buildEanListShareText(
+                                    title = title,
+                                    products = products,
+                                ) { n ->
+                                    context.getString(R.string.ean_share_more, n)
+                                }
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, text)
+                                }
+                                context.startActivity(
+                                    Intent.createChooser(intent, context.getString(R.string.compartir)),
+                                )
+                            },
+                            modifier = Modifier.size(dimens.touchMin),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Share,
+                                contentDescription = shareCd,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
 
@@ -399,7 +471,102 @@ private fun EanSearchContent(
                     rows = rows,
                     query = state.query,
                     onBarcodeClick = onBarcodeClick,
+                    selectionMode = selectionMode,
+                    selectedEans = selectedEans,
+                    onProductSelect = { product, checked ->
+                        if (product.eanPrincipal.isNotBlank()) {
+                            if (checked) selectedEans = selectedEans + product.eanPrincipal
+                            else selectedEans = selectedEans - product.eanPrincipal
+                        }
+                    },
                 )
+
+                if (selectionMode && selectedEans.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = dimens.spacingMd, vertical = dimens.spacingXs),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Button(
+                                onClick = {
+                                    val selectedProducts = selectedEans
+                                        .mapNotNull { ean ->
+                                            rows.filterIsInstance<EanResultRow.Product>()
+                                                .firstOrNull { it.product.eanPrincipal == ean }
+                                                ?.product
+                                        }
+                                    val q = state.query.trim()
+                                    val title = if (q.isBlank()) {
+                                        context.getString(
+                                            R.string.ean_share_catalog_title,
+                                            selectedProducts.size,
+                                        )
+                                    } else {
+                                        context.getString(
+                                            R.string.ean_share_list_title,
+                                            q,
+                                            selectedProducts.size,
+                                        )
+                                    }
+                                    val text = buildEanListShareText(
+                                        title = title,
+                                        products = selectedProducts,
+                                    ) { n ->
+                                        context.getString(R.string.ean_share_more, n)
+                                    }
+                                    val intent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_TEXT, text)
+                                    }
+                                    context.startActivity(
+                                        Intent.createChooser(
+                                            intent,
+                                            context.getString(R.string.compartir),
+                                        ),
+                                    )
+                                },
+                            ) {
+                                Text(
+                                    stringResource(
+                                        R.string.ean_compartir_seleccionados,
+                                        selectedEans.size,
+                                    )
+                                )
+                            }
+                            Button(
+                                onClick = {
+                                    val eans = selectedEans.sorted().joinToString("\n")
+                                    val cm = context.getSystemService(
+                                        ClipboardManager::class.java,
+                                    )
+                                    cm?.setPrimaryClip(
+                                        android.content.ClipData.newPlainText(
+                                            "EANs seleccionados",
+                                            eans,
+                                        ),
+                                    )
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(R.string.ean_copied),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                },
+                            ) {
+                                Text(
+                                    stringResource(
+                                        R.string.ean_copiar_seleccionados,
+                                        selectedEans.size,
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -697,6 +864,9 @@ private fun EanResultsList(
     rows: List<EanResultRow>,
     query: String,
     onBarcodeClick: (EanProductEntity) -> Unit,
+    selectionMode: Boolean = false,
+    selectedEans: Set<String> = emptySet(),
+    onProductSelect: (EanProductEntity, Boolean) -> Unit = { _, _ -> },
 ) {
     val dimens = LocalAppDimens.current
     val density = LocalDensity.current
@@ -760,6 +930,9 @@ private fun EanResultsList(
                         product = row.product,
                         query = query,
                         onBarcodeClick = onBarcodeClick,
+                        selectionMode = selectionMode,
+                        selected = selectedEans.contains(row.product.eanPrincipal),
+                        onSelectChange = { checked -> onProductSelect(row.product, checked) },
                     )
                 }
             }
