@@ -165,6 +165,26 @@ val UrgencyBadgeSoft = Color(0xFFFEF3C7)
 val PromoGradientStart = Color(0xFFF97316)
 val PromoGradientEnd = Color(0xFFEF4444)
 
+// ── Descarga de actualización: neón violeta 2026 ────────────────────
+// La barra de descarga es la única pieza fluorescente de la app: violeta
+// eléctrico con matiz azulada, aura suave y destello que la recorre. Es
+// relleno decorativo; todo el texto del cuadro sigue en tokens AA.
+val DownloadNeonViolet = Color(0xFF7C3AED)      // núcleo violeta eléctrico
+val DownloadNeonPurple = Color(0xFFA855F7)      // púrpura luminoso
+val DownloadNeonBlue = Color(0xFF5B8CFF)        // matiz azulada del degradado
+val DownloadNeonGlow = Color(0xFF8B5CF6)        // halo fluorescente
+val DownloadNeonTrack = Color(0x1F7C3AED)       // carril translúcido (12 %)
+val DownloadNeonTrackEdge = Color(0x4D8B5CF6)   // borde del carril (30 %)
+val DownloadNeonShine = Color(0xE6FFFFFF)       // destello que recorre la barra
+val DownloadNeonIconEdge = Color(0x80FFFFFF)    // filo especular del icono
+
+// Vidrio del cuadro de descarga: el borde se ilumina en violeta arriba y
+// cae a azul violeta abajo. El velo de fondo reutiliza GlassTint*.
+val DownloadGlassBorderTop = Color(0xB3A855F7)
+val DownloadGlassBorderBottom = Color(0x596366F1)
+val DownloadGlassWash = Color(0x1F7C3AED)
+val DownloadGlassWashBlue = Color(0x146366F1)
+
 // ── Header principal 2026: índigo aurora ────────────────────────────
 // El chrome pasó a índigo; el header azul era el último bloque de otro
 // sistema. El degradado arranca casi negro, pasa por índigo y termina en

@@ -604,10 +604,17 @@ private class DrawScopeBackdrop(
  * (luz), un borde frío apagado abajo (volumen), sombra índigo (reflejo del
  * contenido) y un velo frío que deja pasar lo que hay debajo.
  */
-private fun Modifier.liquidGlass(
+internal fun Modifier.liquidGlass(
     shape: Shape,
     elevation: Dp,
     backdrop: (DrawScope.() -> Unit)? = null,
+    borderBrush: Brush = Brush.verticalGradient(
+        listOf(
+            GlassBorderHighlight,
+            GlassBorderHighlight.copy(alpha = 0.35f),
+            GlassBorderShade,
+        ),
+    ),
 ): Modifier = this
     .shadow(
         elevation = elevation,
@@ -623,13 +630,7 @@ private fun Modifier.liquidGlass(
     .background(Brush.verticalGradient(listOf(GlassTintTop, GlassTintBottom)))
     .border(
         width = 1.dp,
-        brush = Brush.verticalGradient(
-            listOf(
-                GlassBorderHighlight,
-                GlassBorderHighlight.copy(alpha = 0.35f),
-                GlassBorderShade,
-            ),
-        ),
+        brush = borderBrush,
         shape = shape,
     )
 
@@ -640,7 +641,7 @@ private fun Modifier.liquidGlass(
  * color de relleno.
  */
 @Composable
-private fun GlassSpecularSheen(shape: Shape, modifier: Modifier = Modifier) {
+internal fun GlassSpecularSheen(shape: Shape, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .clip(shape)
