@@ -395,11 +395,19 @@ private fun ReadyContent(
     onClose: (() -> Unit)?,
 ) {
     val dimens = LocalAppDimens.current
+    val installAttempted = (state as? UpdateCardUiState.Ready)?.installAttempted == true
     UpdateHeader(
         icon = Icons.Rounded.CheckCircle,
         tint = MaterialTheme.colorScheme.primary,
-        title = stringResource(R.string.update_ready_title),
-        subtitle = stringResource(R.string.update_ready_subtitle, state.versionName),
+        title = stringResource(
+            if (installAttempted) R.string.update_pending_title
+            else R.string.update_ready_title,
+        ),
+        subtitle = stringResource(
+            if (installAttempted) R.string.update_pending_subtitle
+            else R.string.update_ready_subtitle,
+            state.versionName,
+        ),
         version = null,
         expanded = expanded,
         onClose = onClose,

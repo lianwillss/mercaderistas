@@ -39,8 +39,9 @@ enum class UpdatePhase { AVAILABLE, DOWNLOADING, READY, INSTALLING, FAILED }
 /**
  * Único estado de actualización que consume la UI. No hay notificación ni
  * diálogo en paralelo: la tarjeta del banner es la única superficie.
- * Al quedar Ready, el ViewModel abre solo la instalación; Installing cubre
- * la validación y la confirmación de Android.
+ * La descarga no instala en primer plano: al quedar Ready se espera a que la
+ * app pase a segundo plano (o a que el usuario toque Instalar). Installing
+ * cubre la validación y la confirmación de Android.
  */
 sealed interface UpdateCardUiState {
     val versionName: String
@@ -75,6 +76,8 @@ sealed interface UpdateCardUiState {
     data class Ready(
         override val versionName: String,
         override val versionCode: Int,
+        /** Ya se intentó instalar sola y Android no completó la instalación. */
+        val installAttempted: Boolean = false,
     ) : UpdateCardUiState
 
     data class Installing(
@@ -121,6 +124,9 @@ class UpdateViewModel @Inject constructor(
         InstalledVersion.buildConfig().versionName,
     )
 
+    /** versionCode del último intento automático, para no repetirlo al abrir. */
+    private val _installAttemptedCode = MutableStateFlow(0)
+
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
 
@@ -135,7 +141,12 @@ class UpdateViewModel @Inject constructor(
 
     /** Estado que pinta la tarjeta: Disponible, Descargando(%), Lista, Instalando, Error. */
     val card: StateFlow<UpdateCardUiState?> =
-        combine(_pendingUpdate, _download, _installedVersionName) { pending, snapshot, installedName ->
+        combine(
+            _pendingUpdate,
+            _download,
+            _installedVersionName,
+            _installAttemptedCode,
+        ) { pending, snapshot, installedName, attemptedCode ->
             if (pending == null) return@combine null
             when (snapshot?.phase) {
                 UpdatePhase.DOWNLOADING -> UpdateCardUiState.Downloading(
@@ -151,6 +162,7 @@ class UpdateViewModel @Inject constructor(
                 UpdatePhase.READY -> UpdateCardUiState.Ready(
                     versionName = pending.versionName,
                     versionCode = pending.versionCode,
+                    installAttempted = attemptedCode == pending.versionCode,
                 )
                 UpdatePhase.INSTALLING -> UpdateCardUiState.Installing(
                     versionName = pending.versionName,
@@ -177,10 +189,10 @@ class UpdateViewModel @Inject constructor(
     /** Evita abrir dos sesiones de PackageInstaller si se toca dos veces. */
     private var installSessionActive = false
 
-    /** La app está visible: es el único momento en que puede abrir el instalador. */
+    /** Alguna Activity de la app está visible: la instalación espera a que se vaya. */
     private var isForeground = false
-    /** El APK ya disparó una instalación automática para este pendiente. */
-    private var autoInstallStarted = false
+    /** versionCode para el que ya se intentó instalar sola al salir. */
+    private var installAttemptedCode = 0
 
     private var restoreJob: Job? = null
     private var downloadJob: Job? = null
@@ -220,19 +232,25 @@ class UpdateViewModel @Inject constructor(
             return
         }
 
+        installAttemptedCode = withContext(Dispatchers.IO) {
+            preferencesRepository.getUpdateInstallAttemptedCode()
+        }
+        _installAttemptedCode.value = installAttemptedCode
+
         _pendingUpdate.value = stored
         val ready = evaluateDownloadedApk(stored)
-        // No pisa un progreso que ya esté en curso.
+        // No pisa un progreso que ya esté en curso. No instala al restaurar:
+        // el intento automático anterior ya quedó persistido y, si no se
+        // completó, la tarjeta ofrece el botón Instalar.
         if (ready != null && downloadJob?.isActive != true) {
             _download.value = ready
-            maybeAutoInstall()
         }
     }
 
     /**
      * Consulta GitHub y deja el resultado en el único estado compartido.
-     * En arranque (autoStartDownload) arranca la descarga dentro de la app;
-     * nunca instala sin que el usuario toque "Instalar".
+     * En arranque (autoStartDownload) arranca la descarga dentro de la app.
+     * La instalación se dispara al salir de la app o al tocar "Instalar".
      */
     fun checkForUpdate(
         force: Boolean = false,
@@ -332,7 +350,10 @@ class UpdateViewModel @Inject constructor(
                     downloadJob = null
                     withContext(Dispatchers.IO) {
                         ApkDownloader.clearDownloadedApk(context)
+                        preferencesRepository.clearUpdateInstallAttemptedCode()
                     }
+                    installAttemptedCode = 0
+                    _installAttemptedCode.value = 0
                     _download.value = null
                 }
 
@@ -347,7 +368,6 @@ class UpdateViewModel @Inject constructor(
                     val evaluated = evaluateDownloadedApk(pending)
                     if (evaluated != null) {
                         _download.value = evaluated
-                        if (evaluated.phase == UpdatePhase.READY) maybeAutoInstall()
                     }
                 }
 
@@ -400,7 +420,6 @@ class UpdateViewModel @Inject constructor(
 
         val context = getApplication<Application>()
         installSessionActive = false
-        autoInstallStarted = false
         downloadJob?.cancel()
         downloadJob = viewModelScope.launch {
             _download.value = DownloadSnapshot(UpdatePhase.DOWNLOADING)
@@ -441,7 +460,11 @@ class UpdateViewModel @Inject constructor(
                             message = context.getString(R.string.update_archivo_faltante),
                             retryable = true,
                         )
-                        if (evaluated?.phase == UpdatePhase.READY) maybeAutoInstall()
+                        if (evaluated?.phase == UpdatePhase.READY && !isForeground) {
+                            // La descarga terminó con la app en segundo plano:
+                            // se instala sin volver a abrirla.
+                            maybeInstallWhenBackgrounded()
+                        }
                     }
                     is DownloadResult.Error -> {
                         if (result.releaseRejected) {
@@ -492,7 +515,6 @@ class UpdateViewModel @Inject constructor(
     /** Cancela y borra el .part: la tarjeta vuelve a "Disponible". */
     fun cancelDownload() {
         if (_download.value?.phase == UpdatePhase.INSTALLING) return
-        autoInstallStarted = false
         downloadJob?.cancel()
         downloadJob = null
         _download.value = null
@@ -503,13 +525,13 @@ class UpdateViewModel @Inject constructor(
     }
 
     /**
-     * Verifica el APK descargado y abre la sesión de PackageInstaller sin
-     * pedir un toque extra. Si el sistema exige confirmación, el receiver la
-     * abre sola; el flujo (progreso, error, reintento) vive en la tarjeta.
+     * Verifica el APK y abre la sesión de PackageInstaller. Se llama al tocar
+     * "Instalar" o al salir de la app (automático); nunca al quedar Ready en
+     * primer plano. Si el sistema exige confirmación, el receiver la abre
+     * sola; el flujo (progreso, error, reintento) vive en la tarjeta.
      */
-    fun installApk() {
-        if (installSessionActive) return
-        autoInstallStarted = true
+    fun installApk(automatic: Boolean = false) {
+        if (installSessionActive || installJob?.isActive == true) return
         val context = getApplication<Application>()
         val apk = ApkDownloader.apkFile(context)
         if (!apk.exists()) {
@@ -524,6 +546,9 @@ class UpdateViewModel @Inject constructor(
         }
 
         if (!ApkDownloader.canInstallPackages(context)) {
+            // Desde segundo plano no se pueden abrir Ajustes: se deja para
+            // que el usuario toque Instalar al volver.
+            if (automatic) return
             awaitingInstallPermission = true
             _message.value = context.getString(R.string.update_permiso_instalar)
             if (!ApkDownloader.openInstallPermissionSettings(context)) {
@@ -534,7 +559,6 @@ class UpdateViewModel @Inject constructor(
         }
 
         awaitingInstallPermission = false
-        installJob?.cancel()
         _download.value = DownloadSnapshot(UpdatePhase.INSTALLING)
         installJob = viewModelScope.launch {
             restoreJob?.join()
@@ -566,6 +590,19 @@ class UpdateViewModel @Inject constructor(
                 return@launch
             }
 
+            if (automatic && isForeground) {
+                // El usuario volvió antes de abrir la sesión: no se instala
+                // encima de lo que está haciendo.
+                _download.value = DownloadSnapshot(
+                    phase = UpdatePhase.READY,
+                    downloadedBytes = apk.length(),
+                    totalBytes = apk.length(),
+                )
+                return@launch
+            }
+
+            if (pending != null) markInstallAttempted(pending.versionCode)
+
             when (val start = withContext(Dispatchers.IO) {
                 ApkDownloader.installApk(context, apk)
             }) {
@@ -582,6 +619,15 @@ class UpdateViewModel @Inject constructor(
                     )
                 }
             }
+        }
+    }
+
+    /** Persiste el intento antes de commitear: un arranque en frío no lo repite. */
+    private suspend fun markInstallAttempted(versionCode: Int) {
+        installAttemptedCode = versionCode
+        _installAttemptedCode.value = versionCode
+        withContext(Dispatchers.IO) {
+            preferencesRepository.setUpdateInstallAttemptedCode(versionCode)
         }
     }
 
@@ -609,7 +655,8 @@ class UpdateViewModel @Inject constructor(
     private suspend fun onInstalled() {
         val context = getApplication<Application>()
         installSessionActive = false
-        autoInstallStarted = false
+        installAttemptedCode = 0
+        _installAttemptedCode.value = 0
         downloadJob?.cancel()
         downloadJob = null
         withContext(Dispatchers.IO) {
@@ -634,24 +681,33 @@ class UpdateViewModel @Inject constructor(
             }
             return
         }
-        // Si la descarga terminó en segundo plano, al volver a la app se
-        // lanza el instalador sin que el usuario tenga que tocar "Instalar".
-        maybeAutoInstall()
-    }
-
-    fun onActivityPaused() {
-        isForeground = false
     }
 
     /**
-     * Abre la sesión de PackageInstaller sola. El usuario solo ve la
-     * confirmación del sistema cuando Android la exige.
+     * La app dejó de estar visible: es el momento de instalar sin que el
+     * cierre se sienta como una salida inesperada. Si el usuario vuelve antes
+     * de que se abra la sesión, el intento automático se aborta.
      */
-    private fun maybeAutoInstall() {
-        if (!isForeground || installSessionActive || autoInstallStarted) return
+    fun onActivityStopped() {
+        isForeground = false
+        maybeInstallWhenBackgrounded()
+    }
+
+    /**
+     * Instala sola solo si la app ya no está visible, el APK está listo y no
+     * hubo un intento previo para esta versión. No abre Ajustes desde
+     * segundo plano ni insiste después de un fallo.
+     */
+    private fun maybeInstallWhenBackgrounded() {
+        if (isForeground) return
+        if (_suppressed.value) return
+        if (installSessionActive || installJob?.isActive == true) return
+        if (awaitingInstallPermission) return
+        val pending = _pendingUpdate.value ?: return
         if (_download.value?.phase != UpdatePhase.READY) return
-        autoInstallStarted = true
-        installApk()
+        if (installAttemptedCode == pending.versionCode) return
+        if (!ApkDownloader.canInstallPackages(getApplication())) return
+        installApk(automatic = true)
     }
 
     fun suppressUntilTomorrow() {
@@ -733,7 +789,8 @@ class UpdateViewModel @Inject constructor(
     private suspend fun cleanupResolved(showMessage: Boolean) {
         val context = getApplication<Application>()
         installSessionActive = false
-        autoInstallStarted = false
+        installAttemptedCode = 0
+        _installAttemptedCode.value = 0
         downloadJob?.cancel()
         downloadJob = null
         withContext(Dispatchers.IO) {

@@ -66,6 +66,12 @@ class PreferencesRepository @Inject constructor(
         private val KEY_PENDING_UPDATE_SIZE = longPreferencesKey("pending_update_size")
         private val KEY_PENDING_UPDATE_SHA = stringPreferencesKey("pending_update_sha")
         /**
+         * versionCode para el que ya se intentó instalar sola al salir de la
+         * app. Evita que un arranque en frío vuelva a lanzar la instalación.
+         */
+        private val KEY_UPDATE_INSTALL_ATTEMPTED_CODE =
+            intPreferencesKey("update_install_attempted_code")
+        /**
          * Tag del release que trajo un APK no instalable (versión anunciada
          * distinta o no más nueva). No se vuelve a ofrecer ese tag.
          */
@@ -327,7 +333,19 @@ class PreferencesRepository @Inject constructor(
             prefs.remove(KEY_PENDING_UPDATE_TAG)
             prefs.remove(KEY_PENDING_UPDATE_SIZE)
             prefs.remove(KEY_PENDING_UPDATE_SHA)
+            prefs.remove(KEY_UPDATE_INSTALL_ATTEMPTED_CODE)
         }
+    }
+
+    suspend fun getUpdateInstallAttemptedCode(): Int =
+        context.prefsDataStore.data.first()[KEY_UPDATE_INSTALL_ATTEMPTED_CODE] ?: 0
+
+    suspend fun setUpdateInstallAttemptedCode(versionCode: Int) {
+        context.prefsDataStore.edit { it[KEY_UPDATE_INSTALL_ATTEMPTED_CODE] = versionCode }
+    }
+
+    suspend fun clearUpdateInstallAttemptedCode() {
+        context.prefsDataStore.edit { it.remove(KEY_UPDATE_INSTALL_ATTEMPTED_CODE) }
     }
 
     /** Tag publicado cuyo APK no se puede instalar sobre esta versión. */

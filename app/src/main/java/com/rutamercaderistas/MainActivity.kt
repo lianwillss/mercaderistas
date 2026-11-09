@@ -22,6 +22,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.map
 import androidx.work.BackoffPolicy
@@ -66,9 +69,25 @@ class MainActivity : ComponentActivity() {
 
     private var firstResumeHandled = false
 
+    /**
+     * ON_STOP del proceso = no queda ninguna Activity de la app visible
+     * (incluido el visor de PDF). Recién ahí se puede instalar sin cortar al
+     * usuario; el onStop de MainActivity se dispara también al abrir el PDF.
+     */
+    private val processLifecycleObserver = object : DefaultLifecycleObserver {
+        override fun onStart(owner: LifecycleOwner) {
+            updateViewModel.onActivityResumed()
+        }
+
+        override fun onStop(owner: LifecycleOwner) {
+            updateViewModel.onActivityStopped()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        ProcessLifecycleOwner.get().lifecycle.addObserver(processLifecycleObserver)
         if (savedInstanceState == null) {
             schedulePeriodicSync()
             promotionRepository.schedulePeriodicRefresh()
@@ -214,7 +233,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        updateViewModel.onActivityResumed()
+        // El foreground/background real lo maneja ProcessLifecycleOwner: así
+        // abrir el visor de PDF no cuenta como salir de la app.
         // El arranque frío ya consulta en LaunchedEffect(Unit); al volver
         // desde segundo plano se revisa con throttle de 15 min.
         if (firstResumeHandled) {
@@ -224,9 +244,9 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onPause() {
-        updateViewModel.onActivityPaused()
-        super.onPause()
+    override fun onDestroy() {
+        ProcessLifecycleOwner.get().lifecycle.removeObserver(processLifecycleObserver)
+        super.onDestroy()
     }
 
     private fun scheduleDailyPromotionNotification() {

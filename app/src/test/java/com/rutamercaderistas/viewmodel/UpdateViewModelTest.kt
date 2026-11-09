@@ -58,6 +58,9 @@ class UpdateViewModelTest {
             coEvery { getPendingUpdate() } returns null
             coEvery { setPendingUpdate(any()) } returns Unit
             coEvery { clearPendingUpdate() } returns Unit
+            coEvery { getUpdateInstallAttemptedCode() } returns 0
+            coEvery { setUpdateInstallAttemptedCode(any()) } returns Unit
+            coEvery { clearUpdateInstallAttemptedCode() } returns Unit
             coEvery { getRejectedUpdateTag() } returns ""
             coEvery { setRejectedUpdateTag(any()) } returns Unit
             coEvery { getLastUpdateCheck() } returns 0L
@@ -230,7 +233,7 @@ class UpdateViewModelTest {
     }
 
     @Test
-    fun `download in foreground starts install automatically`() = runTest {
+    fun `download in foreground waits for app to go background`() = runTest {
         mockAvailableUpdate()
         try {
             viewModel.onActivityResumed()
@@ -239,20 +242,35 @@ class UpdateViewModelTest {
             // Simula el APK que deja el descargador real.
             apkFile.writeBytes(ByteArray(2048))
             viewModel.startUpdate()
+            awaitOnMain { viewModel.card.value is UpdateCardUiState.Ready }
+            // En primer plano no se abre la sesión: la app se cerraría en
+            // medio del uso y el usuario lo vive como una salida inesperada.
+            verify(exactly = 0) { ApkDownloader.installApk(any(), any()) }
+
+            viewModel.onActivityStopped()
             awaitOnMain { viewModel.card.value is UpdateCardUiState.Installing }
             awaitCoVerify {
+                coVerify(exactly = 1) { ApkDownloader.installApk(any(), any()) }
+            }
+            awaitCoVerify {
                 coVerify(exactly = 1) {
-                    ApkDownloader.download(
-                        any(),
-                        "http://x.apk",
-                        any(),
-                        any(),
-                        "12.53",
-                        12053,
-                        any(),
-                    )
+                    preferencesRepository.setUpdateInstallAttemptedCode(12053)
                 }
             }
+        } finally {
+            unmockkObject(UpdateChecker)
+        }
+    }
+
+    @Test
+    fun `download in background installs without returning to foreground`() = runTest {
+        mockAvailableUpdate()
+        try {
+            viewModel.checkForUpdate(force = true, showFeedback = false)
+            awaitOnMain { viewModel.pendingUpdate.value != null }
+            apkFile.writeBytes(ByteArray(2048))
+            viewModel.startUpdate()
+            awaitOnMain { viewModel.card.value is UpdateCardUiState.Installing }
             awaitCoVerify {
                 coVerify(exactly = 1) { ApkDownloader.installApk(any(), any()) }
             }
@@ -262,25 +280,22 @@ class UpdateViewModelTest {
     }
 
     @Test
-    fun `download in background waits for resume to install`() = runTest {
-        mockAvailableUpdate()
-        try {
-            viewModel.checkForUpdate(force = true, showFeedback = false)
-            awaitOnMain { viewModel.pendingUpdate.value != null }
-            apkFile.writeBytes(ByteArray(2048))
-            viewModel.startUpdate()
-            awaitOnMain { viewModel.card.value is UpdateCardUiState.Ready }
-            // Sin foreground no se abre la confirmación del sistema.
-            verify(exactly = 0) { ApkDownloader.installApk(any(), any()) }
+    fun `restore does not repeat an install already attempted`() = runTest {
+        val code = BuildConfig.VERSION_CODE + 1
+        val newer = PendingUpdate("99.99", code, "http://x.apk", "v99.99")
+        coEvery { preferencesRepository.getPendingUpdate() } returns newer
+        coEvery { preferencesRepository.getUpdateInstallAttemptedCode() } returns code
+        apkFile.writeBytes(ByteArray(2048))
 
-            viewModel.onActivityResumed()
-            awaitOnMain { viewModel.card.value is UpdateCardUiState.Installing }
-            awaitCoVerify {
-                coVerify(exactly = 1) { ApkDownloader.installApk(any(), any()) }
-            }
-        } finally {
-            unmockkObject(UpdateChecker)
+        val restored = track(UpdateViewModel(application, preferencesRepository))
+        awaitOnMain {
+            (restored.card.value as? UpdateCardUiState.Ready)?.installAttempted == true
         }
+
+        // Un arranque en frío no relanza la instalación que ya se intentó.
+        restored.onActivityStopped()
+        testDispatcher.scheduler.advanceUntilIdle()
+        verify(exactly = 0) { ApkDownloader.installApk(any(), any()) }
     }
 
     @Test
@@ -389,6 +404,9 @@ class UpdateViewModelTest {
         mockAvailableUpdate()
         try {
             apkFile.writeBytes(ByteArray(2048))
+            // En arranque la Activity ya está en primer plano: la instalación
+            // espera a que el usuario salga.
+            viewModel.onActivityResumed()
             viewModel.checkForUpdate(
                 force = true,
                 showFeedback = false,
