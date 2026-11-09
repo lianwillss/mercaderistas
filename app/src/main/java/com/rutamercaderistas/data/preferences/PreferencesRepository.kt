@@ -71,6 +71,10 @@ class PreferencesRepository @Inject constructor(
          */
         private val KEY_UPDATE_INSTALL_ATTEMPTED_CODE =
             intPreferencesKey("update_install_attempted_code")
+        /** Versión nueva detectada al arrancar: se muestra una vez y se borra. */
+        private val KEY_PENDING_UPGRADE_NOTICE = stringPreferencesKey("pending_upgrade_notice")
+        /** Última pestaña principal elegida, para restaurarla tras actualizar. */
+        private val KEY_LAST_MAIN_TAB = stringPreferencesKey("last_main_tab")
         /**
          * Tag del release que trajo un APK no instalable (versión anunciada
          * distinta o no más nueva). No se vuelve a ofrecer ese tag.
@@ -346,6 +350,24 @@ class PreferencesRepository @Inject constructor(
 
     suspend fun clearUpdateInstallAttemptedCode() {
         context.prefsDataStore.edit { it.remove(KEY_UPDATE_INSTALL_ATTEMPTED_CODE) }
+    }
+
+    val pendingUpgradeNotice: Flow<String?> =
+        context.prefsDataStore.data.map { it[KEY_PENDING_UPGRADE_NOTICE] }
+
+    suspend fun setPendingUpgradeNotice(versionName: String) {
+        context.prefsDataStore.edit { it[KEY_PENDING_UPGRADE_NOTICE] = versionName }
+    }
+
+    suspend fun clearPendingUpgradeNotice() {
+        context.prefsDataStore.edit { it.remove(KEY_PENDING_UPGRADE_NOTICE) }
+    }
+
+    val lastMainTab: Flow<String?> =
+        context.prefsDataStore.data.map { it[KEY_LAST_MAIN_TAB] }
+
+    suspend fun setLastMainTab(value: String) {
+        context.prefsDataStore.edit { it[KEY_LAST_MAIN_TAB] = value }
     }
 
     /** Tag publicado cuyo APK no se puede instalar sobre esta versión. */

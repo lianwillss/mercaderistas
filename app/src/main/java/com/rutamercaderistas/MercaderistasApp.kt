@@ -102,6 +102,11 @@ class MercaderistasApp : Application(), Configuration.Provider {
             val lastVersion = preferencesRepository.getLastVersionCode()
             if (lastVersion != BuildConfig.VERSION_CODE) {
                 Timber.i("Actualización detectada: $lastVersion → ${BuildConfig.VERSION_CODE}. Limpiando caché…")
+                // Solo si venía de una versión instalada (no estreno) y no
+                // es una downgrade: el aviso se muestra una vez al abrir.
+                if (lastVersion in 1 until BuildConfig.VERSION_CODE) {
+                    preferencesRepository.setPendingUpgradeNotice(BuildConfig.VERSION_NAME)
+                }
                 performUpgradeCleanup(lastVersion)
             }
         }

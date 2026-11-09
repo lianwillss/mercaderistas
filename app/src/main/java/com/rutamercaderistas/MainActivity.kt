@@ -26,7 +26,9 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -37,6 +39,7 @@ import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.models.BrandReference
 import com.rutamercaderistas.services.PromotionRepository
 import com.rutamercaderistas.util.openMaps
+import com.rutamercaderistas.ui.components.BottomBarKey
 import com.rutamercaderistas.ui.screens.MainScreen
 import com.rutamercaderistas.ui.theme.MercaderistasTheme
 import com.rutamercaderistas.viewmodel.RouteViewModel
@@ -105,6 +108,34 @@ class MainActivity : ComponentActivity() {
 
             val snackbarHostState = remember { SnackbarHostState() }
             val ctx = LocalContext.current
+
+            val upgradeNotice by preferencesRepository.pendingUpgradeNotice
+                .collectAsStateWithLifecycle(initialValue = null)
+            val lastMainTab by preferencesRepository.lastMainTab
+                .collectAsStateWithLifecycle(initialValue = null)
+            var restoreTab by remember { mutableStateOf<BottomBarKey?>(null) }
+
+            LaunchedEffect(upgradeNotice, lastMainTab) {
+                if (upgradeNotice == null) return@LaunchedEffect
+                val tab = lastMainTab ?: return@LaunchedEffect
+                if (restoreTab == null) {
+                    restoreTab = runCatching { BottomBarKey.valueOf(tab) }.getOrNull()
+                }
+            }
+
+            LaunchedEffect(upgradeNotice) {
+                val notice = upgradeNotice ?: return@LaunchedEffect
+                snackbarHostState.showSnackbar(
+                    ctx.getString(R.string.update_installed_notice, notice),
+                )
+                preferencesRepository.clearPendingUpgradeNotice()
+            }
+
+            val onTabSelected: (BottomBarKey) -> Unit = { key ->
+                lifecycleScope.launch {
+                    preferencesRepository.setLastMainTab(key.name)
+                }
+            }
 
             val transportMode by preferencesRepository.getTransportModeFlow()
                 .map { it ?: "transit" }
@@ -176,6 +207,8 @@ class MainActivity : ComponentActivity() {
                         onCancelUpdate = { updateViewModel.cancelDownload() },
                         onRetryUpdate = { updateViewModel.retryDownload() },
                         onInstallUpdate = { updateViewModel.installApk() },
+                        restoreTab = restoreTab,
+                        onTabSelected = onTabSelected,
                         onCheckUpdate = { updateViewModel.checkForUpdate(force = true) },
                         onSetCurrentDay = { routeViewModel.setCurrentDay(it) },
                         onSelectRoute = { routeViewModel.selectRoute(it) },

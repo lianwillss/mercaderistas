@@ -23,6 +23,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -77,6 +78,15 @@ private fun NavHostController.navigateTopLevel(route: Any) {
     }
 }
 
+private fun topLevelRoute(key: BottomBarKey): Any = when (key) {
+    BottomBarKey.MAIN -> MainRoute
+    BottomBarKey.MARCAS -> PromotionsRoute
+    BottomBarKey.LOCALES -> AllLocalesRoute()
+    BottomBarKey.STOCK -> StockRoute
+    BottomBarKey.CODPROV -> CodProvRoute
+    BottomBarKey.EAN -> EanSearchRoute
+}
+
 @Composable
 fun MainScreen(
     routeUiState: RouteUiState,
@@ -103,6 +113,9 @@ fun MainScreen(
     onCancelUpdate: () -> Unit = {},
     onRetryUpdate: () -> Unit = {},
     onInstallUpdate: () -> Unit = {},
+    /** Pestaña a restaurar tras una actualización; null en un arranque normal. */
+    restoreTab: BottomBarKey? = null,
+    onTabSelected: (BottomBarKey) -> Unit = {},
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -141,14 +154,24 @@ fun MainScreen(
         else -> BottomBarKey.MAIN
     }
 
+    var userNavigated by rememberSaveable { mutableStateOf(false) }
     val onBottomNav: (BottomBarKey) -> Unit = { key ->
-        when (key) {
-            BottomBarKey.MAIN -> navController.navigateTopLevel(MainRoute)
-            BottomBarKey.MARCAS -> navController.navigateTopLevel(PromotionsRoute)
-            BottomBarKey.LOCALES -> navController.navigateTopLevel(AllLocalesRoute())
-            BottomBarKey.STOCK -> navController.navigateTopLevel(StockRoute)
-            BottomBarKey.CODPROV -> navController.navigateTopLevel(CodProvRoute)
-            BottomBarKey.EAN -> navController.navigateTopLevel(EanSearchRoute)
+        userNavigated = true
+        navController.navigateTopLevel(topLevelRoute(key))
+        onTabSelected(key)
+    }
+
+    // Solo en el arranque posterior a una actualización se vuelve a la
+    // pestaña que el usuario tenía. Mantiene [MainRoute] abajo, así Atrás
+    // sigue volviendo a Rutero y no cierra la app desde una pestaña. Si el
+    // usuario ya tocó otra pestaña, su elección manda.
+    var restoredInitialTab by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(restoreTab) {
+        val key = restoreTab ?: return@LaunchedEffect
+        if (restoredInitialTab || userNavigated) return@LaunchedEffect
+        restoredInitialTab = true
+        if (key != BottomBarKey.MAIN) {
+            navController.navigateTopLevel(topLevelRoute(key))
         }
     }
 

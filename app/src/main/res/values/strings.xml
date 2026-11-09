@@ -223,6 +223,7 @@
     <string name="update_instalar">Instalar</string>
     <string name="update_ready_title">Lista para instalar</string>
     <string name="update_ready_subtitle">La versión %1$s está descargada. Se instala sola cuando sales de la app.</string>
+    <string name="update_installed_notice">Actualizado a la versión %1$s</string>
     <string name="update_pending_title">Instalación pendiente</string>
     <string name="update_pending_subtitle">Android no completó la instalación de la %1$s. Toca Instalar para terminarla.</string>
     <string name="update_installing_title">Instalando %1$s</string>
