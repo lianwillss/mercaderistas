@@ -133,6 +133,8 @@ fun MainRouteContent(
     onCancelUpdate: () -> Unit = {},
     onRetryUpdate: () -> Unit = {},
     onInstallUpdate: () -> Unit = {},
+    onRetryInstall: () -> Unit = {},
+    onCancelInstall: () -> Unit = {},
 ) {
     val entries = routeState.entries
     val selectedRoute = routeState.selectedRoute
@@ -261,6 +263,8 @@ fun MainRouteContent(
                         onCancel = onCancelUpdate,
                         onRetry = onRetryUpdate,
                         onInstall = onInstallUpdate,
+                        onRetryInstall = onRetryInstall,
+                        onCancelInstall = onCancelInstall,
                         modifier = Modifier.padding(
                             horizontal = dimens.spacingLg,
                             vertical = dimens.spacingXs,

@@ -84,6 +84,8 @@ sealed interface UpdateCardUiState {
         override val versionName: String,
         override val versionCode: Int,
         val installedVersionName: String = "",
+        /** La sesión quedó esperando la autorización del usuario en Android. */
+        val waitingForUser: Boolean = false,
     ) : UpdateCardUiState
 
     data class Failed(
@@ -113,6 +115,8 @@ class UpdateViewModel @Inject constructor(
         val etaSeconds: Long? = null,
         val message: String = "",
         val retryable: Boolean = true,
+        /** La sesión está commiteada y esperando la confirmación del sistema. */
+        val awaitingUserAction: Boolean = false,
     )
 
     private val _pendingUpdate = MutableStateFlow<PendingUpdate?>(null)
@@ -168,6 +172,7 @@ class UpdateViewModel @Inject constructor(
                     versionName = pending.versionName,
                     versionCode = pending.versionCode,
                     installedVersionName = installedName,
+                    waitingForUser = snapshot.awaitingUserAction,
                 )
                 UpdatePhase.FAILED -> UpdateCardUiState.Failed(
                     versionName = pending.versionName,
@@ -188,10 +193,10 @@ class UpdateViewModel @Inject constructor(
 
     /** Evita abrir dos sesiones de PackageInstaller si se toca dos veces. */
     private var installSessionActive = false
+    /** Serializa reintentar/cancelar para no abandonar la sesión recién creada. */
+    private var sessionMaintenanceActive = false
 
-    /** Alguna Activity de la app está visible: la instalación espera a que se vaya. */
-    private var isForeground = false
-    /** versionCode para el que ya se intentó instalar sola al salir. */
+    /** versionCode para el que ya se intentó instalar. */
     private var installAttemptedCode = 0
 
     private var restoreJob: Job? = null
@@ -238,10 +243,40 @@ class UpdateViewModel @Inject constructor(
         _installAttemptedCode.value = installAttemptedCode
 
         _pendingUpdate.value = stored
+
+        // Si ya hay una sesión de PackageInstaller commiteada, no se crea
+        // otra: la app pudo reiniciarse mientras MIUI esperaba la
+        // confirmación. La tarjeta ofrece reintentar o esperar al sistema.
+        val context = getApplication<Application>()
+        val storedSessionId = withContext(Dispatchers.IO) {
+            preferencesRepository.getInstallSessionId()
+        }
+        val activeSessions = withContext(Dispatchers.IO) {
+            ApkDownloader.activeInstallSessionIds(context)
+        }
+        val storedSessionActive = storedSessionId != 0 && withContext(Dispatchers.IO) {
+            ApkDownloader.isInstallSessionActive(context, storedSessionId)
+        }
+        if (activeSessions.isNotEmpty() || storedSessionActive) {
+            installSessionActive = true
+            _download.value = DownloadSnapshot(
+                phase = UpdatePhase.INSTALLING,
+                awaitingUserAction = true,
+            )
+            return
+        }
+
+        // La sesión guardada ya no existe (se completó, se canceló o el
+        // sistema la limpió): se descarta para no mostrar un estado falso.
+        if (storedSessionId != 0) {
+            withContext(Dispatchers.IO) {
+                preferencesRepository.clearInstallSessionId()
+            }
+        }
+
         val ready = evaluateDownloadedApk(stored)
         // No pisa un progreso que ya esté en curso. No instala al restaurar:
-        // el intento automático anterior ya quedó persistido y, si no se
-        // completó, la tarjeta ofrece el botón Instalar.
+        // la instalación la pide el usuario y la autoriza Android.
         if (ready != null && downloadJob?.isActive != true) {
             _download.value = ready
         }
@@ -348,6 +383,7 @@ class UpdateViewModel @Inject constructor(
                     // descarga recién arrancada no pierda su estado.
                     downloadJob?.cancel()
                     downloadJob = null
+                    discardInstallSession(context)
                     withContext(Dispatchers.IO) {
                         ApkDownloader.clearDownloadedApk(context)
                         preferencesRepository.clearUpdateInstallAttemptedCode()
@@ -460,11 +496,6 @@ class UpdateViewModel @Inject constructor(
                             message = context.getString(R.string.update_archivo_faltante),
                             retryable = true,
                         )
-                        if (evaluated?.phase == UpdatePhase.READY && !isForeground) {
-                            // La descarga terminó con la app en segundo plano:
-                            // se instala sin volver a abrirla.
-                            maybeInstallWhenBackgrounded()
-                        }
                     }
                     is DownloadResult.Error -> {
                         if (result.releaseRejected) {
@@ -525,12 +556,12 @@ class UpdateViewModel @Inject constructor(
     }
 
     /**
-     * Verifica el APK y abre la sesión de PackageInstaller. Se llama al tocar
-     * "Instalar" o al salir de la app (automático); nunca al quedar Ready en
-     * primer plano. Si el sistema exige confirmación, el receiver la abre
-     * sola; el flujo (progreso, error, reintento) vive en la tarjeta.
+     * Verifica el APK y abre la sesión de PackageInstaller. Se llama solo
+     * desde "Instalar" o "Reintentar", con la app en primer plano para que
+     * Android muestre la confirmación nativa. Si hay una sesión vieja,
+     * [ApkDownloader.installApk] la abandona antes de crear la nueva.
      */
-    fun installApk(automatic: Boolean = false) {
+    fun installApk() {
         if (installSessionActive || installJob?.isActive == true) return
         val context = getApplication<Application>()
         val apk = ApkDownloader.apkFile(context)
@@ -546,9 +577,6 @@ class UpdateViewModel @Inject constructor(
         }
 
         if (!ApkDownloader.canInstallPackages(context)) {
-            // Desde segundo plano no se pueden abrir Ajustes: se deja para
-            // que el usuario toque Instalar al volver.
-            if (automatic) return
             awaitingInstallPermission = true
             _message.value = context.getString(R.string.update_permiso_instalar)
             if (!ApkDownloader.openInstallPermissionSettings(context)) {
@@ -577,6 +605,7 @@ class UpdateViewModel @Inject constructor(
                 installSessionActive = false
                 withContext(Dispatchers.IO) {
                     ApkDownloader.clearDownloadedApk(context)
+                    preferencesRepository.clearInstallSessionId()
                     if (validation.releaseRejected && pending != null) {
                         markReleaseRejected(pending.versionTag)
                     }
@@ -590,28 +619,27 @@ class UpdateViewModel @Inject constructor(
                 return@launch
             }
 
-            if (automatic && isForeground) {
-                // El usuario volvió antes de abrir la sesión: no se instala
-                // encima de lo que está haciendo.
-                _download.value = DownloadSnapshot(
-                    phase = UpdatePhase.READY,
-                    downloadedBytes = apk.length(),
-                    totalBytes = apk.length(),
-                )
-                return@launch
-            }
-
             if (pending != null) markInstallAttempted(pending.versionCode)
 
             when (val start = withContext(Dispatchers.IO) {
                 ApkDownloader.installApk(context, apk)
             }) {
-                InstallStart.Started -> {
+                is InstallStart.Started -> {
                     installSessionActive = true
+                    withContext(Dispatchers.IO) {
+                        preferencesRepository.setInstallSessionId(start.sessionId)
+                    }
+                    _download.value = DownloadSnapshot(
+                        phase = UpdatePhase.INSTALLING,
+                        awaitingUserAction = true,
+                    )
                     _message.value = context.getString(R.string.update_confirmar_instalacion)
                 }
                 is InstallStart.Error -> {
                     installSessionActive = false
+                    withContext(Dispatchers.IO) {
+                        preferencesRepository.clearInstallSessionId()
+                    }
                     _download.value = DownloadSnapshot(
                         phase = UpdatePhase.FAILED,
                         message = start.message,
@@ -619,6 +647,67 @@ class UpdateViewModel @Inject constructor(
                     )
                 }
             }
+        }
+    }
+
+    /**
+     * Reintenta una instalación cuya sesión quedó esperando confirmación.
+     * Abandona la sesión vieja (y su notificación) y abre una nueva con la
+     * app en primer plano.
+     */
+    fun retryInstall() {
+        if (installJob?.isActive == true || sessionMaintenanceActive) return
+        sessionMaintenanceActive = true
+        val context = getApplication<Application>()
+        installSessionActive = false
+        viewModelScope.launch {
+            try {
+                discardInstallSession(context)
+                _download.value = DownloadSnapshot(
+                    phase = UpdatePhase.READY,
+                    downloadedBytes = ApkDownloader.apkFile(context).length(),
+                    totalBytes = ApkDownloader.apkFile(context).length(),
+                )
+                installApk()
+            } finally {
+                sessionMaintenanceActive = false
+            }
+        }
+    }
+
+    /** Cancela la sesión pendiente y deja el APK listo para instalar luego. */
+    fun cancelInstall() {
+        if (installJob?.isActive == true || sessionMaintenanceActive) return
+        sessionMaintenanceActive = true
+        val context = getApplication<Application>()
+        installSessionActive = false
+        viewModelScope.launch {
+            try {
+                discardInstallSession(context)
+                val apk = ApkDownloader.apkFile(context)
+                _download.value = DownloadSnapshot(
+                    phase = UpdatePhase.READY,
+                    downloadedBytes = apk.length(),
+                    totalBytes = apk.length(),
+                )
+            } finally {
+                sessionMaintenanceActive = false
+            }
+        }
+    }
+
+    /** Abandona la sesión vieja y su confirmación pendiente. */
+    private suspend fun discardInstallSession(context: Application) {
+        installSessionActive = false
+        val storedSessionId = withContext(Dispatchers.IO) {
+            preferencesRepository.getInstallSessionId()
+        }
+        withContext(Dispatchers.IO) {
+            ApkDownloader.abandonInstallSessions(context)
+            if (storedSessionId != 0) {
+                ApkDownloader.abandonInstallSession(context, storedSessionId)
+            }
+            preferencesRepository.clearInstallSessionId()
         }
     }
 
@@ -637,8 +726,8 @@ class UpdateViewModel @Inject constructor(
                 when (outcome) {
                     InstallOutcome.Success -> onInstalled()
                     is InstallOutcome.Failed -> {
-                        installSessionActive = false
                         val context = getApplication<Application>()
+                        discardInstallSession(context)
                         _download.value = DownloadSnapshot(
                             phase = UpdatePhase.FAILED,
                             message = outcome.message.ifBlank {
@@ -654,7 +743,7 @@ class UpdateViewModel @Inject constructor(
 
     private suspend fun onInstalled() {
         val context = getApplication<Application>()
-        installSessionActive = false
+        discardInstallSession(context)
         installAttemptedCode = 0
         _installAttemptedCode.value = 0
         downloadJob?.cancel()
@@ -669,7 +758,6 @@ class UpdateViewModel @Inject constructor(
     }
 
     fun onActivityResumed() {
-        isForeground = true
         // Solo se retoma el permiso al volver de Ajustes.
         if (awaitingInstallPermission) {
             awaitingInstallPermission = false
@@ -683,32 +771,7 @@ class UpdateViewModel @Inject constructor(
         }
     }
 
-    /**
-     * La app dejó de estar visible: es el momento de instalar sin que el
-     * cierre se sienta como una salida inesperada. Si el usuario vuelve antes
-     * de que se abra la sesión, el intento automático se aborta.
-     */
-    fun onActivityStopped() {
-        isForeground = false
-        maybeInstallWhenBackgrounded()
-    }
 
-    /**
-     * Instala sola solo si la app ya no está visible, el APK está listo y no
-     * hubo un intento previo para esta versión. No abre Ajustes desde
-     * segundo plano ni insiste después de un fallo.
-     */
-    private fun maybeInstallWhenBackgrounded() {
-        if (isForeground) return
-        if (_suppressed.value) return
-        if (installSessionActive || installJob?.isActive == true) return
-        if (awaitingInstallPermission) return
-        val pending = _pendingUpdate.value ?: return
-        if (_download.value?.phase != UpdatePhase.READY) return
-        if (installAttemptedCode == pending.versionCode) return
-        if (!ApkDownloader.canInstallPackages(getApplication())) return
-        installApk(automatic = true)
-    }
 
     fun suppressUntilTomorrow() {
         val failed = _download.value
@@ -788,7 +851,7 @@ class UpdateViewModel @Inject constructor(
 
     private suspend fun cleanupResolved(showMessage: Boolean) {
         val context = getApplication<Application>()
-        installSessionActive = false
+        discardInstallSession(context)
         installAttemptedCode = 0
         _installAttemptedCode.value = 0
         downloadJob?.cancel()

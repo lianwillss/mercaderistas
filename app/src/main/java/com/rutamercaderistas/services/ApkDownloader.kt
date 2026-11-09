@@ -68,7 +68,8 @@ sealed interface ApkValidation {
 
 /** Resultado de abrir una sesión de PackageInstaller. */
 sealed interface InstallStart {
-    data object Started : InstallStart
+    /** La sesión quedó creada y commiteada; el sistema muestra la confirmación. */
+    data class Started(val sessionId: Int) : InstallStart
     data class Error(val message: String, val retryable: Boolean = true) : InstallStart
 }
 
@@ -594,10 +595,13 @@ object ApkDownloader {
 
     /**
      * Instala con una sesión de PackageInstaller (no con un Intent
-     * ACTION_VIEW). En Android 12+ se pide USER_ACTION_NOT_REQUIRED: si el
-     * sistema y el permiso lo permiten, la actualización se aplica sin
-     * diálogo; si no, el receiver recibe STATUS_PENDING_USER_ACTION y abre
-     * la confirmación mínima del sistema.
+     * ACTION_VIEW). La sesión usa la confirmación estándar del sistema
+     * (USER_ACTION_REQUIRED): en MIUI/HyperOS y con Play Protect activo la
+     * instalación silenciosa no es confiable, así que el usuario autoriza
+     * siempre y el receiver abre la pantalla del instalador.
+     *
+     * Antes de crear la sesión se abandonan las sesiones viejas de este
+     * paquete: si una confirmación quedó pendiente, no se acumula otra.
      */
     fun installApk(context: Context, apkFile: File): InstallStart {
         if (!apkFile.exists() || apkFile.length() < MIN_APK_BYTES) {
@@ -619,23 +623,16 @@ object ApkDownloader {
         val installer = context.packageManager.packageInstaller
         var sessionId: Int? = null
         return try {
+            abandonInstallSessions(context)
             val params = PackageInstaller.SessionParams(
                 PackageInstaller.SessionParams.MODE_FULL_INSTALL,
             ).apply {
                 setAppPackageName(context.packageName)
                 setSize(apkFile.length())
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    // Requiere UPDATE_PACKAGES_WITHOUT_USER_ACTION y que la
-                    // app se esté actualizando a sí misma. Si el sistema no
-                    // lo permite, sigue el flujo de confirmación normal.
-                    runCatching {
-                        setRequireUserAction(
-                            PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED,
-                        )
-                    }.onFailure {
-                        Timber.w(it, "El sistema no permite instalar sin acción del usuario")
-                    }
-                }
+                // Sin USER_ACTION_NOT_REQUIRED: queremos la confirmación
+                // nativa también en Android 12+. MIUI ignora el modo
+                // silencioso y deja una notificación pendiente que rompía el
+                // flujo; con confirmación estándar el usuario autoriza una vez.
             }
             val id = installer.createSession(params)
             sessionId = id
@@ -653,7 +650,7 @@ object ApkDownloader {
                 val pendingIntent = PendingIntent.getBroadcast(context, id, statusIntent, flags)
                 session.commit(pendingIntent.intentSender)
             }
-            InstallStart.Started
+            InstallStart.Started(id)
         } catch (e: Exception) {
             Timber.e(e, "Error al abrir la sesión de instalación")
             sessionId?.let { runCatching { installer.abandonSession(it) } }
@@ -661,6 +658,40 @@ object ApkDownloader {
             // mensaje accionable en español.
             InstallStart.Error(context.getString(R.string.update_instalacion_error))
         }
+    }
+
+    /** Sesiones de instalación activas de este paquete. */
+    fun activeInstallSessionIds(context: Context): List<Int> =
+        runCatching {
+            context.packageManager.packageInstaller.mySessions
+                .filter { it.isActive }
+                .map { it.sessionId }
+        }.getOrDefault(emptyList())
+
+    /** Comprueba una sesión puntual (algunos OEM no listan mySessions). */
+    fun isInstallSessionActive(context: Context, sessionId: Int): Boolean =
+        runCatching {
+            context.packageManager.packageInstaller.getSessionInfo(sessionId)?.isActive == true
+        }.getOrDefault(false)
+
+    /** Abandona una sesión puntual; respaldo cuando mySessions no la lista. */
+    fun abandonInstallSession(context: Context, sessionId: Int) {
+        runCatching {
+            context.packageManager.packageInstaller.abandonSession(sessionId)
+        }.onFailure { Timber.w(it, "No se pudo abandonar la sesión %d", sessionId) }
+    }
+
+    /** Abandona las sesiones viejas: una sola instalación pendiente a la vez. */
+    fun abandonInstallSessions(context: Context) {
+        runCatching {
+            val installer = context.packageManager.packageInstaller
+            installer.mySessions.forEach { info ->
+                runCatching { installer.abandonSession(info.sessionId) }
+                    .onFailure {
+                        Timber.w(it, "No se pudo abandonar la sesión %d", info.sessionId)
+                    }
+            }
+        }.onFailure { Timber.w(it, "No se pudieron listar las sesiones de instalación") }
     }
 
     private fun isOnline(context: Context): Boolean {

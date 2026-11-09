@@ -100,6 +100,8 @@ fun UpdateCard(
     onCancel: () -> Unit,
     onRetry: () -> Unit,
     onInstall: () -> Unit,
+    onRetryInstall: () -> Unit = {},
+    onCancelInstall: () -> Unit = {},
     modifier: Modifier = Modifier,
     expanded: Boolean = false,
     onClose: (() -> Unit)? = null,
@@ -157,6 +159,8 @@ fun UpdateCard(
                         )
                         UpdatePhase.INSTALLING -> InstallingContent(
                             state = state,
+                            onRetryInstall = onRetryInstall,
+                            onCancelInstall = onCancelInstall,
                             expanded = expanded,
                             onClose = onClose,
                         )
@@ -427,6 +431,8 @@ private fun ReadyContent(
 @Composable
 private fun InstallingContent(
     state: UpdateCardUiState,
+    onRetryInstall: () -> Unit,
+    onCancelInstall: () -> Unit,
     expanded: Boolean,
     onClose: (() -> Unit)?,
 ) {
@@ -435,38 +441,67 @@ private fun InstallingContent(
     val reducedMotion = LocalReducedMotionEnabled.current
     val installing = state as? UpdateCardUiState.Installing
     val versionName = installing?.versionName ?: state.versionName
+    val waitingForUser = installing?.waitingForUser == true
     UpdateHeader(
         icon = Icons.Rounded.SystemUpdate,
         tint = colors.primary,
-        title = stringResource(R.string.update_installing_title, versionName),
-        subtitle = stringResource(R.string.update_installing_subtitle),
+        title = if (waitingForUser) {
+            stringResource(R.string.update_pending_title)
+        } else {
+            stringResource(R.string.update_installing_title, versionName)
+        },
+        subtitle = if (waitingForUser) {
+            stringResource(R.string.update_pending_install_subtitle)
+        } else {
+            stringResource(R.string.update_installing_subtitle)
+        },
         version = null,
         expanded = expanded,
         onClose = onClose,
     )
     Spacer(Modifier.height(if (expanded) dimens.spacingLg else dimens.spacingMd))
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // Sin animación en loop cuando el usuario pidió movimiento reducido.
-        if (!reducedMotion) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(if (expanded) 22.dp else 18.dp),
-                strokeWidth = 2.dp,
-                color = colors.primary,
+    if (waitingForUser) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AppButton(
+                text = stringResource(R.string.update_cancelar),
+                onClick = onCancelInstall,
+                variant = AppButtonVariant.Text,
+                contentColor = colors.onSurfaceVariant,
             )
             Spacer(Modifier.width(dimens.spacingSm))
+            AppButton(
+                text = stringResource(R.string.update_reintentar),
+                onClick = onRetryInstall,
+            )
         }
-        Text(
-            text = stringResource(R.string.update_installing_waiting),
-            style = if (expanded) {
-                MaterialTheme.typography.bodyMedium
-            } else {
-                MaterialTheme.typography.bodySmall
-            },
-            color = colors.onSurfaceVariant,
-        )
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Sin animación en loop cuando el usuario pidió movimiento reducido.
+            if (!reducedMotion) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(if (expanded) 22.dp else 18.dp),
+                    strokeWidth = 2.dp,
+                    color = colors.primary,
+                )
+                Spacer(Modifier.width(dimens.spacingSm))
+            }
+            Text(
+                text = stringResource(R.string.update_installing_waiting),
+                style = if (expanded) {
+                    MaterialTheme.typography.bodyMedium
+                } else {
+                    MaterialTheme.typography.bodySmall
+                },
+                color = colors.onSurfaceVariant,
+            )
+        }
     }
 }
 

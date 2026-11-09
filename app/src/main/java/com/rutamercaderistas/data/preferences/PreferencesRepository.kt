@@ -75,6 +75,8 @@ class PreferencesRepository @Inject constructor(
         private val KEY_PENDING_UPGRADE_NOTICE = stringPreferencesKey("pending_upgrade_notice")
         /** Última pestaña principal elegida, para restaurarla tras actualizar. */
         private val KEY_LAST_MAIN_TAB = stringPreferencesKey("last_main_tab")
+        /** Sesión de PackageInstaller commiteada, para no duplicarla al reabrir. */
+        private val KEY_INSTALL_SESSION_ID = intPreferencesKey("install_session_id")
         /**
          * Tag del release que trajo un APK no instalable (versión anunciada
          * distinta o no más nueva). No se vuelve a ofrecer ese tag.
@@ -338,6 +340,7 @@ class PreferencesRepository @Inject constructor(
             prefs.remove(KEY_PENDING_UPDATE_SIZE)
             prefs.remove(KEY_PENDING_UPDATE_SHA)
             prefs.remove(KEY_UPDATE_INSTALL_ATTEMPTED_CODE)
+            prefs.remove(KEY_INSTALL_SESSION_ID)
         }
     }
 
@@ -350,6 +353,17 @@ class PreferencesRepository @Inject constructor(
 
     suspend fun clearUpdateInstallAttemptedCode() {
         context.prefsDataStore.edit { it.remove(KEY_UPDATE_INSTALL_ATTEMPTED_CODE) }
+    }
+
+    suspend fun getInstallSessionId(): Int =
+        context.prefsDataStore.data.first()[KEY_INSTALL_SESSION_ID] ?: 0
+
+    suspend fun setInstallSessionId(value: Int) {
+        context.prefsDataStore.edit { it[KEY_INSTALL_SESSION_ID] = value }
+    }
+
+    suspend fun clearInstallSessionId() {
+        context.prefsDataStore.edit { it.remove(KEY_INSTALL_SESSION_ID) }
     }
 
     val pendingUpgradeNotice: Flow<String?> =

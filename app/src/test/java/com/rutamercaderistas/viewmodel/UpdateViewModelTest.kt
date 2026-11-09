@@ -61,6 +61,9 @@ class UpdateViewModelTest {
             coEvery { getUpdateInstallAttemptedCode() } returns 0
             coEvery { setUpdateInstallAttemptedCode(any()) } returns Unit
             coEvery { clearUpdateInstallAttemptedCode() } returns Unit
+            coEvery { getInstallSessionId() } returns 0
+            coEvery { setInstallSessionId(any()) } returns Unit
+            coEvery { clearInstallSessionId() } returns Unit
             coEvery { getRejectedUpdateTag() } returns ""
             coEvery { setRejectedUpdateTag(any()) } returns Unit
             coEvery { getLastUpdateCheck() } returns 0L
@@ -80,7 +83,11 @@ class UpdateViewModelTest {
                 versionName = "12.53",
             )
         every { ApkDownloader.canInstallPackages(any()) } returns true
-        every { ApkDownloader.installApk(any(), any()) } returns InstallStart.Started
+        every { ApkDownloader.installApk(any(), any()) } returns InstallStart.Started(1)
+        every { ApkDownloader.activeInstallSessionIds(any()) } returns emptyList()
+        every { ApkDownloader.isInstallSessionActive(any(), any()) } returns false
+        every { ApkDownloader.abandonInstallSession(any(), any()) } returns Unit
+        every { ApkDownloader.abandonInstallSessions(any()) } returns Unit
         every { ApkDownloader.openInstallPermissionSettings(any()) } returns true
         every { ApkDownloader.clearDownloadedApk(any()) } returns Unit
         every { ApkDownloader.clearPartial(any()) } returns Unit
@@ -233,22 +240,23 @@ class UpdateViewModelTest {
     }
 
     @Test
-    fun `download in foreground waits for app to go background`() = runTest {
+    fun `download waits for the explicit install`() = runTest {
         mockAvailableUpdate()
         try {
-            viewModel.onActivityResumed()
             viewModel.checkForUpdate(force = true, showFeedback = false)
             awaitOnMain { viewModel.pendingUpdate.value != null }
             // Simula el APK que deja el descargador real.
             apkFile.writeBytes(ByteArray(2048))
             viewModel.startUpdate()
             awaitOnMain { viewModel.card.value is UpdateCardUiState.Ready }
-            // En primer plano no se abre la sesión: la app se cerraría en
-            // medio del uso y el usuario lo vive como una salida inesperada.
+            // Descargar no instala: el usuario pide la instalación.
             verify(exactly = 0) { ApkDownloader.installApk(any(), any()) }
 
-            viewModel.onActivityStopped()
-            awaitOnMain { viewModel.card.value is UpdateCardUiState.Installing }
+            viewModel.installApk()
+            awaitOnMain {
+                (viewModel.card.value as? UpdateCardUiState.Installing)
+                    ?.waitingForUser == true
+            }
             awaitCoVerify {
                 coVerify(exactly = 1) { ApkDownloader.installApk(any(), any()) }
             }
@@ -257,22 +265,8 @@ class UpdateViewModelTest {
                     preferencesRepository.setUpdateInstallAttemptedCode(12053)
                 }
             }
-        } finally {
-            unmockkObject(UpdateChecker)
-        }
-    }
-
-    @Test
-    fun `download in background installs without returning to foreground`() = runTest {
-        mockAvailableUpdate()
-        try {
-            viewModel.checkForUpdate(force = true, showFeedback = false)
-            awaitOnMain { viewModel.pendingUpdate.value != null }
-            apkFile.writeBytes(ByteArray(2048))
-            viewModel.startUpdate()
-            awaitOnMain { viewModel.card.value is UpdateCardUiState.Installing }
             awaitCoVerify {
-                coVerify(exactly = 1) { ApkDownloader.installApk(any(), any()) }
+                coVerify(exactly = 1) { preferencesRepository.setInstallSessionId(1) }
             }
         } finally {
             unmockkObject(UpdateChecker)
@@ -280,22 +274,61 @@ class UpdateViewModelTest {
     }
 
     @Test
-    fun `restore does not repeat an install already attempted`() = runTest {
+    fun `restore with a pending session does not create another`() = runTest {
         val code = BuildConfig.VERSION_CODE + 1
         val newer = PendingUpdate("99.99", code, "http://x.apk", "v99.99")
         coEvery { preferencesRepository.getPendingUpdate() } returns newer
         coEvery { preferencesRepository.getUpdateInstallAttemptedCode() } returns code
+        every { ApkDownloader.activeInstallSessionIds(any()) } returns listOf(7)
         apkFile.writeBytes(ByteArray(2048))
 
         val restored = track(UpdateViewModel(application, preferencesRepository))
         awaitOnMain {
-            (restored.card.value as? UpdateCardUiState.Ready)?.installAttempted == true
+            (restored.card.value as? UpdateCardUiState.Installing)
+                ?.waitingForUser == true
         }
 
-        // Un arranque en frío no relanza la instalación que ya se intentó.
-        restored.onActivityStopped()
+        // La sesión vieja sigue viva: no se crea otra ni se relanza sola.
         testDispatcher.scheduler.advanceUntilIdle()
         verify(exactly = 0) { ApkDownloader.installApk(any(), any()) }
+    }
+
+    @Test
+    fun `restore finds a stored session when mySessions is empty`() = runTest {
+        val code = BuildConfig.VERSION_CODE + 1
+        val newer = PendingUpdate("99.99", code, "http://x.apk", "v99.99")
+        coEvery { preferencesRepository.getPendingUpdate() } returns newer
+        coEvery { preferencesRepository.getInstallSessionId() } returns 7
+        every { ApkDownloader.activeInstallSessionIds(any()) } returns emptyList()
+        every { ApkDownloader.isInstallSessionActive(any(), 7) } returns true
+        apkFile.writeBytes(ByteArray(2048))
+
+        val restored = track(UpdateViewModel(application, preferencesRepository))
+        awaitOnMain {
+            (restored.card.value as? UpdateCardUiState.Installing)
+                ?.waitingForUser == true
+        }
+        testDispatcher.scheduler.advanceUntilIdle()
+        verify(exactly = 0) { ApkDownloader.installApk(any(), any()) }
+    }
+
+    @Test
+    fun `retry install abandons the old session and starts a new one`() = runTest {
+        mockAvailableUpdate()
+        try {
+            viewModel.checkForUpdate(force = true, showFeedback = false)
+            awaitOnMain { viewModel.pendingUpdate.value != null }
+            apkFile.writeBytes(ByteArray(2048))
+
+            viewModel.retryInstall()
+            awaitOnMain { viewModel.card.value is UpdateCardUiState.Installing }
+            awaitCoVerify {
+                coVerify(exactly = 1) { ApkDownloader.installApk(any(), any()) }
+            }
+            verify { ApkDownloader.abandonInstallSessions(any()) }
+        } finally {
+            unmockkObject(UpdateChecker)
+        }
     }
 
     @Test

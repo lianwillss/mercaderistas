@@ -113,6 +113,8 @@ fun MainScreen(
     onCancelUpdate: () -> Unit = {},
     onRetryUpdate: () -> Unit = {},
     onInstallUpdate: () -> Unit = {},
+    onRetryInstall: () -> Unit = {},
+    onCancelInstall: () -> Unit = {},
     /** Pestaña a restaurar tras una actualización; null en un arranque normal. */
     restoreTab: BottomBarKey? = null,
     onTabSelected: (BottomBarKey) -> Unit = {},
@@ -230,6 +232,8 @@ fun MainScreen(
                         onCancelUpdate = onCancelUpdate,
                         onRetryUpdate = onRetryUpdate,
                         onInstallUpdate = onInstallUpdate,
+                        onRetryInstall = onRetryInstall,
+                        onCancelInstall = onCancelInstall,
                     )
                 }
                 composable<StockRoute> {
