@@ -10,7 +10,7 @@ App Android para mercaderistas: descarga el rutero desde Google Drive, lo organi
 
 | Dato | Valor |
 |---|---|
-| Versión en `app/build.gradle` | `12.38` (versionCode `12038`) |
+| Versión en `app/build.gradle` | `12.60` (versionCode `12060`) |
 | `minSdk` / `targetSdk` / `compileSdk` | 26 / 35 / 37 |
 | Idioma de la interfaz | Español (`resConfigs "es"`) |
 | Distribución | Releases de GitHub + actualizador interno |
