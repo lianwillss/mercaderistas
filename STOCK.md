@@ -15,11 +15,12 @@ la web interna de la empresa.
 El objetivo es que el mercaderista vea el stock de su local sin entrar a la web, y que un
 supervisor pueda revisar una ruta completa y detectar quiebres y negativos.
 
-Hoy el módulo funciona con un **snapshot local** ("stock.json"). Se puede regenerar
-**desde la propia app** contra KPI One (botón ↻ de la cabecera, con barra de progreso y
-cancelación), sin Mac ni subida manual a Drive. El asset de la APK queda como respaldo
-para la primera instalación. El código de descarga por URL/Drive se conserva para una
-próxima fase, pero todavía no tiene botón en la interfaz.
+El módulo consulta **KPI One en vivo** al buscar por local, ruta o SKU. El
+**snapshot local** ("stock.json") queda como respaldo offline. La descarga masiva
+sigue existiendo como motor interno (reintento de error/forzado), pero **no hay
+botón de recarga manual** en la pantalla: la búsqueda y la revalidación son
+automáticas. El asset de la APK cubre la primera instalación y el código de
+descarga por URL/Drive se conserva para una próxima fase.
 
 ---
 
@@ -120,15 +121,55 @@ StockViewModel ── StockSyncScheduler (WorkManager)
 > regla, el release falla con `Could not create Input Merger`.
 
 > **Arranque manual:** `StockSyncScheduler` usa `setExpedited` y `ExistingWorkPolicy.REPLACE`,
-> sin constraint de red. Así el botón ↻ arranca ya y no se queda pegado a un intento viejo
+> sin constraint de red. Así un arranque forzado no queda pegado a un intento viejo
 > en `ENQUEUED`.
 
 ### Origen de los datos al abrir
 
-1. Si existe `filesDir/stock/stock.json` (generado con ↻ o bajado de Drive), se usa ese.
+1. Si existe `filesDir/stock/stock.json` (generado por la app o bajado de Drive), se usa ese.
 2. Si no, se usa el asset `assets/stock/stock_demo.json` de la APK.
 3. `stock-meta.json` guarda filas, locales, fecha máxima, fallidos y origen; se usa
    para el control de calidad y para el badge "Datos de KPI One al …".
+
+### Búsqueda en vivo (híbrida)
+
+Al buscar por **local**, **ruta** o **SKU**, la app consulta KPI One en el momento
+(`inventory-browse`) y usa el snapshot solo como respaldo:
+
+- Las rutas se resuelven contra Room (`RouteEntryDao`), no contra el snapshot.
+- Debounce de 250 ms, `collectLatest` y caché de 30 s. No hay botón de recarga:
+  el cambio de filtro dispara la consulta solo.
+- **Pintado en dos fases**: primero se muestra el snapshot local o la caché (si
+  hay filas para esa base) y después se revalida contra KPI One. Así el cambio de
+  local/ruta se percibe casi instantáneo aunque la red tarde.
+- Mientras se revalida, la **franja morada** muestra una barra de vidrio con
+  porcentaje real ("Cargando stock… 67%"). El ancho sale de las filas ya
+  descargadas, no de una animación independiente. Al terminar queda
+  "Stock actualizado · 100%" un momento y vuelve la píldora de frescura.
+- Tope de 3 páginas (1.500 filas) y 60 locales por consulta. Si se corta, la
+  cabecera avisa "Resultados parciales".
+- Sin conexión o si KPI One falla, se muestra el snapshot con el aviso
+  "Sin conexión: datos guardados"; la pantalla nunca queda en blanco.
+- Una **marca sola** no dispara la consulta en vivo: puede ser todo el catálogo.
+  Se sigue resolviendo sobre el snapshot.
+- La cabecera muestra "KPI One en vivo" cuando la última consulta fue remota.
+- "En vivo" significa **el último snapshot disponible**, no un dato de este
+  segundo: cada fila conserva su `snapshot_date` y puede venir de días distintos.
+
+### Persistencia y regreso a la pestaña
+
+- La navegación entre pestañas usa `saveState + restoreState`: el ViewModel y la
+  lista de Stock se conservan al cambiar de módulo.
+- Además, la última búsqueda se guarda en `filesDir/stock/stock-cache.json`
+  (`StockCache`). Al abrir la pestaña se pinta de inmediato con el subtítulo
+  "Datos guardados · actualizando…" y luego se revalida contra KPI One.
+- Los filtros de local, ruta, marca y **SKU** se guardan en DataStore. Al volver
+  a la pestaña se restauran y disparan la búsqueda sin recargar.
+- Si el usuario vuelve después de un minuto, `alVolver()` refresca en segundo
+  plano sin ocultar la lista; el spinner de la barra indica que está trabajando.
+- Una misma consulta no se repite si ya está en vuelo o si las filas siguen en
+  pantalla. No hay botón de recarga manual: la revalidación la dispara el flujo.
+- Al cerrar sesión se borra la caché local.
 
 ---
 
@@ -143,13 +184,12 @@ reutilizan cambiando solo esos parámetros.
   (#3B1F7A → #5A34AC → #7B4FD6), esquinas inferiores de 28 dp y texto blanco
   (contraste ≥ 5:1 en todo el degradado). Sin sombras.
 - **Compacto**: 84 dp expandido (título + subtítulo en una fila y píldora debajo) y
-  **56 dp colapsado** (solo título + ↻). El error abre a 168 dp para el mensaje.
+  **56 dp colapsado** (solo título + subtítulo). El error abre a 168 dp para el mensaje.
 - Se colapsa al bajar en la lista y vuelve al llegar arriba, vía `nestedScroll`: el
   delta que encoge el banner se **descuenta del scroll**, así el contenido no salta.
-- Botón ↻ de **48 dp** con fondo circular translúcido. Mientras actualiza queda
-  **deshabilitado**, gira un spinner y una **barra fina de 3 dp** en el borde inferior
-  muestra la fase (`Descargando 84/296 · 3.120 filas`), el porcentaje y **Cancelar**
-  como ✕. Al terminar, check + "Stock actualizado…" durante 4 s.
+- En Stock **no hay botón de refrescar**: la búsqueda se actualiza sola. Si un
+  trabajo de fondo está corriendo, aparece la **barra fina de 3 dp** con la fase
+  (`Descargando 84/296 · 3.120 filas`), el porcentaje y **Cancelar** como ✕.
 - Píldora de frescura **"Actualizado hoy 07:21"**: **verde hoy, ámbar ayer y rojo a
   partir de 2 días**. La hora sale de `generatedAt` del snapshot (instante ISO en
   `stock.json`); si el archivo no la trae (asset de la APK), se omite.
@@ -211,8 +251,8 @@ Con movimiento reducido, todas las animaciones se detienen.
 ## 5. Cómo se alimenta (pipeline)
 
 ```
-[Teléfono] Stock → ↻
-   → StockSyncWorker (WorkManager, foreground, trabajo único)
+[Teléfono] Stock → búsqueda en vivo (inventory-browse)
+   → StockSyncWorker solo como respaldo/forzado (WorkManager, foreground)
    → KpiOneClient: login por cookie, catálogo y inventory-browse
    → StockBulkSync: rutas desde Room, lotes de 4 locales, deduplicación
    → control de calidad → stock.json + stock-meta.json (move atómico)

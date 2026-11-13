@@ -73,8 +73,11 @@ private val slideDownExit: ExitTransition = slideOutVertically { it }
 
 private fun NavHostController.navigateTopLevel(route: Any) {
     navigate(route) {
+        // saveState + restoreState conservan el ViewModel y el estado de cada
+        // pestaña: al volver a Stock no se pierde la última consulta.
         popUpTo(graph.startDestinationId) { saveState = true }
         launchSingleTop = true
+        restoreState = true
     }
 }
 

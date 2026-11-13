@@ -52,6 +52,7 @@ class PreferencesRepository @Inject constructor(
         private val KEY_STOCK_LOCAL = stringPreferencesKey("stock_local")
         private val KEY_STOCK_MARCA = stringPreferencesKey("stock_marca")
         private val KEY_STOCK_RUTA = stringPreferencesKey("stock_ruta")
+        private val KEY_STOCK_SKU = stringPreferencesKey("stock_sku")
         private val KEY_SEARCH_HISTORY = stringPreferencesKey("ean_search_history")
         val KEY_LOCALES_SEARCH_HISTORY = stringPreferencesKey("locales_search_history")
         val KEY_ONBOARDING_DONE = stringPreferencesKey("onboarding_done")
@@ -108,11 +109,20 @@ class PreferencesRepository @Inject constructor(
     suspend fun getStockRuta(): String =
         context.prefsDataStore.data.first()[KEY_STOCK_RUTA] ?: ""
 
-    suspend fun setStockFilters(local: String, marca: String, ruta: String = "") {
+    suspend fun getStockSku(): String =
+        context.prefsDataStore.data.first()[KEY_STOCK_SKU] ?: ""
+
+    suspend fun setStockFilters(
+        local: String,
+        marca: String,
+        ruta: String = "",
+        sku: String = "",
+    ) {
         context.prefsDataStore.edit { prefs ->
             if (local.isBlank()) prefs.remove(KEY_STOCK_LOCAL) else prefs[KEY_STOCK_LOCAL] = local
             if (marca.isBlank()) prefs.remove(KEY_STOCK_MARCA) else prefs[KEY_STOCK_MARCA] = marca
             if (ruta.isBlank()) prefs.remove(KEY_STOCK_RUTA) else prefs[KEY_STOCK_RUTA] = ruta
+            if (sku.isBlank()) prefs.remove(KEY_STOCK_SKU) else prefs[KEY_STOCK_SKU] = sku
         }
     }
 

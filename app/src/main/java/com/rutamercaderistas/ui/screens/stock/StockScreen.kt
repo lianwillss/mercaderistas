@@ -102,6 +102,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rutamercaderistas.R
 import com.rutamercaderistas.data.stock.StockCatalog
@@ -110,6 +112,7 @@ import com.rutamercaderistas.data.stock.StockItem
 import com.rutamercaderistas.data.stock.StockMode
 import com.rutamercaderistas.data.stock.StockResult
 import com.rutamercaderistas.data.stock.StockSort
+import com.rutamercaderistas.data.stock.StockSource
 import com.rutamercaderistas.data.stock.CoberturaTipo
 import com.rutamercaderistas.data.stock.EstadoTipo
 import com.rutamercaderistas.data.stock.StockStatus
@@ -156,6 +159,7 @@ import com.rutamercaderistas.viewmodel.StockViewModel
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import java.time.format.DateTimeFormatter
+import kotlin.math.roundToInt
 
 @Composable
 fun StockScreen(
@@ -164,6 +168,9 @@ fun StockScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val filters by vm.filters.collectAsStateWithLifecycle()
+    // Al volver a la pestaña, si el dato tiene más de un minuto, se refresca
+    // en segundo plano sin ocultar la lista que ya está en pantalla.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.alVolver() }
     val dimens = LocalAppDimens.current
     val context = LocalContext.current
     val reducirMovimiento = LocalReducedMotionEnabled.current
@@ -178,6 +185,14 @@ fun StockScreen(
     // El local solo aporta cuando la lista mezcla varios y no hay cabecera
     // de local que lo muestre (modo por marca).
     val mostrarLocal = filters.modo == StockMode.POR_MARCA && state.result.uniqueLocales > 1
+    val textoProgreso = state.progresoCarga?.let { fraccion ->
+        val pct = (fraccion * 100f).roundToInt().coerceIn(0, 100)
+        if (state.progresoCompleto || pct >= 100) {
+            "Stock actualizado · 100%"
+        } else {
+            "Cargando stock… " + pct + "%"
+        }
+    }
     // La barra de cada tarjeta se mide contra el mayor stock del resultado.
     // Qué eje de filtros está a la vista: estado del stock o cobertura de venta.
     // Son dimensiones distintas y no se muestran a la vez para no mezclar escalas.
@@ -276,15 +291,26 @@ fun StockScreen(
         state.mensajeActualizacion,
         state.actualizacionError,
         state.actualizando,
+        state.aviso,
+        state.truncado,
     ) {
-        val texto = state.mensajeActualizacion
-        if (texto == null || state.actualizacionError || state.actualizando) {
-            null
-        } else {
-            BannerMensaje(
-                texto = texto,
-                exito = texto.contains("actualizado", ignoreCase = true),
+        when {
+            state.truncado -> BannerMensaje(
+                texto = "Resultados parciales: acota por local, marca o producto.",
+                exito = false,
             )
+            state.aviso != null -> BannerMensaje(texto = state.aviso.orEmpty(), exito = false)
+            else -> {
+                val texto = state.mensajeActualizacion
+                if (texto == null || state.actualizacionError || state.actualizando) {
+                    null
+                } else {
+                    BannerMensaje(
+                        texto = texto,
+                        exito = texto.contains("actualizado", ignoreCase = true),
+                    )
+                }
+            }
         }
     }
     val pideAcceso = state.actualizacionError &&
@@ -310,10 +336,18 @@ fun StockScreen(
     ) {
         CollapsingBanner(
             titulo = stringResource(R.string.stock_title),
-            subtitulo = if (state.isDemo) {
-                "Datos de ejemplo · " + state.catalog.locales.size + " locales"
-            } else {
-                "KPI One · " + state.catalog.locales.size + " locales"
+            subtitulo = when {
+                state.fuente == StockSource.LIVE ->
+                    "KPI One en vivo · " + state.catalog.locales.size + " locales"
+                state.fuente == StockSource.CACHE -> if (state.refrescando) {
+                    "Datos guardados · actualizando…"
+                } else {
+                    "Datos guardados"
+                }
+                state.isDemo ->
+                    "Datos de ejemplo · " + state.catalog.locales.size + " locales"
+                else ->
+                    "KPI One · " + state.catalog.locales.size + " locales"
             },
             actualizacion = actualizacion,
             cargando = state.actualizando,
@@ -332,6 +366,10 @@ fun StockScreen(
             etiqueta = if (state.isDemo) "DEMO" else null,
             onCancelar = cancelarActualizacion,
             descripcionRefrescar = "Actualizar stock",
+            // El módulo se actualiza solo: no hay ↻ manual en la cabecera.
+            mostrarRefrescar = false,
+            progresoStock = state.progresoCarga,
+            textoProgresoStock = textoProgreso,
             accionesError = {
                 if (pideAcceso) {
                     BannerAccion("Revisar acceso", onAbrirAjustes)

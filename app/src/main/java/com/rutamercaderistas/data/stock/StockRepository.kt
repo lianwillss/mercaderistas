@@ -8,12 +8,15 @@ import javax.inject.Singleton
  * Fuente de stock de la app.
  *
  * Contrato deliberadamente angosto: la pantalla no sabe si los datos vienen de
- * KPI One (proxy) o de la muestra local. Cuando exista el proxy, se reemplaza
- * [DemoStockRepository] por la implementación remota sin tocar ViewModel ni UI.
+ * KPI One en vivo o del snapshot local. [StockRepositoryRouter] decide en cada
+ * búsqueda y deja el snapshot como respaldo.
  */
 interface StockRepository {
     /** true mientras la pantalla use la muestra local en vez del proxy. */
     val isDemo: Boolean get() = false
+
+    /** ¿Hay filas cargadas? Sirve para no forzar "SinSesion" si el snapshot existe. */
+    val tieneDatos: Boolean get() = false
 
     /** El archivo local no necesita cookie; la consulta en vivo sí. */
     val requiereSesion: Boolean get() = false
@@ -37,7 +40,35 @@ interface StockRepository {
     suspend fun generadoEn(): String? = null
 
     suspend fun catalog(): StockCatalog
+
     suspend fun search(filters: StockFilters): StockResult
+
+    /**
+     * Variante con [force] para saltar la caché corta del modo en vivo.
+     * Las fuentes sin caché pueden ignorarlo.
+     */
+    suspend fun search(filters: StockFilters, force: Boolean): StockResult =
+        search(filters)
+
+    /**
+     * Resultado local/snapshot para pintar de inmediato mientras se pide la
+     * versión en vivo. Las fuentes sin snapshot pueden devolver lo mismo que
+     * [search].
+     */
+    suspend fun searchLocal(filters: StockFilters): StockResult = search(filters)
+
+    /**
+     * Consulta en vivo. Devuelve null cuando la fuente no tiene modo remoto
+     * (por ejemplo, sólo una marca: se resuelve con el snapshot).
+     */
+    suspend fun searchLive(
+        filters: StockFilters,
+        force: Boolean,
+        onProgress: (loaded: Int, total: Int) -> Unit = { _, _ -> },
+    ): StockResult? = null
+
+    /** Vacía la caché de consultas en vivo, si la fuente tiene una. */
+    fun invalidarCache() = Unit
 }
 
 /**
@@ -56,6 +87,8 @@ class DemoStockRepository @Inject constructor(
     private var origin: StockOrigin = origenInicial
 
     override val isDemo: Boolean get() = origin == StockOrigin.ASSET
+
+    override val tieneDatos: Boolean get() = data.items.isNotEmpty()
 
     val origen: StockOrigin get() = origin
 
@@ -155,52 +188,7 @@ class DemoStockRepository @Inject constructor(
                 (texto.isEmpty() ||
                     normalizarStock(item.sku).contains(texto) ||
                     normalizarStock(item.product).contains(texto))
-        }.sinDuplicados()
-
-        val unicos = base.distinctBy { it.sku }
-        val conteoQuiebre = unicos.count { estadoDe(it) == EstadoTipo.Quiebre }
-        val conteoBajo = unicos.count { estadoDe(it) == EstadoTipo.Bajo }
-        val conteoDisponible = unicos.count { estadoDe(it) == EstadoTipo.Disponible }
-        val conteoNegativos = unicos.count { it.stockUnits < 0.0 }
-        val conteoCritico = unicos.count { coberturaDe(it) == CoberturaTipo.Critico }
-        val conteoCoberturaBaja = unicos.count { coberturaDe(it) == CoberturaTipo.Bajo }
-        val conteoSano = unicos.count { coberturaDe(it) == CoberturaTipo.Sano }
-        val conteoSobrestock = unicos.count { coberturaDe(it) == CoberturaTipo.Sobrestock }
-
-        val filtrados = base.filter { item ->
-            (filters.estado == null || estadoDe(item) == filters.estado) &&
-                (filters.cobertura == null || coberturaDe(item) == filters.cobertura) &&
-                (!filters.soloQuiebre || estadoDe(item) == EstadoTipo.Quiebre) &&
-                (!filters.soloNegativos || item.stockUnits < 0.0)
         }
-        val ordenados = when (filters.orden) {
-            StockSort.GRAVEDAD -> filtrados.sortedWith(
-                compareBy(
-                    { if (it.stockUnits < 0.0) 0 else 1 },
-                    { if (estadoDe(it) == EstadoTipo.Quiebre) 0 else 1 },
-                    { it.daysOfInventory ?: Int.MAX_VALUE },
-                    { it.stockUnits },
-            ) )
-            StockSort.PRODUCTO_AZ -> filtrados.sortedWith(
-                compareBy({ it.product.lowercase() }, { it.storeCode })
-            )
-            StockSort.STOCK_ASC -> filtrados.sortedBy { it.stockUnits }
-            StockSort.STOCK_DESC -> filtrados.sortedByDescending { it.stockUnits }
-            // Sin dato va al final: no es "0 días", es "no sé".
-            StockSort.MENOR_COBERTURA -> filtrados.sortedBy {
-                it.coberturaDias ?: Double.MAX_VALUE
-            }
-        }
-        return StockResult(
-            items = ordenados,
-            conteoQuiebre = conteoQuiebre,
-            conteoBajo = conteoBajo,
-            conteoDisponible = conteoDisponible,
-            conteoNegativos = conteoNegativos,
-            conteoCritico = conteoCritico,
-            conteoCoberturaBaja = conteoCoberturaBaja,
-            conteoSano = conteoSano,
-            conteoSobrestock = conteoSobrestock,
-        )
+        return construirStockResult(base, filters)
     }
 }

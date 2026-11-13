@@ -68,6 +68,27 @@ class PreferencesRepositoryTest {
     }
 
     @Test
+    fun `set and get stock filters including sku`() = runTest {
+        repository.setStockFilters("J503", "CASO Y CIA", "EMU-3", "192829")
+
+        assertEquals("J503", repository.getStockLocal())
+        assertEquals("CASO Y CIA", repository.getStockMarca())
+        assertEquals("EMU-3", repository.getStockRuta())
+        assertEquals("192829", repository.getStockSku())
+    }
+
+    @Test
+    fun `blank stock filters clear the stored values`() = runTest {
+        repository.setStockFilters("J503", "CASO Y CIA", "EMU-3", "192829")
+        repository.setStockFilters("", "", "", "")
+
+        assertEquals("", repository.getStockLocal())
+        assertEquals("", repository.getStockMarca())
+        assertEquals("", repository.getStockRuta())
+        assertEquals("", repository.getStockSku())
+    }
+
+    @Test
     fun `default pendingUpdate is null`() = runTest {
         assertNull(repository.getPendingUpdate())
     }

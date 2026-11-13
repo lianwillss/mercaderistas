@@ -82,8 +82,8 @@ class StockAccessViewModel @Inject constructor(
     fun desconectar() {
         viewModelScope.launch {
             runCatching {
-                client.logout()
-                session.borrarTodo()
+                // El router también borra la caché local de la última búsqueda.
+                repo.desconectar()
             }
             _state.update {
                 it.copy(conectado = false, password = "", mensaje = "Acceso eliminado", error = false)

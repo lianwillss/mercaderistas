@@ -1,7 +1,12 @@
 package com.rutamercaderistas.ui.components
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -64,6 +69,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.ui.theme.BannerGlass
+import com.rutamercaderistas.ui.theme.BannerGlassBorder
 import com.rutamercaderistas.ui.theme.BannerPurpleDeep
 import com.rutamercaderistas.ui.theme.BannerPurpleLight
 import com.rutamercaderistas.ui.theme.BannerPurpleMid
@@ -343,6 +349,11 @@ fun CollapsingBanner(
     accionesError: @Composable RowScope.() -> Unit = {},
     descripcionRefrescar: String = "Actualizar",
     descripcionCancelar: String = "Cancelar actualización",
+    /** false en pantallas que se actualizan solas y no exponen recarga manual. */
+    mostrarRefrescar: Boolean = true,
+    /** 0f..1f real de la carga; si no es null reemplaza la píldora de frescura. */
+    progresoStock: Float? = null,
+    textoProgresoStock: String? = null,
 ) {
     val densidad = LocalDensity.current
     val altura = with(densidad) { estado.alturaPx.toDp() }
@@ -423,13 +434,15 @@ fun CollapsingBanner(
                         modifier = Modifier.size(18.dp),
                     )
                 }
-                Spacer(Modifier.width(8.dp))
-                BotonActualizar(
-                    cargando = cargando,
-                    exito = exitoVisible,
-                    onRefresh = onRefresh,
-                    descripcion = descripcionRefrescar,
-                )
+                if (mostrarRefrescar) {
+                    Spacer(Modifier.width(8.dp))
+                    BotonActualizar(
+                        cargando = cargando,
+                        exito = exitoVisible,
+                        onRefresh = onRefresh,
+                        descripcion = descripcionRefrescar,
+                    )
+                }
                 if (cargando && onCancelar != null) {
                     Spacer(Modifier.width(4.dp))
                     BotonCancelar(onCancelar, descripcionCancelar)
@@ -445,6 +458,8 @@ fun CollapsingBanner(
                 visibilidad = visibilidad,
                 alReintentar = onRefresh,
                 accionesError = accionesError,
+                progresoStock = progresoStock,
+                textoProgresoStock = textoProgresoStock,
             )
         }
         if (cargando) {
@@ -467,12 +482,19 @@ private fun ZonaSecundaria(
     visibilidad: Float,
     alReintentar: () -> Unit,
     accionesError: @Composable RowScope.() -> Unit,
+    progresoStock: Float?,
+    textoProgresoStock: String?,
 ) {
     val base = Modifier
         .fillMaxWidth()
         .alpha(visibilidad)
     when {
         error != null -> ZonaError(error, alReintentar, accionesError, base)
+        progresoStock != null -> ProgresoStockGlass(
+            progreso = progresoStock,
+            texto = textoProgresoStock,
+            modifier = base,
+        )
         cargando -> Row(
             modifier = base
                 .height(ALTURA_ZONA)
@@ -530,6 +552,48 @@ private fun ZonaSecundaria(
         ) {
             PastillaFrescura(actualizacion)
         }
+    }
+}
+
+/** Barra real de carga integrada en la franja morada, con carril de vidrio. */
+@Composable
+private fun ProgresoStockGlass(
+    progreso: Float,
+    texto: String?,
+    modifier: Modifier = Modifier,
+) {
+    val reducir = LocalReducedMotionEnabled.current
+    val objetivo = progreso.coerceIn(0f, 1f)
+    val animado by animateFloatAsState(
+        targetValue = objetivo,
+        animationSpec = if (reducir) snap() else tween(320, easing = FastOutSlowInEasing),
+        label = "progresoStock",
+    )
+    val forma = RoundedCornerShape(50)
+    Row(
+        modifier = modifier
+            .height(ALTURA_ZONA)
+            .padding(horizontal = MARGEN_H)
+            .background(BannerGlass.copy(alpha = 0.22f), forma)
+            .border(1.dp, BannerGlassBorder, forma)
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = texto ?: ("Cargando stock… " + (objetivo * 100).toInt() + "%"),
+            style = MaterialTheme.typography.labelMedium,
+            color = BannerText,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1.2f),
+        )
+        Spacer(Modifier.width(10.dp))
+        NeonDownloadBar(
+            // Se lee en fase de dibujo: el brillo anima sin recomponer la fila.
+            progress = { if (reducir) objetivo else animado },
+            modifier = Modifier.weight(1f),
+            barHeight = 8.dp,
+        )
     }
 }
 

@@ -222,6 +222,18 @@ private fun masCompleta(a: StockItem, b: StockItem): StockItem = when {
     else -> a
 }
 
+/** De dónde salieron las filas de esta consulta. */
+enum class StockSource {
+    /** Consulta hecha a KPI One en el momento de buscar. */
+    LIVE,
+
+    /** Última búsqueda guardada en disco; se está revalidando. */
+    CACHE,
+
+    /** Snapshot local (asset, archivo generado o respaldo de Drive). */
+    SNAPSHOT,
+}
+
 /** Resultado agregado de una consulta. */
 data class StockResult(
     val items: List<StockItem> = emptyList(),
@@ -235,6 +247,16 @@ data class StockResult(
     val conteoCoberturaBaja: Int = 0,
     val conteoSano: Int = 0,
     val conteoSobrestock: Int = 0,
+    /** Origen de las filas: en vivo o snapshot local. */
+    val source: StockSource = StockSource.SNAPSHOT,
+    /** Instante ISO en que se consultó KPI One; null si vino del snapshot. */
+    val fetchedAt: String? = null,
+    /** Total de filas que reportó KPI One antes del tope de páginas. */
+    val total: Int = 0,
+    /** true cuando se cortó la descarga en vivo por el tope de páginas. */
+    val truncated: Boolean = false,
+    /** Aviso para la cabecera cuando se usó el respaldo local. */
+    val aviso: String? = null,
 ) {
     val quiebres: Int get() = items.count { estadoDe(it) == EstadoTipo.Quiebre }
     val negativos: Int get() = items.count { it.stockUnits < 0.0 }

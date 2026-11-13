@@ -59,6 +59,22 @@ data class StockRowDto(
     )
 }
 
+/** Misma fila compacta que usa stock.json, para reutilizarla en la caché. */
+fun StockItem.toRowDto() = StockRowDto(
+    storeCode = storeCode,
+    storeName = storeName,
+    brand = brand,
+    product = product,
+    sku = sku,
+    stock = stockUnits,
+    transit = transitUnits,
+    date = snapshotDate,
+    quiebre = if (quiebre) 1 else 0,
+    days = daysOfInventory?.toDouble(),
+    saleWeek = saleLastWeek,
+    sale4w = saleLast4w,
+)
+
 /** Metadatos de la última descarga; se guardan aparte para el control de calidad. */
 @Serializable
 data class StockMeta(
@@ -91,22 +107,7 @@ object StockFileCodec {
             source = source,
             locales = data.locales.map { StockLocalDto(it.code, it.name, it.rutas) },
             marcas = data.marcas,
-            items = data.items.map { item ->
-                StockRowDto(
-                    storeCode = item.storeCode,
-                    storeName = item.storeName,
-                    brand = item.brand,
-                    product = item.product,
-                    sku = item.sku,
-                    stock = item.stockUnits,
-                    transit = item.transitUnits,
-                    date = item.snapshotDate,
-                    quiebre = if (item.quiebre) 1 else 0,
-                    days = item.daysOfInventory?.toDouble(),
-                    saleWeek = item.saleLastWeek,
-                    sale4w = item.saleLast4w,
-                )
-            },
+            items = data.items.map { it.toRowDto() },
         ),
     )
 

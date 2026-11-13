@@ -206,6 +206,8 @@ class QueueHttpServer(vararg responses: String) : Closeable {
 
     fun lastRequest(): String? = pedidos.lastOrNull()
 
+    fun requestCount(): Int = pedidos.size
+
     override fun close() {
         vivo = false
         server.close()
