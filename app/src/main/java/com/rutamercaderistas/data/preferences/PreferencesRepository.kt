@@ -53,6 +53,7 @@ class PreferencesRepository @Inject constructor(
         private val KEY_STOCK_MARCA = stringPreferencesKey("stock_marca")
         private val KEY_STOCK_RUTA = stringPreferencesKey("stock_ruta")
         private val KEY_STOCK_SKU = stringPreferencesKey("stock_sku")
+        private val KEY_STOCK_SCOPE = stringPreferencesKey("stock_scope")
         private val KEY_SEARCH_HISTORY = stringPreferencesKey("ean_search_history")
         val KEY_LOCALES_SEARCH_HISTORY = stringPreferencesKey("locales_search_history")
         val KEY_ONBOARDING_DONE = stringPreferencesKey("onboarding_done")
@@ -111,6 +112,16 @@ class PreferencesRepository @Inject constructor(
 
     suspend fun getStockSku(): String =
         context.prefsDataStore.data.first()[KEY_STOCK_SKU] ?: ""
+
+    /** "MIS_RUTAS" o "RM_COMPLETA"; vacío en instalaciones anteriores. */
+    suspend fun getStockScope(): String =
+        context.prefsDataStore.data.first()[KEY_STOCK_SCOPE] ?: ""
+
+    suspend fun setStockScope(value: String) {
+        context.prefsDataStore.edit { prefs ->
+            prefs[KEY_STOCK_SCOPE] = value
+        }
+    }
 
     suspend fun setStockFilters(
         local: String,

@@ -146,8 +146,11 @@ Al buscar por **local**, **ruta** o **SKU**, la app consulta KPI One en el momen
   porcentaje real ("Cargando stock… 67%"). El ancho sale de las filas ya
   descargadas, no de una animación independiente. Al terminar queda
   "Stock actualizado · 100%" un momento y vuelve la píldora de frescura.
-- Tope de 3 páginas (1.500 filas) y 60 locales por consulta. Si se corta, la
-  cabecera avisa "Resultados parciales".
+- La consulta pagina hasta el `pagination.total` que informa KPI One: una
+  ruta real (5.000-10.000 filas) ya no se corta en 1.500. Los topes de
+  seguridad son 10.000 filas (20 páginas de 500) y 150 locales por consulta.
+  Si se corta, la cabecera avisa "Resultados parciales" y los conteos de las
+  tarjetas se calculan sobre la base completa descargada.
 - Sin conexión o si KPI One falla, se muestra el snapshot con el aviso
   "Sin conexión: datos guardados"; la pantalla nunca queda en blanco.
 - Una **marca sola** no dispara la consulta en vivo: puede ser todo el catálogo.

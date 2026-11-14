@@ -85,8 +85,10 @@ data class StockMeta(
     val maxSnapshot: String? = null,
     val source: String = "kpi-one",
     val durationMs: Long = 0L,
-    /** "rm" o "all"; si cambia, el QC no compara contra el alcance anterior. */
+    /** "rm", "all" o "rutas:EMU-1,EMU-3"; si cambia, el QC no compara. */
     val scope: String = "all",
+    /** Rutas explícitas de una descarga acotada ("Mis rutas"); vacío = RM. */
+    val rutas: List<String> = emptyList(),
 )
 
 object StockFileCodec {

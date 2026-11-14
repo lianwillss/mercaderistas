@@ -110,7 +110,9 @@ import com.rutamercaderistas.data.stock.StockCatalog
 import com.rutamercaderistas.data.stock.StockFilters
 import com.rutamercaderistas.data.stock.StockItem
 import com.rutamercaderistas.data.stock.StockMode
+import com.rutamercaderistas.data.stock.StockAlcance
 import com.rutamercaderistas.data.stock.StockResult
+import com.rutamercaderistas.data.stock.StockScope
 import com.rutamercaderistas.data.stock.StockSort
 import com.rutamercaderistas.data.stock.StockSource
 import com.rutamercaderistas.data.stock.CoberturaTipo
@@ -399,6 +401,8 @@ fun StockScreen(
                 StockFiltersCard(
                     catalog = state.catalog,
                     filters = filters,
+                    alcance = state.alcance,
+                    onAlcance = vm::cambiarAlcance,
                     onFilter = vm::onFilter,
                 )
             }
@@ -470,11 +474,21 @@ fun StockScreen(
                     )
                 }
                 StockStatus.Idle -> item(key = "inicial") {
-                    EstadoCard(
-                        icono = Icons.Outlined.Search,
-                        titulo = "Busca para ver el stock",
-                        detalle = "Elige un local o una marca, o escribe un producto.",
-                    )
+                    if (state.catalog.locales.isEmpty() && state.alcance.limita) {
+                        EstadoCard(
+                            icono = Icons.Outlined.Storefront,
+                            titulo = "Sin locales en tus rutas",
+                            detalle = state.alcance.resumen + ". Prueba con la RM completa.",
+                            accion = "Ver RM completa",
+                            onAccion = { vm.cambiarAlcance(StockScope.RM_COMPLETA) },
+                        )
+                    } else {
+                        EstadoCard(
+                            icono = Icons.Outlined.Search,
+                            titulo = "Busca para ver el stock",
+                            detalle = "Elige un local o una marca, o escribe un producto.",
+                        )
+                    }
                 }
                 StockStatus.Loading -> items(3, key = { "skeleton-$it" }) { SkeletonCard() }
                 StockStatus.Error -> item(key = "error") {
@@ -488,6 +502,15 @@ fun StockScreen(
                 }
                 StockStatus.Empty -> item(key = "vacio") {
                     val localElegido = state.catalog.locales.firstOrNull { it.code == filters.local }
+                    if (state.catalog.locales.isEmpty() && state.alcance.limita) {
+                        EstadoCard(
+                            icono = Icons.Outlined.Storefront,
+                            titulo = "Sin locales en tus rutas",
+                            detalle = state.alcance.resumen + ". Prueba con la RM completa.",
+                            accion = "Ver RM completa",
+                            onAccion = { vm.cambiarAlcance(StockScope.RM_COMPLETA) },
+                        )
+                    } else {
                     EstadoCard(
                         icono = Icons.Outlined.Inventory2,
                         titulo = when {
@@ -522,6 +545,7 @@ fun StockScreen(
                             }
                         },
                     )
+                    }
                 }
                 StockStatus.Ready -> items(filas, key = { it.key }) { fila ->
                     val modificador = if (reducirMovimiento) Modifier else Modifier.animateItem()
@@ -637,6 +661,8 @@ private fun construirFilas(items: List<StockItem>, modo: StockMode): List<FilaSt
 private fun StockFiltersCard(
     catalog: StockCatalog,
     filters: StockFilters,
+    alcance: StockAlcance,
+    onAlcance: (StockScope) -> Unit,
     onFilter: ((StockFilters) -> StockFilters) -> Unit,
 ) {
     val dimens = LocalAppDimens.current
@@ -687,6 +713,28 @@ private fun StockFiltersCard(
                         variant = AppButtonVariant.Text,
                     )
                 }
+            }
+
+            // Alcance: no es un filtro de la lista, decide qué se descarga y
+            // qué locales ofrece el catálogo. Por eso va primero y separado.
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AppFilterChip(
+                        selected = alcance.scope == StockScope.MIS_RUTAS,
+                        onClick = { onAlcance(StockScope.MIS_RUTAS) },
+                        label = { Text("Mis rutas") },
+                    )
+                    AppFilterChip(
+                        selected = alcance.scope == StockScope.RM_COMPLETA,
+                        onClick = { onAlcance(StockScope.RM_COMPLETA) },
+                        label = { Text("RM completa") },
+                    )
+                }
+                Text(
+                    text = alcance.resumen,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             val localMostrado = catalog.locales

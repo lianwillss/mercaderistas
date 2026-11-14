@@ -94,7 +94,7 @@ class StockBulkSync @Inject constructor(
             val catalogo = client.catalog(force = true)
             val catalogoSet = catalogo.codes.toSet()
             val rm = rmCodes.codes()
-            val alcance = if (rm.isEmpty()) "all" else "rm"
+            val alcance = alcanceDe(request, rm)
             val mapa = construirMapa(routeDao.getAllEntries(), request, rm)
             Timber.i(
                 "StockBulkSync: %d códigos en el rutero, %d en RM, %d en el catálogo",
@@ -103,8 +103,14 @@ class StockBulkSync @Inject constructor(
                 catalogoSet.size,
             )
             if (mapa.isEmpty()) {
+                val detalle = if (request.rutas.isNotEmpty()) {
+                    "Ninguna de tus rutas (" + request.rutas.sorted().joinToString(", ") +
+                        ") tiene locales en el rutero."
+                } else {
+                    "El rutero no tiene locales para actualizar."
+                }
                 return@withContext StockSyncOutcome.Failure(
-                    "El rutero no tiene locales para actualizar. Sincroniza el rutero primero.",
+                    detalle + " Sincroniza el rutero primero.",
                 )
             }
 
@@ -119,7 +125,11 @@ class StockBulkSync @Inject constructor(
             )
             if (pedidos.isEmpty()) {
                 return@withContext StockSyncOutcome.Failure(
-                    "Ningún local del rutero coincide con KPI One.",
+                    if (request.rutas.isNotEmpty()) {
+                        "Ningún local de tus rutas coincide con KPI One."
+                    } else {
+                        "Ningún local del rutero coincide con KPI One."
+                    },
                 )
             }
 
@@ -259,6 +269,10 @@ class StockBulkSync @Inject constructor(
                 source = "kpi-one",
                 durationMs = terminado - inicio,
                 scope = alcance,
+                rutas = request.rutas.map { it.trim().uppercase() }
+                    .filter { it.isNotEmpty() }
+                    .distinct()
+                    .sorted(),
             )
             storage.backup(STOCK_FILE)
             storage.backup(META_FILE)
@@ -293,6 +307,23 @@ class StockBulkSync @Inject constructor(
             Timber.e(e, "StockBulkSync falló")
             StockSyncOutcome.Failure(e.message ?: "No se pudo actualizar el stock.", e)
         }
+    }
+
+    /**
+     * Clave del alcance que se guarda en la meta. El QC sólo compara contra el
+     * snapshot anterior cuando la clave es idéntica: bajar "Mis rutas" después
+     * de la RM no es una caída de datos.
+     */
+    private fun alcanceDe(request: StockSyncRequest, rm: Set<String>): String = when {
+        request.rutas.isNotEmpty() -> claveAlcanceRutas(request.rutas)
+        request.locales.isNotEmpty() -> "locales:" + request.locales
+            .map { it.trim().uppercase() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .sorted()
+            .joinToString(",")
+        rm.isEmpty() -> StockAlcance.SCOPE_ALL
+        else -> StockAlcance.SCOPE_RM
     }
 
     private fun construirMapa(

@@ -97,6 +97,37 @@ class StockBulkSyncTest {
         }
     }
 
+    @Test
+    fun unaDescargaAcotadaSoloPideLasRutasDelAlcanceYLoRegistraEnLaMeta() = runBlocking {
+        QueueHttpServer(
+            response(200, """{"ok":true}""", "Set-Cookie: session=abc; Path=/"),
+            response(200, """{"storeCodes":["J503","J502"],"brands":[]}"""),
+            response(200, """[{"storeCode":"J503","name":"JUMBO MAIPU"}]"""),
+            response(200, inventarioDosLocales()),
+        ).use { server ->
+            val storage = InMemoryStockStorage()
+            // El snapshot anterior es la RM: bajar una ruta no es una caída.
+            storage.files[StockBulkSync.META_FILE] = StockFileCodec.encodeMeta(
+                StockMeta(rows = 100, locales = 10, scope = StockAlcance.SCOPE_RM),
+            )
+            val sync = sync(
+                server,
+                storage,
+                listOf(entrada("J503", "EMU-3"), entrada("J502", "DMU-5")),
+            )
+
+            val resultado = sync.run(StockSyncRequest(rutas = setOf("EMU-3")))
+
+            assertTrue(resultado is StockSyncOutcome.Success)
+            val exito = resultado as StockSyncOutcome.Success
+            assertEquals(1, exito.meta.locales)
+            assertEquals(1, exito.meta.rows)
+            assertEquals(claveAlcanceRutas(setOf("EMU-3")), exito.meta.scope)
+            assertEquals(listOf("EMU-3"), exito.meta.rutas)
+            assertTrue(exito.data.items.all { it.storeCode == "J503" })
+        }
+    }
+
     private fun sync(
         server: QueueHttpServer,
         storage: StockStorage,

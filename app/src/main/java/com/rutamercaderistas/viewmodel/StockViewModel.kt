@@ -6,11 +6,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.work.WorkInfo
 import com.rutamercaderistas.data.stock.CachedStock
+import com.rutamercaderistas.data.stock.StockAlcance
 import com.rutamercaderistas.data.stock.StockCache
 import com.rutamercaderistas.data.stock.StockCatalog
 import com.rutamercaderistas.data.stock.StockFilters
 import com.rutamercaderistas.data.stock.StockRepository
 import com.rutamercaderistas.data.stock.StockResult
+import com.rutamercaderistas.data.stock.StockScope
+import com.rutamercaderistas.data.stock.StockScopeStore
 import com.rutamercaderistas.data.stock.StockSource
 import com.rutamercaderistas.data.stock.StockStatus
 import com.rutamercaderistas.data.preferences.PreferencesRepository
@@ -27,6 +30,7 @@ import com.rutamercaderistas.data.stock.remote.SessionExpiredException
 import com.rutamercaderistas.worker.StockSyncWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,6 +49,8 @@ import javax.inject.Inject
 data class StockUiState(
     val catalog: StockCatalog = StockCatalog(),
     val result: StockResult = StockResult(),
+    /** Rutas visibles/descargables: "Mis rutas" o la RM completa. */
+    val alcance: StockAlcance = StockAlcance(),
     val status: StockStatus = StockStatus.Idle,
     val isDemo: Boolean = false,
     val hasSession: Boolean = true,
@@ -81,6 +87,7 @@ class StockViewModel @Inject constructor(
     private val scheduler: StockSyncScheduler,
     private val client: KpiOneClient,
     private val stockCache: StockCache,
+    private val scopeStore: StockScopeStore,
 ) : ViewModel() {
 
     private val _filters = MutableStateFlow(StockFilters())
@@ -106,7 +113,27 @@ class StockViewModel @Inject constructor(
     /** Descarta respuestas viejas si se dispararon dos búsquedas a la vez. */
     private var generacionConsulta = 0
 
+    /**
+     * El catálogo y las búsquedas esperan a que el alcance esté fijado en el
+     * repositorio: si no, la primera consulta saldría sin el límite de rutas.
+     */
+    private val alcanceResuelto = CompletableDeferred<StockAlcance>()
+
     init {
+        // Primero el alcance: el resto de los flujos lo espera.
+        viewModelScope.launch {
+            val alcance = runCatching { scopeStore.cargar() }.getOrElse { StockAlcance() }
+            aplicarAlcance(alcance)
+            alcanceResuelto.complete(alcance)
+            // Si el snapshot en disco no cubre el alcance elegido, se baja sólo
+            // esa parte. Sin credenciales no se fuerza un error al abrir.
+            val cubierto = runCatching { scopeStore.snapshotCubre(alcance) }
+                .getOrDefault(true)
+            if (!cubierto && client.puedeEntrar() && !_state.value.actualizando) {
+                iniciarActualizacion()
+            }
+        }
+
         // Recuerda la última búsqueda y, si hay caché en disco, la pinta de
         // inmediato. Después el flujo de filtros pide la versión nueva.
         viewModelScope.launch {
@@ -135,6 +162,7 @@ class StockViewModel @Inject constructor(
 
         // Al abrir, la app intenta entrar sola: el usuario no debería tocar nada.
         viewModelScope.launch {
+            alcanceResuelto.await()
             if (_state.value.result.items.isEmpty()) {
                 _state.update { it.copy(status = StockStatus.Loading) }
             }
@@ -164,6 +192,7 @@ class StockViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            alcanceResuelto.await()
             // El debounce evita una consulta por tecla al escribir el SKU y
             // collectLatest cancela la búsqueda anterior si el usuario sigue
             // escribiendo: con red no conviene encolar consultas viejas.
@@ -270,6 +299,34 @@ class StockViewModel @Inject constructor(
         }
     }
 
+    /** Fija en el repositorio el límite de rutas del alcance visible. */
+    private fun aplicarAlcance(alcance: StockAlcance) {
+        val rutas = if (alcance.limita) alcance.rutas else emptySet()
+        runCatching { repo.fijarAlcance(rutas) }
+        _state.update { it.copy(alcance = alcance) }
+    }
+
+    /**
+     * Cambia entre "Mis rutas" y "RM completa". Reacomoda catálogo y búsqueda
+     * al nuevo límite y, si el snapshot actual no cubre el alcance, dispara una
+     * descarga acotada.
+     */
+    fun cambiarAlcance(scope: StockScope) {
+        if (scope == _state.value.alcance.scope) return
+        viewModelScope.launch {
+            val alcance = runCatching { scopeStore.cambiar(scope) }
+                .getOrElse { StockAlcance(scope) }
+            aplicarAlcance(alcance)
+            cargarCatalogo()
+            cargar(_filters.value, force = true)
+            val cubierto = runCatching { scopeStore.snapshotCubre(alcance) }
+                .getOrDefault(true)
+            if (!cubierto && client.puedeEntrar() && !_state.value.actualizando) {
+                iniciarActualizacion()
+            }
+        }
+    }
+
     /** Genera el stock dentro de la app (KPI One directo). */
     fun iniciarActualizacion(force: Boolean = false) {
         if (_state.value.actualizando) return
@@ -284,7 +341,12 @@ class StockViewModel @Inject constructor(
             }
             return
         }
-        val id = runCatching { scheduler.start(StockSyncRequest(force = force)) }.getOrNull()
+        val alcance = _state.value.alcance
+        val request = StockSyncRequest(
+            rutas = if (alcance.limita) alcance.rutas else emptySet(),
+            force = force,
+        )
+        val id = runCatching { scheduler.start(request) }.getOrNull()
         if (id == null) {
             _state.update {
                 it.copy(

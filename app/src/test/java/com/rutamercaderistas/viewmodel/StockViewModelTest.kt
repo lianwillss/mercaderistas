@@ -3,13 +3,16 @@ package com.rutamercaderistas.viewmodel
 import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.data.stock.CachedStock
 import com.rutamercaderistas.data.stock.EstadoTipo
+import com.rutamercaderistas.data.stock.StockAlcance
 import com.rutamercaderistas.data.stock.StockCache
 import com.rutamercaderistas.data.stock.StockCatalog
+import com.rutamercaderistas.data.stock.StockScope
 import com.rutamercaderistas.data.stock.StockFilters
 import com.rutamercaderistas.data.stock.StockItem
 import com.rutamercaderistas.data.stock.StockLocal
 import com.rutamercaderistas.data.stock.StockRepository
 import com.rutamercaderistas.data.stock.StockResult
+import com.rutamercaderistas.data.stock.StockScopeStore
 import com.rutamercaderistas.data.stock.StockSource
 import com.rutamercaderistas.data.stock.StockSyncScheduler
 import com.rutamercaderistas.data.stock.StockSyncRequest
@@ -20,6 +23,7 @@ import com.rutamercaderistas.data.stock.remote.KpiSessionStore
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
+import io.mockk.verify
 import androidx.lifecycle.viewModelScope
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -49,6 +53,7 @@ class StockViewModelTest {
     private val scheduler = mockk<StockSyncScheduler>(relaxed = true)
     private val client = mockk<KpiOneClient>(relaxed = true)
     private val cache = mockk<StockCache>(relaxed = true)
+    private val scopeStore = mockk<StockScopeStore>(relaxed = true)
     private var vm: StockViewModel? = null
 
     @Before
@@ -71,6 +76,8 @@ class StockViewModelTest {
         )
         every { cache.load() } returns null
         every { cache.save(any(), any()) } returns Unit
+        coEvery { scopeStore.cargar() } returns StockAlcance()
+        every { scopeStore.snapshotCubre(any()) } returns true
     }
 
     @After
@@ -94,7 +101,7 @@ class StockViewModelTest {
             StockResult(items = listOf(item("J503", 20.0)), source = StockSource.LIVE)
         }
 
-        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache)
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, scopeStore)
 
         val cacheState = await { it.fuente == StockSource.CACHE }
         assertEquals(10.0, cacheState.result.items.single().stockUnits, 0.0)
@@ -120,7 +127,7 @@ class StockViewModelTest {
             source = StockSource.LIVE,
         )
 
-        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache)
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, scopeStore)
         await { it.status == com.rutamercaderistas.data.stock.StockStatus.Idle }
 
         vm!!.onFilter { it.conLocal("J503") }
@@ -137,7 +144,7 @@ class StockViewModelTest {
             source = StockSource.LIVE,
         )
 
-        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache)
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, scopeStore)
         vm!!.onFilter { it.conLocal("J503") }
         await { it.result.items.isNotEmpty() }
 
@@ -145,6 +152,34 @@ class StockViewModelTest {
         delay(900)
 
         coVerify(exactly = 1) { repo.searchLive(any(), any(), any()) }
+    }
+
+    @Test
+    fun `cambiar a RM completa quita el limite y pide el snapshot que falta`() = runBlocking {
+        val scoped = StockAlcance(StockScope.MIS_RUTAS, setOf("EMU-3"))
+        coEvery { scopeStore.cargar() } returns scoped
+        coEvery { scopeStore.cambiar(StockScope.RM_COMPLETA) } returns StockAlcance(StockScope.RM_COMPLETA)
+        // Al abrir, el snapshot ya cubre "Mis rutas"; al cambiar a RM, no.
+        every { scopeStore.snapshotCubre(any()) } returnsMany listOf(true, false)
+        every { client.puedeEntrar() } returns true
+        every { scheduler.start(any()) } returns java.util.UUID.randomUUID()
+
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, scopeStore)
+        await { it.alcance.limita }
+        verify { repo.fijarAlcance(setOf("EMU-3")) }
+
+        vm!!.cambiarAlcance(StockScope.RM_COMPLETA)
+        await { it.alcance.scope == StockScope.RM_COMPLETA }
+
+        verify { repo.fijarAlcance(emptySet()) }
+        verify {
+            scheduler.start(
+                match {
+                    it.rutas.isEmpty() &&
+                        !it.force
+                },
+            )
+        }
     }
 
     private suspend fun await(predicado: (StockUiState) -> Boolean): StockUiState =

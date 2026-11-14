@@ -69,6 +69,13 @@ interface StockRepository {
 
     /** Vacía la caché de consultas en vivo, si la fuente tiene una. */
     fun invalidarCache() = Unit
+
+    /**
+     * Acota catálogo y búsquedas a estas rutas. Vacío = sin filtro (RM o todo
+     * el snapshot disponible). Lo fija el ViewModel cuando el alcance es
+     * "Mis rutas".
+     */
+    fun fijarAlcance(rutas: Set<String>) = Unit
 }
 
 /**
@@ -95,10 +102,46 @@ class DemoStockRepository @Inject constructor(
     @Volatile
     private var data: DemoStockData = data
 
+    /**
+     * Rutas normalizadas del alcance actual. Vacío = no limitar (RM o el
+     * snapshot completo). Lo fija el ViewModel al abrir o al cambiar "Mis
+     * rutas" / "RM completa".
+     */
+    @Volatile
+    private var alcanceRutas: Set<String> = emptySet()
+
+    override fun fijarAlcance(rutas: Set<String>) {
+        alcanceRutas = rutas
+            .map { normalizarRuta(it) }
+            .filter { it.isNotEmpty() }
+            .toSet()
+    }
+
+    /**
+     * Códigos de local que caen dentro del alcance. null = sin filtro.
+     * Se cruza por nombre de ruta normalizado porque el snapshot guarda las
+     * rutas tal como venían en el rutero.
+     */
+    private fun codigosDelAlcance(): Set<String>? {
+        val rutas = alcanceRutas
+        if (rutas.isEmpty()) return null
+        return data.locales
+            .filter { local -> local.rutas.any { normalizarRuta(it) in rutas } }
+            .map { it.code }
+            .toSet()
+    }
+
     // Se descartan las marcas dadas de baja acá, en el único punto por donde
     // pasan catálogo y búsqueda: así también aplica a los snapshots nuevos que
     // lleguen por URL o KPI One, no sólo al JSON empaquetado.
-    private val items: List<StockItem> get() = data.items.filterNot { marcaExcluida(it.brand) }
+    private val items: List<StockItem>
+        get() {
+            val codigos = codigosDelAlcance()
+            return data.items.filterNot { item ->
+                marcaExcluida(item.brand) ||
+                    (codigos != null && item.storeCode !in codigos)
+            }
+        }
 
     /** Reemplaza la muestra en memoria tras una actualización por URL o KPI One. */
     fun actualizarDatos(nuevos: DemoStockData, nuevoOrigen: StockOrigin = StockOrigin.KPI_ONE) {
@@ -124,14 +167,26 @@ class DemoStockRepository @Inject constructor(
         datos.items.maxOfOrNull { it.snapshotDate }
 
     override suspend fun catalog(): StockCatalog {
+        val codigosAlcance = codigosDelAlcance()
         val locales = data.locales.ifEmpty {
             items.map { StockLocal(it.storeCode, it.storeName) }
                 .distinctBy { it.code }
                 .sortedBy { it.code }
+        }.let { lista ->
+            if (codigosAlcance == null) lista else lista.filter { it.code in codigosAlcance }
         }
-        val marcas = data.marcas.filterNot { marcaExcluida(it) }
-            .ifEmpty { items.map { it.brand }.distinct().sorted() }
-        val rutas = locales.flatMap { it.rutas }.distinct().sorted()
+        // Con alcance, la marca se ofrece sólo si tiene stock en esos locales:
+        // el catálogo general incluye marcas que no llegan a todas las rutas.
+        val marcas = if (codigosAlcance == null) {
+            data.marcas.filterNot { marcaExcluida(it) }
+                .ifEmpty { items.map { it.brand }.distinct().sorted() }
+        } else {
+            items.map { it.brand }.distinct().sorted()
+        }
+        val rutas = locales.flatMap { it.rutas }
+            .filter { alcanceRutas.isEmpty() || normalizarRuta(it) in alcanceRutas }
+            .distinct()
+            .sorted()
         // Marcas que tienen stock en los locales de cada ruta: al elegir una ruta
         // el selector de marca se limita a las marcas realmente presentes.
         // Items agrupados por local UNA vez: antes cada ruta recorría los 13k

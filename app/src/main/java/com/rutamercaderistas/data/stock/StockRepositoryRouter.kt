@@ -102,6 +102,11 @@ class StockRepositoryRouter @Inject constructor(
 
     override fun invalidarCache() = remote.invalidarCache()
 
+    override fun fijarAlcance(rutas: Set<String>) {
+        local.fijarAlcance(rutas)
+        remote.fijarAlcance(rutas)
+    }
+
     private suspend fun localSearch(filters: StockFilters): StockResult =
         withContext(Dispatchers.Default) { local.search(filters) }
 

@@ -262,6 +262,39 @@ class DemoStockRepositoryTest {
     }
 
     @Test
+    fun `el alcance de mis rutas limita catalogo, marcas y busqueda`() = runBlocking {
+        val conRutas = DemoStockRepository(
+            DemoStockData(
+                items = listOf(
+                    StockItem("AL3083", "JUMBO NUNOA", "CASO Y CIA", "Nectar", "1", 1.0, null, "2026-10-28", false),
+                    StockItem("HI45", "LIDER MAIPU", "SUK", "Falafel", "2", 2.0, null, "2026-10-28", false),
+                ),
+                locales = listOf(
+                    StockLocal("AL3083", "JUMBO NUNOA", listOf("EMU-3")),
+                    StockLocal("HI45", "LIDER MAIPU", listOf("DMU-5")),
+                ),
+                marcas = listOf("CASO Y CIA", "SUK", "SIN STOCK EN LA RUTA"),
+            ),
+        )
+
+        conRutas.fijarAlcance(setOf("emu 3"))
+
+        val catalogo = conRutas.catalog()
+        assertEquals(listOf("AL3083"), catalogo.locales.map { it.code })
+        assertEquals(listOf("EMU-3"), catalogo.rutas)
+        assertEquals(listOf("CASO Y CIA"), catalogo.marcas)
+        assertEquals(listOf("CASO Y CIA"), catalogo.marcasPorRuta["EMU3"])
+        assertEquals(1, conRutas.search(StockFilters()).items.size)
+        assertEquals(1, conRutas.search(StockFilters(sku = "nectar")).items.size)
+        assertEquals(0, conRutas.search(StockFilters(ruta = "DMU-5")).items.size)
+
+        // Vacío vuelve a significar "sin límite" (RM completa).
+        conRutas.fijarAlcance(emptySet())
+        assertEquals(2, conRutas.catalog().locales.size)
+        assertEquals(2, conRutas.search(StockFilters()).items.size)
+    }
+
+    @Test
     fun `marca dada de baja no aparece en catalogo, busqueda ni conteos`() = runBlocking {
         // La fuente escribe la marca de las dos formas: "BERRYSUR" en stock y
         // "BERRY SUR" en el catálogo EAN. Ninguna debe sobrevivir al filtro.

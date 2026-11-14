@@ -251,9 +251,16 @@ data class StockResult(
     val source: StockSource = StockSource.SNAPSHOT,
     /** Instante ISO en que se consultó KPI One; null si vino del snapshot. */
     val fetchedAt: String? = null,
-    /** Total de filas que reportó KPI One antes del tope de páginas. */
+    /**
+     * Filas que reportó KPI One para la consulta. Con la descarga completa
+     * coincide con lo bajado (incluye duplicados que luego se deduplican).
+     */
     val total: Int = 0,
-    /** true cuando se cortó la descarga en vivo por el tope de páginas. */
+    /**
+     * true cuando la descarga en vivo no alcanzó el total de KPI One: se cortó
+     * por el tope de filas/locales o la API dejó de paginar antes de tiempo.
+     * Los conteos de las tarjetas son parciales en ese caso.
+     */
     val truncated: Boolean = false,
     /** Aviso para la cabecera cuando se usó el respaldo local. */
     val aviso: String? = null,
