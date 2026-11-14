@@ -96,4 +96,5 @@ Capas y flujo de datos: `README.md` §3. Acá solo lo que no se puede romper:
 - Acciones CI están fijadas por SHA; no cambiar a tags flotantes. `softprops/action-gh-release` usa `overwrite_files`.
 - Firma local: `keystore.properties` (gitignored). CI: `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`, `KEYSTORE_PATH`.
 - No incluir secretos ni los Excel fuente de la raíz en commits. No hacer commit, tag o push salvo petición explícita.
+- **Release pedido por el usuario:** antes de versionar, revisar `git status` y el diff completo e incluir **todos los cambios de código solicitados en la sesión**, no solo los del último módulo tocado. Excluir únicamente artefactos (`build/`, APKs, logs, `apk.txt`, `.claude/`). No dejar cambios de código pedidos sin commitear ni asumir que ya viajaron en una release anterior.
 - **JAVA_HOME**: el JDK está en `~/.gradle/jdks/eclipse_adoptium-21-aarch64-os_x.2/jdk-21.0.7+6/Contents/Home` (no en `/Applications/Android Studio.app/...`). Anticipar `JAVA_HOME="..."` al ejecutar gradle.

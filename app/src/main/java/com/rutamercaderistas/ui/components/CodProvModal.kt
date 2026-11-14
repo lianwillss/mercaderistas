@@ -123,7 +123,7 @@ fun copyCodProvToClipboard(context: android.content.Context, code: String) {
 }
 
 /**
- * Fila de marca compacta: avatar · nombre · píldora Cencosud centrada · chip
+ * Fila de marca compacta: avatar · nombre · píldora TOTTUS centrada · chip
  * de código copiable (los códigos largos bajan a 2 líneas con ancho máximo).
  * Entrada con springs e stagger (cross-fade si hay movimiento reducido).
  */
@@ -193,7 +193,7 @@ fun CodProvRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        CencosudPill()
+        TottusPill()
         Spacer(modifier = Modifier.width(8.dp))
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -233,13 +233,13 @@ fun CodProvRow(
 }
 
 /**
- * Píldora "( Cencosud )" estilo M3 moderno: relleno verde flúor con brillo
+ * Píldora "( TOTTUS )" estilo M3 moderno: relleno verde flúor con brillo
  * superior, borde que la recorta sobre fondos claros y sombra sutil. Compacta
  * para convivir con nombre y chip en una sola línea. Texto negro sobre
  * [AccentGreen] (≈9.5:1, sobrado para AA).
  */
 @Composable
-fun CencosudPill(modifier: Modifier = Modifier) {
+fun TottusPill(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .shadow(3.dp, CircleShape, spotColor = AccentGreenText.copy(alpha = 0.35f))
@@ -258,7 +258,7 @@ fun CencosudPill(modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = stringResource(R.string.cod_prov_cencosud_pill),
+            text = stringResource(R.string.cod_prov_tottus_pill),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
             color = Color.Black,
