@@ -17,6 +17,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -110,14 +111,14 @@ import com.rutamercaderistas.data.stock.StockCatalog
 import com.rutamercaderistas.data.stock.StockFilters
 import com.rutamercaderistas.data.stock.StockItem
 import com.rutamercaderistas.data.stock.StockMode
-import com.rutamercaderistas.data.stock.StockAlcance
 import com.rutamercaderistas.data.stock.StockResult
-import com.rutamercaderistas.data.stock.StockScope
 import com.rutamercaderistas.data.stock.StockSort
 import com.rutamercaderistas.data.stock.StockSource
 import com.rutamercaderistas.data.stock.CoberturaTipo
 import com.rutamercaderistas.data.stock.EstadoTipo
+import com.rutamercaderistas.data.stock.ValidacionNegativo
 import com.rutamercaderistas.data.stock.StockStatus
+import com.rutamercaderistas.data.stock.validacionNegativo
 import com.rutamercaderistas.data.stock.StockSyncPhase
 import com.rutamercaderistas.data.stock.coberturaDe
 import com.rutamercaderistas.data.stock.conLocal
@@ -401,8 +402,6 @@ fun StockScreen(
                 StockFiltersCard(
                     catalog = state.catalog,
                     filters = filters,
-                    alcance = state.alcance,
-                    onAlcance = vm::cambiarAlcance,
                     onFilter = vm::onFilter,
                 )
             }
@@ -415,14 +414,25 @@ fun StockScreen(
                         result = state.result,
                         filtros = filters,
                         enCobertura = verCobertura,
+                        osaEnCurso = state.osaEnCurso,
                         onSeccion = { cobertura ->
                             verCobertura = cobertura
                             vm.onFilter {
-                                if (cobertura) it.copy(estado = null, soloNegativos = false) else it.copy(cobertura = null)
+                                if (cobertura) {
+                                    it.copy(
+                                        estado = null,
+                                        soloNegativos = false,
+                                        validacion = null,
+                                    )
+                                } else {
+                                    it.copy(cobertura = null)
+                                }
                             }
                         },
                         onSelectEstado = { estado ->
-                            vm.onFilter { it.copy(estado = estado, soloNegativos = false) }
+                            vm.onFilter {
+                                it.copy(estado = estado, soloNegativos = false, validacion = null)
+                            }
                         },
                         onToggleNegativos = {
                             vm.onFilter {
@@ -431,11 +441,20 @@ fun StockScreen(
                                     soloNegativos = activar,
                                     estado = null,
                                     cobertura = null,
+                                    validacion = if (activar) it.validacion else null,
                                     orden = if (activar && it.orden == StockSort.PRODUCTO_AZ) {
                                         StockSort.GRAVEDAD
                                     } else {
                                         it.orden
                                     },
+                                )
+                            }
+                        },
+                        onSelectValidacion = { validacion ->
+                            vm.onFilter {
+                                it.copy(
+                                    validacion = validacion,
+                                    soloNegativos = true,
                                 )
                             }
                         },
@@ -445,6 +464,7 @@ fun StockScreen(
                                     cobertura = tipo,
                                     estado = null,
                                     soloNegativos = false,
+                                    validacion = null,
                                     orden = if (tipo != null && it.orden == StockSort.PRODUCTO_AZ) {
                                         StockSort.MENOR_COBERTURA
                                     } else {
@@ -474,13 +494,13 @@ fun StockScreen(
                     )
                 }
                 StockStatus.Idle -> item(key = "inicial") {
-                    if (state.catalog.locales.isEmpty() && state.alcance.limita) {
+                    if (state.catalog.locales.isEmpty()) {
                         EstadoCard(
                             icono = Icons.Outlined.Storefront,
-                            titulo = "Sin locales en tus rutas",
-                            detalle = state.alcance.resumen + ". Prueba con la RM completa.",
-                            accion = "Ver RM completa",
-                            onAccion = { vm.cambiarAlcance(StockScope.RM_COMPLETA) },
+                            titulo = "Sin locales en el rutero",
+                            detalle = "No hay locales indexados. Sincroniza el stock o prueba con otro filtro.",
+                            accion = "Sincronizar",
+                            onAccion = { vm.iniciarActualizacion(force = true) },
                         )
                     } else {
                         EstadoCard(
@@ -502,24 +522,40 @@ fun StockScreen(
                 }
                 StockStatus.Empty -> item(key = "vacio") {
                     val localElegido = state.catalog.locales.firstOrNull { it.code == filters.local }
-                    if (state.catalog.locales.isEmpty() && state.alcance.limita) {
+                    if (state.catalog.locales.isEmpty()) {
                         EstadoCard(
                             icono = Icons.Outlined.Storefront,
-                            titulo = "Sin locales en tus rutas",
-                            detalle = state.alcance.resumen + ". Prueba con la RM completa.",
-                            accion = "Ver RM completa",
-                            onAccion = { vm.cambiarAlcance(StockScope.RM_COMPLETA) },
+                            titulo = "Sin locales en el rutero",
+                            detalle = "No hay locales indexados. Sincroniza el stock o prueba con otro filtro.",
+                            accion = "Sincronizar",
+                            onAccion = { vm.iniciarActualizacion(force = true) },
                         )
                     } else {
                     EstadoCard(
                         icono = Icons.Outlined.Inventory2,
                         titulo = when {
+                            state.osaEnCurso && filters.validacion != null ->
+                                "Cruzando negativos con OSA…"
+                            filters.validacion == ValidacionNegativo.CONTRADICE ->
+                                "Sin negativos por verificar"
+                            filters.validacion == ValidacionNegativo.CONFIRMADO ->
+                                "Sin negativos confirmados"
+                            filters.validacion == ValidacionNegativo.SIN_DATO ->
+                                "Sin negativos sin OSA"
                             filters.soloNegativos -> "Sin negativos"
                             filters.cobertura != null -> "Ningún producto en ese tramo"
                             localElegido != null -> "Sin stock para este local"
                             else -> "Sin resultados"
                         },
                         detalle = when {
+                            state.osaEnCurso && filters.validacion != null ->
+                                "Consultando la última visita de cada local."
+                            filters.validacion == ValidacionNegativo.CONTRADICE ->
+                                "Ningún negativo coincide con OSA sí en este corte."
+                            filters.validacion == ValidacionNegativo.CONFIRMADO ->
+                                "Ningún negativo está confirmado por OSA en este corte."
+                            filters.validacion == ValidacionNegativo.SIN_DATO ->
+                                "Todos los negativos de este corte tienen respuesta OSA."
                             filters.soloNegativos -> "No hay stock negativo con estos filtros."
                             filters.cobertura != null -> "No hay productos en ese tramo de cobertura con los filtros actuales."
                             localElegido != null -> localElegido.label + ": todavía no hay stock cargado."
@@ -538,6 +574,7 @@ fun StockScreen(
                                         sku = "",
                                         estado = null,
                                         cobertura = null,
+                                        validacion = null,
                                         soloQuiebre = false,
                                         soloNegativos = false,
                                     )
@@ -563,6 +600,7 @@ fun StockScreen(
                             item = fila.item,
                             mostrarLocal = mostrarLocal,
                             mostrarFecha = fila.mostrarFecha,
+                            mostrarSinOsa = state.result.osaConsultada,
                             fraccion = if (maxStock > 0.0) {
                                 (fila.item.stockUnits / maxStock).toFloat().coerceIn(0f, 1f)
                             } else {
@@ -661,8 +699,6 @@ private fun construirFilas(items: List<StockItem>, modo: StockMode): List<FilaSt
 private fun StockFiltersCard(
     catalog: StockCatalog,
     filters: StockFilters,
-    alcance: StockAlcance,
-    onAlcance: (StockScope) -> Unit,
     onFilter: ((StockFilters) -> StockFilters) -> Unit,
 ) {
     val dimens = LocalAppDimens.current
@@ -672,6 +708,7 @@ private fun StockFiltersCard(
         filters.sku.isNotBlank() ||
         filters.cobertura != null ||
         filters.estado != null ||
+        filters.validacion != null ||
         filters.soloQuiebre ||
         filters.soloNegativos
 
@@ -705,6 +742,7 @@ private fun StockFiltersCard(
                                     sku = "",
                                     estado = null,
                                     cobertura = null,
+                                    validacion = null,
                                     soloQuiebre = false,
                                     soloNegativos = false,
                                 )
@@ -713,28 +751,6 @@ private fun StockFiltersCard(
                         variant = AppButtonVariant.Text,
                     )
                 }
-            }
-
-            // Alcance: no es un filtro de la lista, decide qué se descarga y
-            // qué locales ofrece el catálogo. Por eso va primero y separado.
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AppFilterChip(
-                        selected = alcance.scope == StockScope.MIS_RUTAS,
-                        onClick = { onAlcance(StockScope.MIS_RUTAS) },
-                        label = { Text("Mis rutas") },
-                    )
-                    AppFilterChip(
-                        selected = alcance.scope == StockScope.RM_COMPLETA,
-                        onClick = { onAlcance(StockScope.RM_COMPLETA) },
-                        label = { Text("RM completa") },
-                    )
-                }
-                Text(
-                    text = alcance.resumen,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
 
             val localMostrado = catalog.locales
@@ -906,9 +922,11 @@ private fun ResumenEstados(
     result: StockResult,
     filtros: StockFilters,
     enCobertura: Boolean,
+    osaEnCurso: Boolean,
     onSeccion: (Boolean) -> Unit,
     onSelectEstado: (EstadoTipo?) -> Unit,
     onToggleNegativos: () -> Unit,
+    onSelectValidacion: (ValidacionNegativo?) -> Unit,
     onSelectCobertura: (CoberturaTipo?) -> Unit,
 ) {
     SegmentoResumen(enCobertura = enCobertura, onSeccion = onSeccion)
@@ -945,6 +963,15 @@ private fun ResumenEstados(
                     )
                 },
                 modifier = Modifier.weight(1f),
+            )
+        }
+        if (filtros.soloNegativos) {
+            Spacer(Modifier.height(8.dp))
+            CruzarOsa(
+                result = result,
+                filtros = filtros,
+                osaEnCurso = osaEnCurso,
+                onSelectValidacion = onSelectValidacion,
             )
         }
     } else {
@@ -999,6 +1026,109 @@ private fun ResumenEstados(
                 seleccionada = filtros.cobertura == CoberturaTipo.Sobrestock,
                 onClick = { onSelectCobertura(if (filtros.cobertura == CoberturaTipo.Sobrestock) null else CoberturaTipo.Sobrestock) },
                 modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+/**
+ * Cruce de los negativos con la OSA de la última visita.
+ *
+ * Los chips sólo aparecen cuando el cruce terminó: antes "Sin OSA" mentiría.
+ * Mientras corre se muestra una línea discreta; si no hay red, se avisa que
+ * el cruce necesita conexión.
+ */
+@Composable
+private fun CruzarOsa(
+    result: StockResult,
+    filtros: StockFilters,
+    osaEnCurso: Boolean,
+    onSelectValidacion: (ValidacionNegativo?) -> Unit,
+) {
+    when {
+        osaEnCurso && !result.osaConsultada -> {
+            Text(
+                text = "Cruzando negativos con OSA…",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        result.osaConsultada -> {
+            // Los chips cuentan filas de negativos (lo que se ve en la lista);
+            // "Todas" usa la suma de los tres cruces, no los SKU únicos.
+            val totalFilas = result.conteoConfirmados +
+                result.conteoContradicen + result.conteoSinOsa
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                AppFilterChip(
+                    selected = filtros.validacion == null,
+                    onClick = { onSelectValidacion(null) },
+                    label = { Text("Todas · " + totalFilas) },
+                )
+                AppFilterChip(
+                    selected = filtros.validacion == ValidacionNegativo.CONTRADICE,
+                    onClick = {
+                        onSelectValidacion(
+                            if (filtros.validacion == ValidacionNegativo.CONTRADICE) {
+                                null
+                            } else {
+                                ValidacionNegativo.CONTRADICE
+                            },
+                        )
+                    },
+                    label = { Text("Por verificar · " + result.conteoContradicen) },
+                )
+                AppFilterChip(
+                    selected = filtros.validacion == ValidacionNegativo.CONFIRMADO,
+                    onClick = {
+                        onSelectValidacion(
+                            if (filtros.validacion == ValidacionNegativo.CONFIRMADO) {
+                                null
+                            } else {
+                                ValidacionNegativo.CONFIRMADO
+                            },
+                        )
+                    },
+                    label = { Text("Confirmados · " + result.conteoConfirmados) },
+                )
+                AppFilterChip(
+                    selected = filtros.validacion == ValidacionNegativo.SIN_DATO,
+                    onClick = {
+                        onSelectValidacion(
+                            if (filtros.validacion == ValidacionNegativo.SIN_DATO) {
+                                null
+                            } else {
+                                ValidacionNegativo.SIN_DATO
+                            },
+                        )
+                    },
+                    label = { Text("Sin OSA · " + result.conteoSinOsa) },
+                )
+            }
+            if (result.conteoContradicen > 0) {
+                Text(
+                    text = plural(
+                        result.conteoContradicen,
+                        "negativo",
+                        "negativos",
+                    ) + " con OSA sí: revisa el stock (puede estar desactualizado).",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = UrgencyOrangeText,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+        }
+        result.conteoNegativos > 0 -> {
+            Text(
+                text = if (result.source == StockSource.LIVE) {
+                    "No se pudo consultar OSA; el stock del portal sigue igual."
+                } else {
+                    "OSA no disponible con datos guardados."
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -1312,12 +1442,14 @@ private fun StockItemCard(
     item: StockItem,
     mostrarLocal: Boolean,
     mostrarFecha: Boolean,
+    mostrarSinOsa: Boolean,
     fraccion: Float,
     modifier: Modifier = Modifier,
 ) {
     val dimens = LocalAppDimens.current
     val estado = estadoDe(item)
     val transito = item.transitUnits ?: 0.0
+    val validacion = validacionNegativo(item)
     val descripcion = buildString {
         append(item.product)
         append(", ").append(item.brand)
@@ -1325,6 +1457,12 @@ private fun StockItemCard(
         append(", ").append(item.stockLabel).append(" unidades")
         append(", ").append(estado.texto.lowercase())
         item.coberturaDias?.let { append(", cobertura ").append(it.toInt()).append(" días") }
+        when (validacion) {
+            ValidacionNegativo.CONTRADICE ->
+                append(", OSA dice que sí está en góndola: verificar el stock")
+            ValidacionNegativo.CONFIRMADO -> append(", OSA confirma que no está en góndola")
+            ValidacionNegativo.SIN_DATO -> if (mostrarSinOsa) append(", sin respuesta OSA")
+        }
         if (mostrarLocal) append(", ").append(item.storeName)
         if (transito > 0.0) append(", tránsito ").append(item.transitLabel)
         if (mostrarFecha) append(", ").append(fechaTexto(item.snapshotDate))
@@ -1375,6 +1513,10 @@ private fun StockItemCard(
                     Spacer(Modifier.width(6.dp))
                     BadgeCobertura(item)
                 }
+                if (item.stockUnits < 0.0 && (item.osa != null || mostrarSinOsa)) {
+                    Spacer(Modifier.width(6.dp))
+                    BadgeOsa(item, mostrarSinOsa)
+                }
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = buildString {
@@ -1394,6 +1536,13 @@ private fun StockItemCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+            }
+            if (validacion == ValidacionNegativo.CONTRADICE) {
+                Text(
+                    text = "OSA dice que está exhibido: el stock del portal puede no estar actualizado.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = UrgencyOrangeText,
+                )
             }
         }
             // Barra pegada al borde inferior de la tarjeta.
@@ -1445,6 +1594,57 @@ private fun BadgeEstado(estado: EstadoTipo) {
             style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
         )
+    }
+}
+
+/**
+ * OSA sólo se pinta en negativos: es la evidencia de góndola que permite
+ * decidir si el negativo del portal es real o un stock desactualizado.
+ */
+@Composable
+private fun BadgeOsa(item: StockItem, mostrarSinDato: Boolean) {
+    val osa = item.osa
+    val validacion = validacionNegativo(item)
+    if (validacion == ValidacionNegativo.SIN_DATO && !mostrarSinDato) return
+    val fondo = when (validacion) {
+        ValidacionNegativo.CONTRADICE -> UrgencyOrangeSoft
+        ValidacionNegativo.CONFIRMADO,
+        ValidacionNegativo.SIN_DATO,
+        -> MaterialTheme.colorScheme.surfaceContainerHigh
+    }
+    val color = when (validacion) {
+        ValidacionNegativo.CONTRADICE -> UrgencyOrangeText
+        ValidacionNegativo.CONFIRMADO,
+        ValidacionNegativo.SIN_DATO,
+        -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val texto = when {
+        osa == null -> "Sin OSA"
+        osa.estaEnGondola -> "OSA: sí está"
+        else -> "OSA: no está"
+    }
+    Surface(color = fondo, contentColor = color, shape = RoundedCornerShape(6.dp)) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (validacion == ValidacionNegativo.CONTRADICE) {
+                Icon(
+                    imageVector = Icons.Outlined.WarningAmber,
+                    contentDescription = null,
+                    tint = color,
+                    modifier = Modifier.size(12.dp),
+                )
+                Spacer(Modifier.width(3.dp))
+            }
+            Text(text = texto, style = MaterialTheme.typography.labelSmall)
+            if (osa != null && osa.fecha.isNotBlank()) {
+                Text(
+                    text = " · " + fechaOsaCorta(osa.fecha),
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
+        }
     }
 }
 
@@ -1831,6 +2031,12 @@ private fun diasDesde(iso: String): Long? = runCatching {
 /** Fecha del snapshot de KPI One, literal. */
 private fun fechaTexto(iso: String): String = fechaCorta(iso)
 
+/** Fecha compacta para el badge de OSA: "14/11" en vez de "14-11-2026". */
+private fun fechaOsaCorta(iso: String): String =
+    runCatching {
+        LocalDate.parse(iso).format(DateTimeFormatter.ofPattern("dd/MM"))
+    }.getOrDefault(iso.take(10))
+
 private data class LocalGrave(
     val codigo: String,
     val nombre: String,
@@ -1857,6 +2063,9 @@ internal fun mensajeCompartir(
     val items = result.items
     val negativos = items.count { it.stockUnits < 0.0 }
     val quiebres = items.count { estadoDe(it) == EstadoTipo.Quiebre }
+    val porVerificar = items.count {
+        validacionNegativo(it) == ValidacionNegativo.CONTRADICE
+    }
     val peores = items.groupBy { it.storeCode to it.storeName }
         .map { (clave, lista) ->
             LocalGrave(
@@ -1891,6 +2100,12 @@ internal fun mensajeCompartir(
                 plural(negativos, "negativo", "negativos") + " en " +
                     plural(localesConNegativos, "local", "locales"),
             )
+            if (porVerificar > 0) {
+                appendLine(
+                    plural(porVerificar, "negativo", "negativos") +
+                        " con OSA sí: revisar el stock (puede estar desactualizado).",
+                )
+            }
             if (peores.any { it.negativos > 0 }) {
                 appendLine()
                 appendLine("Locales con más negativos:")

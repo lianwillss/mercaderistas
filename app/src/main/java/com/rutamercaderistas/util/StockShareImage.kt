@@ -9,7 +9,9 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import com.rutamercaderistas.data.stock.EstadoTipo
 import com.rutamercaderistas.data.stock.StockItem
+import com.rutamercaderistas.data.stock.ValidacionNegativo
 import com.rutamercaderistas.data.stock.estadoDe
+import com.rutamercaderistas.data.stock.validacionNegativo
 import java.io.File
 
 /**
@@ -76,6 +78,11 @@ object StockShareImage {
         val sello = System.currentTimeMillis()
         val totalNegativos = items.count { it.stockUnits < 0.0 }
         val totalQuiebres = items.count { estadoDe(it) == EstadoTipo.Quiebre }
+        // Negativos que la OSA marca como "sí está": son los que hay que
+        // verificar antes de reportarlos (stock posiblemente desactualizado).
+        val totalPorVerificar = items.count {
+            validacionNegativo(it) == ValidacionNegativo.CONTRADICE
+        }
 
         return paginas.mapIndexed { indice, pagina ->
             dibujar(
@@ -87,6 +94,7 @@ object StockShareImage {
                 totalLocales = porLocal.size,
                 totalQuiebres = totalQuiebres,
                 totalNegativos = totalNegativos,
+                totalPorVerificar = totalPorVerificar,
                 soloNegativos = soloNegativos,
                 paginaActual = indice + 1,
                 totalPaginas = paginas.size,
@@ -151,6 +159,7 @@ object StockShareImage {
         totalLocales: Int,
         totalQuiebres: Int,
         totalNegativos: Int,
+        totalPorVerificar: Int,
         soloNegativos: Boolean,
         paginaActual: Int,
         totalPaginas: Int,
@@ -193,8 +202,14 @@ object StockShareImage {
         paint.textSize = 24f
         val resumen = if (soloNegativos) {
             // El foco es el negativo: sin quiebres ni "registros" en la cabecera.
-            plural(totalNegativos, "negativo", "negativos") + " · " +
-                plural(totalLocales, "local", "locales")
+            buildString {
+                append(plural(totalNegativos, "negativo", "negativos"))
+                append(" · ").append(plural(totalLocales, "local", "locales"))
+                if (totalPorVerificar > 0) {
+                    append(" · ")
+                    append(plural(totalPorVerificar, "por verificar", "por verificar"))
+                }
+            }
         } else {
             plural(totalItems, "registro", "registros") + " · " +
                 plural(totalQuiebres, "quiebre", "quiebres") + " · " +

@@ -1,6 +1,7 @@
 package com.rutamercaderistas.data.stock.remote
 
 import com.rutamercaderistas.BuildConfig
+import com.rutamercaderistas.data.stock.OsaRespuestaRemota
 import com.rutamercaderistas.data.stock.StockItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -20,6 +21,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.io.IOException
 import java.net.URLEncoder
+import java.time.LocalDate
 import java.util.concurrent.TimeUnit
 
 /** Catálogo de KPI One: códigos de local, marcas y nombres. */
@@ -134,6 +136,25 @@ class KpiOneClient(
         val items = root["items"]?.jsonArray.orEmpty().mapNotNull { it.aItem() }
         val total = root["pagination"]?.jsonObject?.get("total")?.numero()?.toInt() ?: items.size
         InventoryPage(items, total)
+    }
+
+    /**
+     * OSA de la última visita de un local+marca dentro de la ventana.
+     *
+     * KPI One no expone un endpoint plano de respuestas: la respuesta OSA vive
+     * dentro del survey de una visita ("¿El producto está presente en
+     * góndola?"). Se buscan las fotos/visitas del par y se baja el survey de la
+     * más reciente. Sin visita en la ventana devuelve lista vacía (no es error).
+     */
+    suspend fun fetchOsaReciente(
+        storeCode: String,
+        brand: String,
+        desde: LocalDate,
+        hasta: LocalDate,
+    ): List<OsaRespuestaRemota> = withContext(Dispatchers.IO) {
+        val visita = buscarVisitaReciente(storeCode, brand, desde, hasta)
+            ?: return@withContext emptyList()
+        descargarOsa(storeCode, visita)
     }
 
     // ── Internos ───────────────────────────────────────────────────
@@ -285,7 +306,68 @@ class KpiOneClient(
             // cobertura desde la primera sincronización, sin pedir nada extra.
             saleLastWeek = obj["sale_last_week"]?.entero(),
             saleLast4w = obj["sale_last_4w"]?.entero(),
+            // IDs internos: la OSA se cruza por store_id/product_id y no por
+            // texto, que puede venir con descripciones distintas.
+            storeId = obj["store_id"]?.entero(),
+            productId = obj["product_id"]?.entero(),
         )
+    }
+
+    private data class FotoVisita(
+        val id: Int,
+        val fecha: String,
+    )
+
+    /**
+     * Visita (foto) más reciente del local+marca. El browse de KPI One viene
+     * ordenado de más nueva a más vieja: con limit=1 alcanza.
+     */
+    private fun buscarVisitaReciente(
+        storeCode: String,
+        brand: String,
+        desde: LocalDate,
+        hasta: LocalDate,
+    ): FotoVisita? {
+        val url = buildString {
+            append("/api/admin/photos/browse?storeCodes=").append(encode(storeCode))
+            if (brand.isNotBlank()) append("&brands=").append(encode(brand))
+            append("&startDate=").append(desde)
+            append("&endDate=").append(hasta)
+            append("&limit=1&page=1")
+        }
+        val root = getJson(url).jsonObject
+        val registro = root["records"]?.jsonArray?.firstOrNull()?.jsonObject ?: return null
+        val id = registro["id"]?.entero() ?: return null
+        val fecha = registro["date"]?.texto()
+            ?: registro["uploadDate"]?.texto()
+            ?: return null
+        return FotoVisita(id, fecha)
+    }
+
+    /** Respuestas OSA (sí/no) dentro del survey de una visita. */
+    private fun descargarOsa(
+        storeCode: String,
+        visita: FotoVisita,
+    ): List<OsaRespuestaRemota> {
+        val root = getJson("/api/admin/photos/survey-data/" + visita.id).jsonObject
+        val respuestas = root["osa"]?.jsonObject?.get("responses")?.jsonArray
+            ?: return emptyList()
+        return respuestas.mapNotNull { elemento ->
+            val obj = elemento as? JsonObject ?: return@mapNotNull null
+            val answer = obj["answer"]?.texto()?.lowercase()
+            if (answer != "si" && answer != "no") return@mapNotNull null
+            OsaRespuestaRemota(
+                storeCode = storeCode,
+                productId = obj["productId"]?.entero(),
+                sku = obj["productSku"]?.texto().orEmpty(),
+                respuesta = answer == "si",
+                fecha = obj["respondedAt"]?.texto().orEmpty(),
+                visitaFecha = visita.fecha,
+                motivo = obj["notes"]?.texto()?.takeIf(String::isNotBlank),
+                stockContado = obj["finalStock"]?.numero(),
+                stockB2bVisita = obj["b2bStock"]?.numero(),
+            )
+        }
     }
 
     private fun encode(valor: String): String = URLEncoder.encode(valor, "UTF-8")

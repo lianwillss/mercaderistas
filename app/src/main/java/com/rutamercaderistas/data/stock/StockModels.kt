@@ -24,6 +24,8 @@ data class StockFilters(
     val sku: String = "",
     val soloQuiebre: Boolean = false,
     val soloNegativos: Boolean = false,
+    /** Cruce del negativo con la respuesta OSA de la última visita. */
+    val validacion: ValidacionNegativo? = null,
     /** Filtra por estado (quiebre, bajo, disponible); null = todos. */
     val estado: EstadoTipo? = null,
     /** Filtra por tramo de cobertura de venta; null = todos. */
@@ -90,6 +92,80 @@ fun estadoDe(item: StockItem): EstadoTipo {
     }
 }
 
+/**
+ * Respuesta OSA ("¿El producto está presente en góndola?") de la última
+ * visita registrada para un local y producto.
+ *
+ * La OSA no es stock: es lo que el mercaderista vio en góndola. Cruzarla con
+ * el negativo del portal sirve para detectar datos desactualizados: si el
+ * portal dice negativo pero la OSA dice que el producto está exhibido, el
+ * stock probablemente no se ajustó.
+ */
+data class OsaRespuesta(
+    /** true = estaba en góndola ("sí"); false = no estaba ("no"). */
+    val estaEnGondola: Boolean,
+    /** Fecha de la respuesta (ISO yyyy-MM-dd). */
+    val fecha: String = "",
+    /** Fecha de la visita que contiene la respuesta (ISO yyyy-MM-dd). */
+    val visitaFecha: String = "",
+    /** Motivo/gestion escrito por el mercaderista, si lo hubo. */
+    val motivo: String? = null,
+    /** Stock contado en la visita, si el flujo lo pidió. */
+    val stockContado: Double? = null,
+    /** Stock B2B que mostraba KPI One en el momento de la visita. */
+    val stockB2bVisita: Double? = null,
+)
+
+/**
+ * Respuesta OSA tal como llega de KPI One. Se mantiene fuera de [StockItem]
+ * para que el cliente HTTP no dependa de la validación de UI.
+ */
+data class OsaRespuestaRemota(
+    val storeCode: String,
+    val productId: Int?,
+    val sku: String,
+    val respuesta: Boolean,
+    /** respondedAt de la respuesta (ISO, con hora). */
+    val fecha: String,
+    /** Fecha de la visita donde se respondió (yyyy-MM-dd). */
+    val visitaFecha: String,
+    val motivo: String? = null,
+    val stockContado: Double? = null,
+    val stockB2bVisita: Double? = null,
+) {
+    fun aRespuesta() = OsaRespuesta(
+        estaEnGondola = respuesta,
+        fecha = fecha.substringBefore("T").ifBlank { fecha },
+        visitaFecha = visitaFecha,
+        motivo = motivo,
+        stockContado = stockContado,
+        stockB2bVisita = stockB2bVisita,
+    )
+}
+
+/** Resultado de cruzar un negativo con la OSA de la última visita. */
+enum class ValidacionNegativo(val texto: String) {
+    /** OSA "no": el negativo coincide con lo que se vio en góndola. */
+    CONFIRMADO("Confirmado"),
+
+    /** OSA "sí": el producto está exhibido y el stock del portal no cuadra. */
+    CONTRADICE("Por verificar"),
+
+    /** No hay respuesta OSA para este local/producto/fecha. */
+    SIN_DATO("Sin OSA"),
+}
+
+/**
+ * Sólo los negativos se cruzan: el resto de los estados no necesita OSA.
+ * Sin respuesta o con stock no negativo queda [ValidacionNegativo.SIN_DATO].
+ */
+fun validacionNegativo(item: StockItem): ValidacionNegativo = when {
+    item.stockUnits >= 0.0 -> ValidacionNegativo.SIN_DATO
+    item.osa == null -> ValidacionNegativo.SIN_DATO
+    item.osa.estaEnGondola -> ValidacionNegativo.CONTRADICE
+    else -> ValidacionNegativo.CONFIRMADO
+}
+
 /** Ruta comparable: "EMU-3", "emu 3" y "emu3" quedan iguales. */
 fun normalizarRuta(texto: String): String =
     normalizarStock(texto).filter { it.isLetterOrDigit() }
@@ -120,6 +196,7 @@ fun StockFilters.conLocal(valor: String): StockFilters {
         estado = if (buscar) EstadoTipo.Disponible else estado,
         soloQuiebre = if (buscar) false else soloQuiebre,
         soloNegativos = if (buscar) false else soloNegativos,
+        validacion = if (buscar) null else validacion,
     )
 }
 
@@ -136,6 +213,7 @@ fun StockFilters.conRuta(valor: String): StockFilters {
         estado = if (buscar) EstadoTipo.Disponible else estado,
         soloQuiebre = if (buscar) false else soloQuiebre,
         soloNegativos = if (buscar) false else soloNegativos,
+        validacion = if (buscar) null else validacion,
     )
 }
 
@@ -169,6 +247,12 @@ data class StockItem(
     val saleLastWeek: Int? = null,
     /** Unidades vendidas en los últimos 28 días según KPI One; null = sin dato. */
     val saleLast4w: Int? = null,
+    /** ID interno de KPI One para el local; permite cruzar OSA sin ambigüedad. */
+    val storeId: Int? = null,
+    /** ID interno de KPI One para el producto; permite cruzar OSA sin ambigüedad. */
+    val productId: Int? = null,
+    /** Respuesta OSA de la última visita, sólo para negativos. */
+    val osa: OsaRespuesta? = null,
 ) {
     /**
      * Venta diaria promedio. La ventana de 28 días manda porque suaviza promociones;
@@ -216,6 +300,10 @@ fun List<StockItem>.sinDuplicados(): List<StockItem> {
 }
 
 private fun masCompleta(a: StockItem, b: StockItem): StockItem = when {
+    // La OSA es el dato más valioso de esta fila: si una descripción la trae
+    // y la otra no, se conserva la que la tiene.
+    a.osa == null && b.osa != null -> b
+    a.osa != null && b.osa == null -> a
     a.daysOfInventory == null && b.daysOfInventory != null -> b
     a.daysOfInventory != null && b.daysOfInventory == null -> a
     b.product.length > a.product.length -> b
@@ -247,6 +335,17 @@ data class StockResult(
     val conteoCoberturaBaja: Int = 0,
     val conteoSano: Int = 0,
     val conteoSobrestock: Int = 0,
+    /** Negativos que la OSA confirma fuera de góndola. */
+    val conteoConfirmados: Int = 0,
+    /** Negativos con OSA "sí": el stock probablemente está desactualizado. */
+    val conteoContradicen: Int = 0,
+    /** Negativos sin respuesta OSA para el local/producto. */
+    val conteoSinOsa: Int = 0,
+    /**
+     * true cuando ya se intentó cruzar TODOS los negativos con OSA. Mientras
+     * sea false no se pinta "Sin OSA": la respuesta puede estar en camino.
+     */
+    val osaConsultada: Boolean = false,
     /** Origen de las filas: en vivo o snapshot local. */
     val source: StockSource = StockSource.SNAPSHOT,
     /** Instante ISO en que se consultó KPI One; null si vino del snapshot. */
@@ -267,6 +366,9 @@ data class StockResult(
 ) {
     val quiebres: Int get() = items.count { estadoDe(it) == EstadoTipo.Quiebre }
     val negativos: Int get() = items.count { it.stockUnits < 0.0 }
+    /** Negativos que OSA marca como "sí está" y conviene revisar. */
+    val porVerificar: Int
+        get() = items.count { validacionNegativo(it) == ValidacionNegativo.CONTRADICE }
     val uniqueProducts: Int get() = items.map { it.sku }.distinct().size
     val uniqueLocales: Int get() = items.map { it.storeCode }.distinct().size
     val uniqueBrands: Int get() = items.map { it.brand }.distinct().size

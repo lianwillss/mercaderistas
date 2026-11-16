@@ -24,6 +24,7 @@ data class StockCacheDto(
     val sku: String = "",
     val estado: String? = null,
     val cobertura: String? = null,
+    val validacion: String? = null,
     val soloQuiebre: Boolean = false,
     val soloNegativos: Boolean = false,
     val orden: String = "PRODUCTO_AZ",
@@ -39,6 +40,10 @@ data class StockCacheDto(
     val conteoCoberturaBaja: Int = 0,
     val conteoSano: Int = 0,
     val conteoSobrestock: Int = 0,
+    val conteoConfirmados: Int = 0,
+    val conteoContradicen: Int = 0,
+    val conteoSinOsa: Int = 0,
+    val osaConsultada: Boolean = false,
     val items: List<StockRowDto> = emptyList(),
 )
 
@@ -59,8 +64,13 @@ data class CachedStock(
     val conteoCoberturaBaja: Int = 0,
     val conteoSano: Int = 0,
     val conteoSobrestock: Int = 0,
+    val conteoConfirmados: Int = 0,
+    val conteoContradicen: Int = 0,
+    val conteoSinOsa: Int = 0,
+    val osaConsultada: Boolean = false,
     val estado: EstadoTipo? = null,
     val cobertura: CoberturaTipo? = null,
+    val validacion: ValidacionNegativo? = null,
     val soloQuiebre: Boolean = false,
     val soloNegativos: Boolean = false,
     val orden: StockSort = StockSort.PRODUCTO_AZ,
@@ -110,8 +120,15 @@ class StockCache @Inject constructor(
             conteoCoberturaBaja = dto.conteoCoberturaBaja,
             conteoSano = dto.conteoSano,
             conteoSobrestock = dto.conteoSobrestock,
+            conteoConfirmados = dto.conteoConfirmados,
+            conteoContradicen = dto.conteoContradicen,
+            conteoSinOsa = dto.conteoSinOsa,
+            osaConsultada = dto.osaConsultada,
             estado = dto.estado?.let { runCatching { EstadoTipo.valueOf(it) }.getOrNull() },
             cobertura = dto.cobertura?.let { runCatching { CoberturaTipo.valueOf(it) }.getOrNull() },
+            validacion = dto.validacion?.let {
+                runCatching { ValidacionNegativo.valueOf(it) }.getOrNull()
+            },
             soloQuiebre = dto.soloQuiebre,
             soloNegativos = dto.soloNegativos,
             orden = runCatching { StockSort.valueOf(dto.orden) }
@@ -122,13 +139,14 @@ class StockCache @Inject constructor(
     }.getOrNull()
 
     @Synchronized
-    fun save(filtros: StockFilters, resultado: StockResult) {
+    fun save(filtros: StockFilters, resultado: StockResult, forzar: Boolean = false) {
         if (resultado.items.isEmpty()) return
         val clave = clave(filtros)
         val ahora = System.currentTimeMillis()
         // Evita reescribir el archivo por cambios de orden/estado o por el
-        // mismo refresco repetido en pocos segundos.
-        if (clave == lastKey && ahora - lastSavedAt < MIN_INTERVALO_MS) return
+        // mismo refresco repetido en pocos segundos. El cruce OSA llega poco
+        // después del stock y sí debe quedar guardado (forzar = true).
+        if (!forzar && clave == lastKey && ahora - lastSavedAt < MIN_INTERVALO_MS) return
         val dto = StockCacheDto(
             local = filtros.local,
             ruta = filtros.ruta,
@@ -136,6 +154,7 @@ class StockCache @Inject constructor(
             sku = filtros.sku,
             estado = filtros.estado?.name,
             cobertura = filtros.cobertura?.name,
+            validacion = filtros.validacion?.name,
             soloQuiebre = filtros.soloQuiebre,
             soloNegativos = filtros.soloNegativos,
             orden = filtros.orden.name,
@@ -151,6 +170,10 @@ class StockCache @Inject constructor(
             conteoCoberturaBaja = resultado.conteoCoberturaBaja,
             conteoSano = resultado.conteoSano,
             conteoSobrestock = resultado.conteoSobrestock,
+            conteoConfirmados = resultado.conteoConfirmados,
+            conteoContradicen = resultado.conteoContradicen,
+            conteoSinOsa = resultado.conteoSinOsa,
+            osaConsultada = resultado.osaConsultada,
             items = resultado.items.map { it.toRowDto() },
         )
         if (storage.writeAtomic(FILE, json.encodeToString(dto))) {
@@ -169,6 +192,7 @@ class StockCache @Inject constructor(
     private fun clave(filtros: StockFilters): String =
         filtros.local + "|" + filtros.ruta + "|" + filtros.marca + "|" + filtros.sku +
             "|" + filtros.estado + "|" + filtros.cobertura +
+            "|" + filtros.validacion +
             "|" + filtros.soloQuiebre + "|" + filtros.soloNegativos +
             "|" + filtros.orden + "|" + filtros.modo
 

@@ -309,22 +309,8 @@ class StockBulkSync @Inject constructor(
         }
     }
 
-    /**
-     * Clave del alcance que se guarda en la meta. El QC sólo compara contra el
-     * snapshot anterior cuando la clave es idéntica: bajar "Mis rutas" después
-     * de la RM no es una caída de datos.
-     */
-    private fun alcanceDe(request: StockSyncRequest, rm: Set<String>): String = when {
-        request.rutas.isNotEmpty() -> claveAlcanceRutas(request.rutas)
-        request.locales.isNotEmpty() -> "locales:" + request.locales
-            .map { it.trim().uppercase() }
-            .filter { it.isNotEmpty() }
-            .distinct()
-            .sorted()
-            .joinToString(",")
-        rm.isEmpty() -> StockAlcance.SCOPE_ALL
-        else -> StockAlcance.SCOPE_RM
-    }
+    private fun alcanceDe(request: StockSyncRequest, rm: Set<String>): String =
+        if (rm.isEmpty()) "all" else "rm"
 
     private fun construirMapa(
         entries: List<RouteEntryEntity>,

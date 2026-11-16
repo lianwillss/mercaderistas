@@ -42,6 +42,16 @@ data class StockRowDto(
     @SerialName("vw") val saleWeek: Int? = null,
     /** Unidades vendidas en 28 días (KPI One). Ausente en archivos v2 y anteriores. */
     @SerialName("v28") val sale4w: Int? = null,
+    /** IDs internos de KPI One; permiten cruzar OSA por clave exacta. */
+    @SerialName("si") val storeId: Int? = null,
+    @SerialName("pi") val productId: Int? = null,
+    /** Respuesta OSA (1 = sí está, 0 = no está), si se llegó a consultar. */
+    @SerialName("o") val osa: Int? = null,
+    @SerialName("of") val osaFecha: String? = null,
+    @SerialName("ov") val osaVisita: String? = null,
+    @SerialName("om") val osaMotivo: String? = null,
+    @SerialName("oc") val osaContado: Double? = null,
+    @SerialName("ob") val osaStockB2b: Double? = null,
 ) {
     fun toItem() = StockItem(
         storeCode = storeCode,
@@ -56,6 +66,18 @@ data class StockRowDto(
         daysOfInventory = days?.toInt(),
         saleLastWeek = saleWeek,
         saleLast4w = sale4w,
+        storeId = storeId,
+        productId = productId,
+        osa = osa?.let {
+            OsaRespuesta(
+                estaEnGondola = it == 1,
+                fecha = osaFecha.orEmpty(),
+                visitaFecha = osaVisita.orEmpty(),
+                motivo = osaMotivo,
+                stockContado = osaContado,
+                stockB2bVisita = osaStockB2b,
+            )
+        },
     )
 }
 
@@ -73,6 +95,14 @@ fun StockItem.toRowDto() = StockRowDto(
     days = daysOfInventory?.toDouble(),
     saleWeek = saleLastWeek,
     sale4w = saleLast4w,
+    storeId = storeId,
+    productId = productId,
+    osa = osa?.let { if (it.estaEnGondola) 1 else 0 },
+    osaFecha = osa?.fecha?.takeIf(String::isNotBlank),
+    osaVisita = osa?.visitaFecha?.takeIf(String::isNotBlank),
+    osaMotivo = osa?.motivo,
+    osaContado = osa?.stockContado,
+    osaStockB2b = osa?.stockB2bVisita,
 )
 
 /** Metadatos de la última descarga; se guardan aparte para el control de calidad. */

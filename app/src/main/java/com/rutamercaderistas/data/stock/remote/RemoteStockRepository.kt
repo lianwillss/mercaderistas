@@ -2,6 +2,8 @@ package com.rutamercaderistas.data.stock.remote
 
 import com.rutamercaderistas.data.local.RouteEntryDao
 import com.rutamercaderistas.data.local.RouteEntryEntity
+import com.rutamercaderistas.data.stock.OsaRespuesta
+import com.rutamercaderistas.data.stock.OsaRespuestaRemota
 import com.rutamercaderistas.data.stock.StockCatalog
 import com.rutamercaderistas.data.stock.StockFilters
 import com.rutamercaderistas.data.stock.StockItem
@@ -10,12 +12,23 @@ import com.rutamercaderistas.data.stock.StockRepository
 import com.rutamercaderistas.data.stock.StockResult
 import com.rutamercaderistas.data.stock.StockSource
 import com.rutamercaderistas.data.stock.construirStockResult
+import com.rutamercaderistas.data.stock.codigosDeRuta
 import com.rutamercaderistas.data.stock.normalizarRuta
 import com.rutamercaderistas.data.stock.normalizarStock
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.time.Instant
+import java.time.LocalDate
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -47,24 +60,6 @@ class RemoteStockRepository @Inject constructor(
     override val isDemo: Boolean = false
 
     override val requiereSesion: Boolean = true
-
-    /**
-     * Rutas del alcance actual (normalizadas). Vacío = sin límite. Al cambiar,
-     * se descarta el índice filtrado y la caché de consultas: una respuesta
-     * armada con otro alcance no sirve.
-     */
-    @Volatile
-    private var alcanceRutas: Set<String> = emptySet()
-
-    override fun fijarAlcance(rutas: Set<String>) {
-        val nuevas = rutas
-            .map { normalizarRuta(it) }
-            .filter { it.isNotEmpty() }
-            .toSet()
-        if (nuevas == alcanceRutas) return
-        alcanceRutas = nuevas
-        invalidarCache()
-    }
 
     // ── Catálogo ───────────────────────────────────────────────────
 
@@ -122,20 +117,13 @@ class RemoteStockRepository @Inject constructor(
                         fetchedAt = Instant.ofEpochMilli(cache.at).toString(),
                         total = cache.total,
                         truncated = cache.truncated,
+                        osaConsultada = cache.osaConsultada,
                     )
                 }
             }
 
             val entradas = entradas()
-            // Sin local ni ruta, una búsqueda por SKU en vivo debe acotarse a
-            // los locales del alcance; si no, KPI One devolvería la RM entera.
-            val todosLosCodigos = resolverCodigos(entradas, filters).ifEmpty {
-                if (alcanceRutas.isEmpty()) {
-                    emptyList()
-                } else {
-                    entradas.map { it.codigo.trim().uppercase() }.distinct()
-                }
-            }
+            val todosLosCodigos = resolverCodigos(entradas, filters)
             val codigos = todosLosCodigos.take(MAX_LOCALES)
             val truncadoPorLocales = todosLosCodigos.size > codigos.size
             if ((filters.local.isNotBlank() || filters.ruta.isNotBlank()) && codigos.isEmpty()) {
@@ -210,8 +198,172 @@ class RemoteStockRepository @Inject constructor(
             )
         }
 
+    // ── Cruce OSA ──────────────────────────────────────────────────
+
+    /**
+     * Completa los negativos con la OSA de la última visita.
+     *
+     * Se hace después de mostrar el stock (segunda fase): la red de KPI One
+     * tarda ~1-2 s por visita y no debe frenar la búsqueda. La respuesta se
+     * cachea por local+marca, así cambiar de filtro u ordenar no vuelve a
+     * pedirla. Si algún par falla o se agota el tiempo, se devuelven los
+     * cruces que sí llegaron y NO se marca "sin OSA" para el resto.
+     */
+    override suspend fun completarOsa(
+        filtros: StockFilters,
+        resultado: StockResult,
+    ): StockResult? {
+        if (resultado.source != StockSource.LIVE) return null
+        // La entrada cruda de la búsqueda: permite reconstruir la lista
+        // completa (sin el filtro actual) y mantener OSA al cambiar filtros.
+        val clave = cacheKey(filtros)
+        val entrada = leerCache(clave) ?: return null
+        val negativos = entrada.items.filter {
+            it.stockUnits < 0.0 && it.storeCode.isNotBlank() && it.brand.isNotBlank()
+        }
+        if (negativos.isEmpty()) return null
+        // Ya cruzado y completo: no volver a pedir OSA por el mismo corte.
+        if (entrada.osaConsultada && negativos.none { it.osa == null }) return null
+
+        val pares = paresOsa(negativos)
+        if (pares.isEmpty()) return null
+        val (porPar, completo) = resolverOsa(pares)
+
+        // Se enriquecen todas las filas crudas: la próxima reconstrucción
+        // (otro estado/orden) ya sale con la OSA puesta.
+        val enriquecidos = entrada.items.map { item ->
+            if (item.stockUnits >= 0.0 || item.osa != null) {
+                item
+            } else {
+                item.copy(osa = osaDe(item, porPar))
+            }
+        }
+        val consultada = completo &&
+            enriquecidos.none { it.stockUnits < 0.0 && it.osa == null }
+        synchronized(cacheLock) {
+            val actual = cache[clave]
+            if (actual != null && actual.at == entrada.at) {
+                cache[clave] = actual.copy(
+                    items = enriquecidos,
+                    osaConsultada = consultada,
+                )
+            }
+        }
+        return construirResultado(
+            items = enriquecidos,
+            codigos = entrada.codigos,
+            filtros = filtros,
+            source = StockSource.LIVE,
+            fetchedAt = Instant.ofEpochMilli(entrada.at).toString(),
+            total = entrada.total,
+            truncated = entrada.truncated,
+            osaConsultada = consultada,
+        )
+    }
+
+    /** Pares local+marca con negativos, de los más repetidos a los menos. */
+    private fun paresOsa(negativos: List<StockItem>): List<Pair<String, String>> {
+        val conteo = LinkedHashMap<Pair<String, String>, Int>()
+        for (item in negativos) {
+            val par = item.storeCode.trim().uppercase() to item.brand.trim()
+            conteo[par] = (conteo[par] ?: 0) + 1
+        }
+        return conteo.entries
+            .sortedWith(compareByDescending<Map.Entry<Pair<String, String>, Int>> { it.value }
+                .thenBy { it.key.first + "|" + it.key.second })
+            .map { it.key }
+            .take(MAX_PARES_OSA)
+    }
+
+    /**
+     * Trae las respuestas de cada par, primero desde la caché corta y después
+     * de KPI One (con concurrencia y presupuesto acotados).
+     */
+    private suspend fun resolverOsa(
+        pares: List<Pair<String, String>>,
+    ): Pair<Map<Pair<String, String>, List<OsaRespuestaRemota>>, Boolean> {
+        val salida = ConcurrentHashMap<Pair<String, String>, List<OsaRespuestaRemota>>()
+        val pendientes = mutableListOf<Pair<String, String>>()
+        val ahora = System.currentTimeMillis()
+        synchronized(osaCacheLock) {
+            for (par in pares) {
+                val cache = osaCache[par]
+                if (cache != null && ahora - cache.vistaEn <= OSA_CACHE_TTL_MS) {
+                    salida[par] = cache.respuestas
+                } else {
+                    pendientes += par
+                }
+            }
+        }
+        if (pendientes.isEmpty()) return salida to true
+
+        val fallo = AtomicBoolean(false)
+        val desde = LocalDate.now().minusDays(OSA_VENTANA_DIAS)
+        val hasta = LocalDate.now()
+        val completo = withTimeoutOrNull(OSA_PRESUPUESTO_MS) {
+            coroutineScope {
+                val permiso = Semaphore(OSA_CONCURRENCIA)
+                pendientes.map { par ->
+                    async(Dispatchers.IO) {
+                        permiso.withPermit {
+                            try {
+                                val respuestas = client.fetchOsaReciente(
+                                    storeCode = par.first,
+                                    brand = par.second,
+                                    desde = desde,
+                                    hasta = hasta,
+                                )
+                                salida[par] = respuestas
+                                guardarOsaCache(par, respuestas)
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (_: Exception) {
+                                // Un par caído no invalida los demás.
+                                fallo.set(true)
+                            }
+                        }
+                    }
+                }.awaitAll()
+                true
+            }
+        } != null
+        val todoResuelto = salida.keys.containsAll(pares)
+        return salida to (completo && todoResuelto && !fallo.get())
+    }
+
+    private fun guardarOsaCache(
+        par: Pair<String, String>,
+        respuestas: List<OsaRespuestaRemota>,
+    ) = synchronized(osaCacheLock) {
+        if (osaCache.size >= MAX_OSA_CACHE && par !in osaCache) {
+            osaCache.entries.firstOrNull()?.let { osaCache.remove(it.key) }
+        }
+        osaCache[par] = OsaParCache(
+            respuestas = respuestas,
+            vistaEn = System.currentTimeMillis(),
+        )
+    }
+
+    private fun osaDe(
+        item: StockItem,
+        porPar: Map<Pair<String, String>, List<OsaRespuestaRemota>>,
+    ): OsaRespuesta? {
+        val lista = porPar[item.storeCode.trim().uppercase() to item.brand.trim()]
+            ?: return null
+        val id = item.productId
+        val encontrada = (if (id != null) {
+            lista.firstOrNull { it.productId == id }
+        } else {
+            null
+        }) ?: lista.firstOrNull {
+            normalizarStock(it.sku) == normalizarStock(item.sku)
+        } ?: return null
+        return encontrada.aRespuesta()
+    }
+
     override fun invalidarCache() {
         synchronized(cacheLock) { cache.clear() }
+        synchronized(osaCacheLock) { osaCache.clear() }
         routeIndex = null
     }
 
@@ -244,8 +396,7 @@ class RemoteStockRepository @Inject constructor(
      * memoria), así que cambiar sólo la marca reutiliza la descarga.
      */
     private fun cacheKey(filters: StockFilters): String =
-        alcanceKey() + "|" +
-            normalizarStock(filters.local.substringBefore("·")) + "|" +
+        normalizarStock(filters.local.substringBefore("·")) + "|" +
             normalizarRuta(filters.ruta) + "|" +
             normalizarStock(filters.sku)
 
@@ -262,6 +413,7 @@ class RemoteStockRepository @Inject constructor(
         fetchedAt: String,
         total: Int,
         truncated: Boolean,
+        osaConsultada: Boolean = false,
     ): StockResult {
         val permitidos = codigos.toSet()
         val marca = normalizarStock(filtros.marca)
@@ -280,10 +432,9 @@ class RemoteStockRepository @Inject constructor(
             fetchedAt = fetchedAt,
             total = total,
             truncated = truncated,
+            osaConsultada = osaConsultada,
         )
     }
-
-    private fun alcanceKey(): String = alcanceRutas.sorted().joinToString(",")
 
     private fun leerCache(clave: String): CacheEntry? = synchronized(cacheLock) {
         val entrada = cache[clave] ?: return@synchronized null
@@ -307,9 +458,6 @@ class RemoteStockRepository @Inject constructor(
         val actual = routeIndex
         if (actual != null && ahora - actual.at < RUTAS_TTL_MS) return actual.entries
         val nuevas = routeDao.getAllEntries()
-            .filter { entry ->
-                alcanceRutas.isEmpty() || normalizarRuta(entry.rutero) in alcanceRutas
-            }
         routeIndex = RouteIndex(nuevas, ahora)
         return nuevas
     }
@@ -333,13 +481,7 @@ class RemoteStockRepository @Inject constructor(
                 .distinct()
         }
 
-        val ruta = normalizarRuta(filters.ruta)
-        if (ruta.isBlank()) return emptyList()
-        return entradas.filter {
-            val nombre = normalizarRuta(it.rutero)
-            nombre == ruta || (ruta.length >= 3 && nombre.startsWith(ruta))
-        }.map { it.codigo.trim().uppercase() }
-            .distinct()
+        return codigosDeRuta(entradas, filters.ruta)
     }
 
     private data class CacheEntry(
@@ -350,6 +492,8 @@ class RemoteStockRepository @Inject constructor(
         val total: Int,
         val truncated: Boolean,
         val at: Long,
+        /** El cruce OSA ya terminó para esta búsqueda. */
+        val osaConsultada: Boolean = false,
     )
 
     private data class RouteIndex(
@@ -357,8 +501,17 @@ class RemoteStockRepository @Inject constructor(
         val at: Long,
     )
 
+    /** Respuestas OSA por local+marca; la última visita tarda en cambiar. */
+    private data class OsaParCache(
+        val respuestas: List<OsaRespuestaRemota>,
+        val vistaEn: Long,
+    )
+
     private val cache = LinkedHashMap<String, CacheEntry>()
     private val cacheLock = Any()
+
+    private val osaCache = LinkedHashMap<Pair<String, String>, OsaParCache>()
+    private val osaCacheLock = Any()
 
     @Volatile
     private var routeIndex: RouteIndex? = null
@@ -382,5 +535,15 @@ class RemoteStockRepository @Inject constructor(
         /** Bajar una ruta entera son varias páginas: la caché evita repetirlo. */
         const val CACHE_TTL_MS = 60_000L
         const val RUTAS_TTL_MS = 60_000L
+
+        /** Tope de pares local+marca por cruce; el resto queda sin cruzar. */
+        const val MAX_PARES_OSA = 40
+        /** Ventana para buscar la última visita del par local+marca. */
+        const val OSA_VENTANA_DIAS = 60L
+        const val OSA_CONCURRENCIA = 6
+        /** Presupuesto total del cruce: nunca frena la pantalla más que esto. */
+        const val OSA_PRESUPUESTO_MS = 12_000L
+        const val OSA_CACHE_TTL_MS = 10 * 60_000L
+        const val MAX_OSA_CACHE = 64
     }
 }

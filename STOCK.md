@@ -385,3 +385,58 @@ lotes, QC del 10 %, fallidos y escritura del snapshot).
 # release (R8, Hilt, WorkManager)
 ./gradlew --no-parallel :app:assembleRelease
 ```
+
+---
+
+## 11. Cruce con OSA (stock negativo vs respuesta OSA)
+
+La OSA de KPI One es la respuesta **"¿El producto está presente en góndola?"** de una
+visita. No es stock: es lo que el mercaderista vio. Cruzarla con el negativo del portal
+detecta datos desactualizados:
+
+- **OSA sí + stock negativo** → el producto está exhibido y el portal no se ajustó:
+  hay que **verificar el stock** antes de reportarlo.
+- **OSA no + stock negativo** → el negativo queda **confirmado**.
+- **Sin respuesta OSA** → no se puede validar; se muestra igual el negativo.
+
+### Fuente y join
+
+En KPI One no hay endpoint plano de OSA; las respuestas viven en el survey de una visita:
+
+1. `GET /api/admin/photos/browse?storeCodes=<local>&brands=<marca>&startDate=..&endDate=..&limit=1&page=1`
+   → última visita del par local+marca (ventana de 60 días; el browse ordena de más
+   nueva a más vieja).
+2. `GET /api/admin/photos/survey-data/{id}` → `osa.responses[]` con
+   `productId`, `productSku`, `answer` (`si`/`no`), `respondedAt`, `notes` y
+   `b2bStock` de la visita.
+
+El join es por `store_id` + `product_id` (ambos vienen en `inventory-browse`), con
+fallback a SKU normalizado. No se cruza por texto de local/marca.
+
+### Cómo corre
+
+- **Dos fases**: primero se pinta el stock; después, en segundo plano, se completa la OSA.
+  La búsqueda nunca espera a KPI One por el cruce.
+- Sólo se piden pares local+marca con **negativos**; se deduplican y se priorizan por
+  cantidad de filas. Tope: 40 pares, concurrencia 6, presupuesto total 12 s.
+- Caché en memoria por par local+marca (10 min). Si un par falla o se agota el tiempo,
+  se muestran los cruces que llegaron y **no** se marca "Sin OSA" para el resto.
+- Si el stock viene del snapshot o no hay red, la OSA no se consulta y se avisa en la
+  pantalla cuando el filtro Negativos está activo.
+
+### UI y persistencia
+
+- Tarjetas de negativos: badge `OSA: sí está` / `OSA: no está` + fecha, o `Sin OSA`
+  cuando el cruce terminó. Con OSA sí se agrega la línea
+  "OSA dice que está exhibido: el stock del portal puede no estar actualizado."
+- Con el filtro **Negativos** activo aparecen los chips
+  **Todas / Por verificar / Confirmados / Sin OSA** con sus conteos. En el orden
+  **Gravedad**, los negativos que hay que verificar van primero.
+- El PNG y el texto de compartir incluyen cuántos negativos están "por verificar".
+- `StockCache` guarda OSA, IDs y `osaConsultada`; al volver a la pestaña los badges
+  siguen visibles mientras se revalida.
+
+Tests: `OsaNegativosTest` (validación, conteos, filtros y orden),
+`KpiOneClientTest.fetchOsaRecienteLeeLaUltimaVisitaYSusRespuestas`,
+`RemoteStockRepositoryTest.completa los negativos con la OSA de la ultima visita` y
+`StockCacheTest.guarda la OSA de los negativos y si el cruce termino`.

@@ -6,14 +6,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.work.WorkInfo
 import com.rutamercaderistas.data.stock.CachedStock
-import com.rutamercaderistas.data.stock.StockAlcance
 import com.rutamercaderistas.data.stock.StockCache
 import com.rutamercaderistas.data.stock.StockCatalog
 import com.rutamercaderistas.data.stock.StockFilters
 import com.rutamercaderistas.data.stock.StockRepository
 import com.rutamercaderistas.data.stock.StockResult
-import com.rutamercaderistas.data.stock.StockScope
-import com.rutamercaderistas.data.stock.StockScopeStore
 import com.rutamercaderistas.data.stock.StockSource
 import com.rutamercaderistas.data.stock.StockStatus
 import com.rutamercaderistas.data.preferences.PreferencesRepository
@@ -49,8 +46,6 @@ import javax.inject.Inject
 data class StockUiState(
     val catalog: StockCatalog = StockCatalog(),
     val result: StockResult = StockResult(),
-    /** Rutas visibles/descargables: "Mis rutas" o la RM completa. */
-    val alcance: StockAlcance = StockAlcance(),
     val status: StockStatus = StockStatus.Idle,
     val isDemo: Boolean = false,
     val hasSession: Boolean = true,
@@ -73,6 +68,8 @@ data class StockUiState(
     val progresoCompleto: Boolean = false,
     /** La consulta en vivo se cortó por el tope de páginas. */
     val truncado: Boolean = false,
+    /** Se están cruzando los negativos con la OSA de la última visita. */
+    val osaEnCurso: Boolean = false,
     /** Aviso cuando se cayó al snapshot por falta de red o error. */
     val aviso: String? = null,
 )
@@ -87,7 +84,6 @@ class StockViewModel @Inject constructor(
     private val scheduler: StockSyncScheduler,
     private val client: KpiOneClient,
     private val stockCache: StockCache,
-    private val scopeStore: StockScopeStore,
 ) : ViewModel() {
 
     private val _filters = MutableStateFlow(StockFilters())
@@ -113,27 +109,7 @@ class StockViewModel @Inject constructor(
     /** Descarta respuestas viejas si se dispararon dos búsquedas a la vez. */
     private var generacionConsulta = 0
 
-    /**
-     * El catálogo y las búsquedas esperan a que el alcance esté fijado en el
-     * repositorio: si no, la primera consulta saldría sin el límite de rutas.
-     */
-    private val alcanceResuelto = CompletableDeferred<StockAlcance>()
-
     init {
-        // Primero el alcance: el resto de los flujos lo espera.
-        viewModelScope.launch {
-            val alcance = runCatching { scopeStore.cargar() }.getOrElse { StockAlcance() }
-            aplicarAlcance(alcance)
-            alcanceResuelto.complete(alcance)
-            // Si el snapshot en disco no cubre el alcance elegido, se baja sólo
-            // esa parte. Sin credenciales no se fuerza un error al abrir.
-            val cubierto = runCatching { scopeStore.snapshotCubre(alcance) }
-                .getOrDefault(true)
-            if (!cubierto && client.puedeEntrar() && !_state.value.actualizando) {
-                iniciarActualizacion()
-            }
-        }
-
         // Recuerda la última búsqueda y, si hay caché en disco, la pinta de
         // inmediato. Después el flujo de filtros pide la versión nueva.
         viewModelScope.launch {
@@ -162,7 +138,6 @@ class StockViewModel @Inject constructor(
 
         // Al abrir, la app intenta entrar sola: el usuario no debería tocar nada.
         viewModelScope.launch {
-            alcanceResuelto.await()
             if (_state.value.result.items.isEmpty()) {
                 _state.update { it.copy(status = StockStatus.Loading) }
             }
@@ -192,7 +167,6 @@ class StockViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
-            alcanceResuelto.await()
             // El debounce evita una consulta por tecla al escribir el SKU y
             // collectLatest cancela la búsqueda anterior si el usuario sigue
             // escribiendo: con red no conviene encolar consultas viejas.
@@ -299,34 +273,6 @@ class StockViewModel @Inject constructor(
         }
     }
 
-    /** Fija en el repositorio el límite de rutas del alcance visible. */
-    private fun aplicarAlcance(alcance: StockAlcance) {
-        val rutas = if (alcance.limita) alcance.rutas else emptySet()
-        runCatching { repo.fijarAlcance(rutas) }
-        _state.update { it.copy(alcance = alcance) }
-    }
-
-    /**
-     * Cambia entre "Mis rutas" y "RM completa". Reacomoda catálogo y búsqueda
-     * al nuevo límite y, si el snapshot actual no cubre el alcance, dispara una
-     * descarga acotada.
-     */
-    fun cambiarAlcance(scope: StockScope) {
-        if (scope == _state.value.alcance.scope) return
-        viewModelScope.launch {
-            val alcance = runCatching { scopeStore.cambiar(scope) }
-                .getOrElse { StockAlcance(scope) }
-            aplicarAlcance(alcance)
-            cargarCatalogo()
-            cargar(_filters.value, force = true)
-            val cubierto = runCatching { scopeStore.snapshotCubre(alcance) }
-                .getOrDefault(true)
-            if (!cubierto && client.puedeEntrar() && !_state.value.actualizando) {
-                iniciarActualizacion()
-            }
-        }
-    }
-
     /** Genera el stock dentro de la app (KPI One directo). */
     fun iniciarActualizacion(force: Boolean = false) {
         if (_state.value.actualizando) return
@@ -341,9 +287,8 @@ class StockViewModel @Inject constructor(
             }
             return
         }
-        val alcance = _state.value.alcance
         val request = StockSyncRequest(
-            rutas = if (alcance.limita) alcance.rutas else emptySet(),
+            rutas = emptySet(),
             force = force,
         )
         val id = runCatching { scheduler.start(request) }.getOrNull()
@@ -394,6 +339,7 @@ class StockViewModel @Inject constructor(
         val filtros = base.copy(
             estado = cache.estado,
             cobertura = cache.cobertura,
+            validacion = cache.validacion,
             soloQuiebre = cache.soloQuiebre,
             soloNegativos = cache.soloNegativos,
             orden = cache.orden,
@@ -406,6 +352,7 @@ class StockViewModel @Inject constructor(
             fetchedAt = cache.fetchedAt,
             total = cache.total,
             truncated = cache.truncated,
+            osaConsultada = cache.osaConsultada,
         ).copy(
             // Los conteos de las tarjetas salen de la búsqueda sin filtrar por
             // estado; el subconjunto cacheado no alcanza para recalcularlos.
@@ -417,6 +364,9 @@ class StockViewModel @Inject constructor(
             conteoCoberturaBaja = cache.conteoCoberturaBaja,
             conteoSano = cache.conteoSano,
             conteoSobrestock = cache.conteoSobrestock,
+            conteoConfirmados = cache.conteoConfirmados,
+            conteoContradicen = cache.conteoContradicen,
+            conteoSinOsa = cache.conteoSinOsa,
         )
         filtrosMostrados = filtros
         ultimaCargaEn = cache.fetchedAt
@@ -431,6 +381,7 @@ class StockViewModel @Inject constructor(
                 refrescando = true,
                 progresoCarga = 0f,
                 progresoCompleto = false,
+                osaEnCurso = false,
                 fuente = StockSource.CACHE,
                 consultadoEn = cache.fetchedAt,
                 truncado = cache.truncated,
@@ -495,6 +446,7 @@ class StockViewModel @Inject constructor(
                     fuente = StockSource.SNAPSHOT,
                     consultadoEn = null,
                     truncado = false,
+                    osaEnCurso = false,
                     aviso = null,
                 )
             }
@@ -616,6 +568,7 @@ class StockViewModel @Inject constructor(
                 fuente = resultado.source,
                 consultadoEn = resultado.fetchedAt,
                 truncado = resultado.truncated,
+                osaEnCurso = false,
                 aviso = resultado.aviso,
                 fechaDatos = resultado.maxSnapshot ?: it.fechaDatos,
                 generadoEn = if (resultado.source == StockSource.LIVE) {
@@ -636,10 +589,69 @@ class StockViewModel @Inject constructor(
                 runCatching { stockCache.save(filtros, resultado) }
             }
         }
+        // Segunda fase: cruzar los negativos con la OSA de la última visita.
+        // No bloquea la lista; los badges aparecen cuando llegan.
+        if (enVivo?.source == StockSource.LIVE &&
+            resultado.conteoNegativos > 0 &&
+            !resultado.osaConsultada
+        ) {
+            iniciarCruceOsa(generacion, filtros)
+        }
         if (actualizado) ocultarProgreso(generacion)
         } finally {
             if (generacion == generacionConsulta && consultaEnCurso == filtros) {
                 consultaEnCurso = null
+            }
+        }
+    }
+
+    /**
+     * Completa los negativos con la OSA de la última visita en segundo plano.
+     *
+     * La búsqueda ya quedó pintada: si el cruce tarda o falla, la lista sigue
+     * igual y sólo faltan los badges. Se reemplaza el resultado completo para
+     * que los conteos y los chips "Verificar / Confirmados / Sin OSA" queden
+     * consistentes.
+     */
+    private fun iniciarCruceOsa(generacion: Int, filtros: StockFilters) {
+        if (_state.value.osaEnCurso) return
+        _state.update { it.copy(osaEnCurso = true) }
+        viewModelScope.launch {
+            val enriquecido = try {
+                withContext(Dispatchers.IO) {
+                    repo.completarOsa(filtros, _state.value.result)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                null
+            }
+            if (generacion != generacionConsulta || _filters.value != filtros) {
+                _state.update { it.copy(osaEnCurso = false) }
+                return@launch
+            }
+            if (enriquecido == null) {
+                _state.update { it.copy(osaEnCurso = false) }
+                return@launch
+            }
+            _state.update { actual ->
+                if (actual.fuente != StockSource.LIVE) {
+                    actual.copy(osaEnCurso = false)
+                } else {
+                    actual.copy(result = enriquecido, osaEnCurso = false)
+                }
+            }
+            // La caché de la última búsqueda también guarda el cruce, así al
+            // volver a la pestaña los badges siguen ahí mientras revalida.
+            if (filtros.local.isNotBlank() ||
+                filtros.ruta.isNotBlank() ||
+                filtros.sku.trim().length >= 3
+            ) {
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        stockCache.save(filtros, _state.value.result, forzar = true)
+                    }
+                }
             }
         }
     }
@@ -658,7 +670,8 @@ class StockViewModel @Inject constructor(
             anterior.estado == nueva.estado &&
             anterior.cobertura == nueva.cobertura &&
             anterior.soloQuiebre == nueva.soloQuiebre &&
-            anterior.soloNegativos == nueva.soloNegativos
+            anterior.soloNegativos == nueva.soloNegativos &&
+            anterior.validacion == nueva.validacion
 
     fun onFilter(cambio: (StockFilters) -> StockFilters) {
         _filters.update(cambio)

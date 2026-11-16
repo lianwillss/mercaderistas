@@ -61,6 +61,49 @@ class StockCacheTest {
         assertNull(cache.load())
     }
 
+    @Test
+    fun `guarda la OSA de los negativos y si el cruce termino`() {
+        val filtros = StockFilters(
+            local = "J503",
+            soloNegativos = true,
+            validacion = ValidacionNegativo.CONTRADICE,
+        )
+        val negativo = item("J503", -2.0).copy(
+            storeId = 878,
+            productId = 7165,
+            osa = OsaRespuesta(
+                estaEnGondola = true,
+                fecha = "2026-11-14",
+                visitaFecha = "2026-11-14",
+                stockB2bVisita = 10.0,
+            ),
+        )
+        val resultado = StockResult(
+            items = listOf(negativo),
+            source = StockSource.LIVE,
+            fetchedAt = "2026-11-14T13:43:24Z",
+            total = 1,
+            conteoNegativos = 1,
+            conteoContradicen = 1,
+            osaConsultada = true,
+        )
+
+        cache.save(filtros, resultado)
+        val recuperado = cache.load()
+
+        assertTrue(recuperado != null)
+        assertEquals(ValidacionNegativo.CONTRADICE, recuperado!!.validacion)
+        assertTrue(recuperado.osaConsultada)
+        assertEquals(1, recuperado.conteoContradicen)
+        val fila = recuperado.items.single()
+        assertEquals(878, fila.storeId)
+        assertEquals(7165, fila.productId)
+        assertTrue(fila.osa?.estaEnGondola == true)
+        assertEquals("2026-11-14", fila.osa?.fecha)
+        assertEquals(10.0, fila.osa?.stockB2bVisita ?: 0.0, 0.0)
+        assertEquals(ValidacionNegativo.CONTRADICE, validacionNegativo(fila))
+    }
+
     private fun item(store: String, stock: Double) = StockItem(
         storeCode = store,
         storeName = "JUMBO MAIPU",

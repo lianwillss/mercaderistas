@@ -308,6 +308,60 @@ class RemoteStockRepositoryTest {
         }
     }
 
+    @Test
+    fun `completa los negativos con la OSA de la ultima visita`() = runBlocking {
+        QueueHttpServer(
+            respuestaLogin(),
+            response(
+                200,
+                inventario(
+                    fila(
+                        "J503", "JUMBO MAIPU", "CASO Y CIA", "192829", -1.0,
+                        storeId = 878, productId = 7165,
+                    ),
+                    fila(
+                        "J503", "JUMBO MAIPU", "CASO Y CIA", "192830", 5.0,
+                        storeId = 878, productId = 5000,
+                    ),
+                    total = 2,
+                ),
+            ),
+            // Browse: última visita del local+marca.
+            response(
+                200,
+                """{"records":[{"id":99,"date":"2026-11-14"}],"total":1}""",
+            ),
+            // Survey de esa visita: la OSA del producto negativo.
+            response(
+                200,
+                """{"osa":{"responses":[{"productId":7165,"productSku":"192829",
+                   "answer":"si","respondedAt":"2026-11-14T13:43:24.056Z",
+                   "b2bStock":10}]}}""".trimIndent(),
+            ),
+        ).use { server ->
+            val session = InMemoryKpiSessionStore()
+            val client = client(server, session)
+            val dao = mockk<RouteEntryDao>()
+            coEvery { dao.getAllEntries() } returns listOf(entrada("J503"))
+            val repo = RemoteStockRepository(client, session, dao)
+
+            assertTrue(repo.ensureSession())
+            val resultado = repo.search(StockFilters(local = "J503"))
+            assertEquals(1, resultado.items.count { it.stockUnits < 0.0 })
+
+            val cruzado = repo.completarOsa(StockFilters(local = "J503"), resultado)
+
+            assertNotNull(cruzado)
+            val negativo = cruzado!!.items.first { it.stockUnits < 0.0 }
+            assertTrue(negativo.osa?.estaEnGondola == true)
+            assertEquals("2026-11-14", negativo.osa?.fecha)
+            assertEquals(1, cruzado.conteoContradicen)
+            assertEquals(0, cruzado.conteoConfirmados)
+            assertTrue(cruzado.osaConsultada)
+            assertTrue(server.lastRequest()!!.startsWith("GET /api/admin/photos/survey-data/99"))
+        }
+    }
+
     private fun client(server: QueueHttpServer, session: InMemoryKpiSessionStore) = KpiOneClient(
         session = session,
         baseUrl = server.url,
@@ -346,8 +400,11 @@ class RemoteStockRepositoryTest {
         sku: String,
         stock: Double,
         quiebre: Int = 0,
+        storeId: Int? = null,
+        productId: Int? = null,
     ): String = """{"store_code":"$storeCode","store_name":"$storeName","brand_raw":"$brand",
         "product_desc_raw":"Producto $sku","sku_b2b_raw":"$sku","stock_units":$stock,
+        "store_id":$storeId,"product_id":$productId,
         "transit_units":0,"snapshot_date":"2026-11-12","quiebre":$quiebre,
         "days_of_inventory":10,"sale_last_week":5,"sale_last_4w":20}""".trimIndent()
 

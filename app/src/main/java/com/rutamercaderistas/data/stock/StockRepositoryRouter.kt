@@ -100,12 +100,21 @@ class StockRepositoryRouter @Inject constructor(
         }
     }
 
-    override fun invalidarCache() = remote.invalidarCache()
-
-    override fun fijarAlcance(rutas: Set<String>) {
-        local.fijarAlcance(rutas)
-        remote.fijarAlcance(rutas)
+    override suspend fun completarOsa(
+        filtros: StockFilters,
+        resultado: StockResult,
+    ): StockResult? {
+        if (!network.online()) return null
+        return try {
+            remote.completarOsa(filtros, resultado)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
     }
+
+    override fun invalidarCache() = remote.invalidarCache()
 
     private suspend fun localSearch(filters: StockFilters): StockResult =
         withContext(Dispatchers.Default) { local.search(filters) }

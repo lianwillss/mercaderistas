@@ -15,6 +15,8 @@ fun construirStockResult(
     total: Int = 0,
     truncated: Boolean = false,
     aviso: String? = null,
+    /** El cruce con OSA ya se intentó para todos los negativos. */
+    osaConsultada: Boolean = false,
 ): StockResult {
     val sinDuplicados = base.sinDuplicados()
     val unicos = sinDuplicados.distinctBy { it.sku }
@@ -26,17 +28,41 @@ fun construirStockResult(
     val conteoCoberturaBaja = unicos.count { coberturaDe(it) == CoberturaTipo.Bajo }
     val conteoSano = unicos.count { coberturaDe(it) == CoberturaTipo.Sano }
     val conteoSobrestock = unicos.count { coberturaDe(it) == CoberturaTipo.Sobrestock }
+    // Los conteos OSA son por fila (no por SKU): es lo que el usuario ve en
+    // la lista de negativos. "Sin OSA" sólo se cuenta si el cruce terminó.
+    val conteoConfirmados = sinDuplicados.count {
+        it.stockUnits < 0.0 && validacionNegativo(it) == ValidacionNegativo.CONFIRMADO
+    }
+    val conteoContradicen = sinDuplicados.count {
+        it.stockUnits < 0.0 && validacionNegativo(it) == ValidacionNegativo.CONTRADICE
+    }
+    val conteoSinOsa = if (osaConsultada) {
+        sinDuplicados.count {
+            it.stockUnits < 0.0 && validacionNegativo(it) == ValidacionNegativo.SIN_DATO
+        }
+    } else {
+        0
+    }
 
     val filtrados = sinDuplicados.filter { item ->
         (filtros.estado == null || estadoDe(item) == filtros.estado) &&
             (filtros.cobertura == null || coberturaDe(item) == filtros.cobertura) &&
             (!filtros.soloQuiebre || estadoDe(item) == EstadoTipo.Quiebre) &&
-            (!filtros.soloNegativos || item.stockUnits < 0.0)
+            (!filtros.soloNegativos || item.stockUnits < 0.0) &&
+            (filtros.validacion == null ||
+                (item.stockUnits < 0.0 && validacionNegativo(item) == filtros.validacion))
     }
     val ordenados = when (filtros.orden) {
         StockSort.GRAVEDAD -> filtrados.sortedWith(
             compareBy(
-                { if (it.stockUnits < 0.0) 0 else 1 },
+                {
+                    when {
+                        it.stockUnits >= 0.0 -> 2
+                        // Primero lo que hay que verificar: negativo con OSA "sí".
+                        validacionNegativo(it) == ValidacionNegativo.CONTRADICE -> 0
+                        else -> 1
+                    }
+                },
                 { if (estadoDe(it) == EstadoTipo.Quiebre) 0 else 1 },
                 { it.daysOfInventory ?: Int.MAX_VALUE },
                 { it.stockUnits },
@@ -62,6 +88,10 @@ fun construirStockResult(
         conteoCoberturaBaja = conteoCoberturaBaja,
         conteoSano = conteoSano,
         conteoSobrestock = conteoSobrestock,
+        conteoConfirmados = conteoConfirmados,
+        conteoContradicen = conteoContradicen,
+        conteoSinOsa = conteoSinOsa,
+        osaConsultada = osaConsultada,
         source = source,
         fetchedAt = fetchedAt,
         total = if (total > 0) total else sinDuplicados.size,

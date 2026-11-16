@@ -48,6 +48,7 @@ class KpiOneClientTest {
                   "items":[
                     {"store_code":"J503","store_name":"JUMBO MAIPU","brand_raw":"CASO Y CIA",
                      "product_desc_raw":"Nectar Jumex","sku_b2b_raw":"192829","stock_units":94,
+                     "store_id":878,"product_id":1790,
                      "transit_units":0,"snapshot_date":"2026-10-28","quiebre":0,"days_of_inventory":10,
                      "sale_last_week":12,"sale_last_4w":48}
                   ],
@@ -70,6 +71,8 @@ class KpiOneClientTest {
             assertEquals(10, fila.daysOfInventory)
             assertEquals(12, fila.saleLastWeek)
             assertEquals(48, fila.saleLast4w)
+            assertEquals(878, fila.storeId)
+            assertEquals(1790, fila.productId)
             assertEquals(48.0 / 28.0, fila.ventaDiaria!!, 0.0001)
             assertEquals(94.0 / (48.0 / 28.0), fila.coberturaDias!!, 0.0001)
             assertTrue(server.lastRequest()!!.contains("/api/b2b-reports/terreno/inventory-browse"))
@@ -112,6 +115,49 @@ class KpiOneClientTest {
             val pagina = client.fetchInventory(listOf("J503"))
             assertEquals(0, pagina.items.size)
             assertEquals("session=nueva", session.cookie())
+        }
+    }
+
+    @Test
+    fun `fetchOsaRecienteLeeLaUltimaVisitaYSusRespuestas`() = runBlocking {
+        QueueHttpServer(
+            response(200, """{"ok":true}""", "Set-Cookie: session=abc; Path=/"),
+            response(
+                200,
+                """{"records":[{"id":99,"date":"2026-11-14"}],"total":1}""",
+            ),
+            response(
+                200,
+                """{"osa":{"responses":[
+                    {"productId":7165,"productSku":"17735507","answer":"no",
+                     "respondedAt":"2026-11-14T13:43:24.056Z","b2bStock":-1},
+                    {"productId":5080,"productSku":"80651320","answer":"si",
+                     "respondedAt":"2026-11-14T13:43:52.140Z","b2bStock":10},
+                    {"productId":1,"productSku":"sin-responder","answer":null}
+                ]}}""".trimIndent(),
+            ),
+        ).use { server ->
+            val session = InMemoryKpiSessionStore()
+            val client = client(server, session)
+            assertTrue(client.ensureSession())
+
+            val respuestas = client.fetchOsaReciente(
+                storeCode = "FA3741",
+                brand = "CASO Y CIA",
+                desde = java.time.LocalDate.of(2026, 9, 16),
+                hasta = java.time.LocalDate.of(2026, 11, 16),
+            )
+
+            assertEquals(2, respuestas.size)
+            val no = respuestas.first { it.sku == "17735507" }
+            assertEquals(7165, no.productId)
+            assertTrue(!no.respuesta)
+            assertEquals("2026-11-14", no.visitaFecha)
+            assertEquals(-1.0, no.stockB2bVisita ?: 0.0, 0.0)
+            val si = respuestas.first { it.sku == "80651320" }
+            assertTrue(si.respuesta)
+            assertEquals(10.0, si.stockB2bVisita ?: 0.0, 0.0)
+            assertTrue(server.lastRequest()!!.startsWith("GET /api/admin/photos/survey-data/99"))
         }
     }
 
