@@ -477,6 +477,11 @@
         <item quantity="one">+%1$d marca</item>
         <item quantity="other">+%1$d marcas</item>
     </plurals>
+    <plurals name="local_marca_count">
+        <item quantity="one">1 marca</item>
+        <item quantity="other">%1$d marcas</item>
+    </plurals>
+    <string name="local_sin_marcas">Sin marcas</string>
     <string name="locale_clientes">Clientes</string>
     <string name="locale_marcas_count">%1$d marcas</string>
     <string name="onboarding_cerrar_cd">Cerrar guía</string>

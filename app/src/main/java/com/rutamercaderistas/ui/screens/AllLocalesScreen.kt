@@ -46,12 +46,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.semantics.heading
 import com.rutamercaderistas.models.DiaSemana
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.History
@@ -1021,9 +1023,19 @@ private fun LocaleCardContent(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
-            if (local.codigo.isNotBlank()) {
+            val marcasCount = remember(local) { local.clientes.distinctBy { it.nombre }.size }
+            if (local.codigo.isNotBlank() || marcasCount > 0) {
                 Spacer(modifier = Modifier.height(4.dp))
-                CodigoChip(codigo = local.codigo)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (local.codigo.isNotBlank()) {
+                        CodigoChip(codigo = local.codigo)
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    BrandCountChip(count = marcasCount)
+                }
             }
             // Días en que se visita el local dentro de la ruta actual
             // (unión de los días de sus marcas; vacío si no hay datos).
@@ -1154,6 +1166,44 @@ private fun LocaleCardContent(
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
             modifier = Modifier.size(dimens.iconSm),
+        )
+    }
+}
+
+/** Chip pequeño con el conteo de marcas distintas del local. Se muestra en la
+ * fila del código (o de los días) sin agrandar la tarjeta ni tapar la dirección. */
+@Composable
+private fun BrandCountChip(count: Int) {
+    val text = when {
+        count == 0 -> stringResource(R.string.local_sin_marcas)
+        else -> pluralStringResource(R.plurals.local_marca_count, count, count)
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(20.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Category,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(12.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
         )
     }
 }
