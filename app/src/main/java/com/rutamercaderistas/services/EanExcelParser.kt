@@ -17,7 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 
-const val EAN_DATA_VERSION = 46
+const val EAN_DATA_VERSION = 47
 
 // Prefijo/sufijo de los archivos Excel de catálogo EAN en assets.
 // Para agregar más productos basta con soltar otro archivo "ean*.xlsx"
@@ -57,6 +57,7 @@ private val EAN_FILE_BRANDS = mapOf(
     "patpot" to "PATPOT",
     "pet_kitchen" to "PET KITCHEN",
     "indomitable" to "PET KITCHEN",
+    "pet_kitchen_indomitable" to "PET KITCHEN",
     "sangria_candela" to "SANGRIA CANDELA",
 )
 
@@ -481,7 +482,7 @@ class EanExcelParser @Inject constructor(
 
     // Cargar desde assets (todos los archivos "ean_*.xlsx" se combinan)
     suspend fun loadFromAssets(): Result<Int> {
-        // Abre y parsea ~31 xlsx: fuera del hilo principal o la pantalla se
+        // Abre y parsea ~30 xlsx: fuera del hilo principal o la pantalla se
         // congela mientras dura el import (ANR al navegar a Cod. EAN).
         return withImportLock {
             withContext(Dispatchers.IO) {

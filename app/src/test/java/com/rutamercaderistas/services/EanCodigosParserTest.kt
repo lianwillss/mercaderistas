@@ -433,6 +433,42 @@ class EanCodigosParserTest {
     }
 
     @Test
+    fun `ean_pet_kitchen_indomitable_xlsx_imports_2_snack_dental_pet_kitchen`() = runTest {
+        val dao = mockk<EanProductDao>(relaxed = true)
+        val insertedSlot = slot<List<EanProductEntity>>()
+        coEvery { dao.clearAll() } returns Unit
+        coEvery { dao.insertAll(capture(insertedSlot)) } returns Unit
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
+
+        val result = parser.loadFromFile(
+            "src/main/assets/ean_pet_kitchen_indomitable.xlsx",
+            brandFromFilename("ean_pet_kitchen_indomitable.xlsx"),
+        )
+
+        assertTrue("parser should succeed: ${result.exceptionOrNull()}", result.isSuccess)
+        assertEquals(2, result.getOrNull())
+        val inserted = insertedSlot.captured
+        // Sin columna Marca en el Excel: la marca sale del nombre del asset (→ PET KITCHEN).
+        assertTrue("marca debe ser PET KITCHEN, got ${inserted.map { it.marca }}", inserted.all { it.marca == "PET KITCHEN" })
+        assertTrue(
+            "EAN deben conservarse, got ${inserted.map { it.eanPrincipal }}",
+            inserted.map { it.eanPrincipal }.containsAll(listOf("6286938262664", "6286938262732")),
+        )
+        assertTrue(
+            "SKU deben conservarse, got ${inserted.map { it.codCencosud }}",
+            inserted.map { it.codCencosud }.containsAll(listOf("2094110", "2094111")),
+        )
+        assertEquals(
+            "SNACK DENTAL PLUS 28 DIAS RAZA GDE INDOM",
+            inserted.single { it.codCencosud == "2094110" }.descripcionProducto,
+        )
+        assertEquals(
+            "SNACK DENTAL PLUS 28 DIAS RAZA PEQ INDOM",
+            inserted.single { it.codCencosud == "2094111" }.descripcionProducto,
+        )
+    }
+
+    @Test
     fun `ningun EAN se repite en dos SKU distintos entre assets`() = runTest {
         // Guarda contra el error real: un EAN copiado a la fila de otro producto.
         // Sí se permite el mismo EAN con el mismo SKU (catálogos solapados:
