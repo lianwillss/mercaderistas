@@ -500,6 +500,47 @@ class EanCodigosParserTest {
     }
 
     @Test
+    fun `ean_pet_kitchen_productos_xlsx_imports_3_pet_kitchen_products`() = runTest {
+        val dao = mockk<EanProductDao>(relaxed = true)
+        val insertedSlot = slot<List<EanProductEntity>>()
+        coEvery { dao.clearAll() } returns Unit
+        coEvery { dao.insertAll(capture(insertedSlot)) } returns Unit
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
+
+        val result = parser.loadFromFile(
+            "src/main/assets/ean_pet_kitchen_productos.xlsx",
+            brandFromFilename("ean_pet_kitchen_productos.xlsx"),
+        )
+
+        assertTrue("parser should succeed: ${result.exceptionOrNull()}", result.isSuccess)
+        assertEquals(3, result.getOrNull())
+        val inserted = insertedSlot.captured
+        assertTrue("marca debe ser PET KITCHEN, got ${inserted.map { it.marca }}", inserted.all { it.marca == "PET KITCHEN" })
+        assertTrue(
+            "EAN deben conservarse, got ${inserted.map { it.eanPrincipal }}",
+            inserted.map { it.eanPrincipal }.containsAll(
+                listOf("6286938261292", "6286938261056", "8046880200835"),
+            ),
+        )
+        assertTrue(
+            "SKU deben conservarse, got ${inserted.map { it.codCencosud }}",
+            inserted.map { it.codCencosud }.containsAll(listOf("2094109", "2094108", "2081585")),
+        )
+        assertEquals(
+            "GALLETA CREAMY MANTEQUILLA MANI INDOMITA",
+            inserted.single { it.codCencosud == "2094109" }.descripcionProducto,
+        )
+        assertEquals(
+            "GALLETA CREAMY ARANDANOS INDOMITABLE",
+            inserted.single { it.codCencosud == "2094108" }.descripcionProducto,
+        )
+        assertEquals(
+            "SNACK PERRO ANTIOX ARANDAN WILDSNOUT 34G",
+            inserted.single { it.codCencosud == "2081585" }.descripcionProducto,
+        )
+    }
+
+    @Test
     fun `ningun EAN se repite en dos SKU distintos entre assets`() = runTest {
         // Guarda contra el error real: un EAN copiado a la fila de otro producto.
         // Sí se permite el mismo EAN con el mismo SKU (catálogos solapados:
