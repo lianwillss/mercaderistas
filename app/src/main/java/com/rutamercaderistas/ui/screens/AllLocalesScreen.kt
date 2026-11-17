@@ -1309,16 +1309,17 @@ private fun LocaleDetailContent(
         }
         if (brands.isNotEmpty()) {
             Text(
-                text = stringResource(R.string.locale_clientes),
+                text = stringResource(R.string.locale_marcas_count, brands.size),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            brands.forEach { cliente ->
+            brands.forEachIndexed { index, cliente ->
                 MatchedBrandLine(
                     cliente = cliente,
                     daysLabel = diasLabel(local.marcasDias[cliente.nombre].orEmpty()),
                     query = searchQuery,
                     onBrandSearch = onBrandSearch,
+                    brandNumber = index + 1,
                 )
             }
         }

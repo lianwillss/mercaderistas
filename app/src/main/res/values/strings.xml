@@ -478,6 +478,7 @@
         <item quantity="other">+%1$d marcas</item>
     </plurals>
     <string name="locale_clientes">Clientes</string>
+    <string name="locale_marcas_count">%1$d marcas</string>
     <string name="onboarding_cerrar_cd">Cerrar guía</string>
     <string name="onboarding_paso_cd">Guía de inicio, paso %1$d de %2$d: %3$s</string>
     <string name="onboarding_rutero_title">Aquí está tu ruta</string>
