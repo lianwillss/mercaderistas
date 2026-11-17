@@ -182,6 +182,37 @@ class EanCodigosParserTest {
     }
 
     @Test
+    fun `keyfood_fleje xlsx parses 1 KEYFOOD product`() = runTest {
+        val dao = mockk<EanProductDao>(relaxed = true)
+        val insertedSlot = slot<List<EanProductEntity>>()
+        coEvery { dao.clearAll() } returns Unit
+        coEvery { dao.insertAll(capture(insertedSlot)) } returns Unit
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
+
+        val result = parser.loadFromFile(
+            "src/main/assets/ean_keyfood_fleje.xlsx",
+            brandFromFilename("ean_keyfood_fleje.xlsx"),
+        )
+
+        assertTrue("parser should succeed: ${result.exceptionOrNull()}", result.isSuccess)
+        assertEquals(1, result.getOrNull())
+        val inserted = insertedSlot.captured
+        assertTrue("marca debe ser KEYFOOD, got ${inserted.map { it.marca }}", inserted.all { it.marca == "KEYFOOD" })
+        assertTrue(
+            "EAN debe ser 8046908903083, got ${inserted.map { it.eanPrincipal }}",
+            inserted.any { it.eanPrincipal == "8046908903083" },
+        )
+        assertTrue(
+            "SKU debe ser 2087432, got ${inserted.map { it.codCencosud }}",
+            inserted.any { it.codCencosud == "2087432" },
+        )
+        assertEquals(
+            "ACEITE OLIVA EXTR VIRG PESTO BACIO 500ML",
+            inserted.single { it.codCencosud == "2087432" }.descripcionProducto,
+        )
+    }
+
+    @Test
     fun `gomitas xlsx parses 1 ABEJA DORADA product`() = runTest {
         val dao = mockk<EanProductDao>(relaxed = true)
         coEvery { dao.clearAll() } returns Unit
