@@ -1,5 +1,7 @@
 package com.rutamercaderistas.viewmodel
 
+import com.rutamercaderistas.data.local.EanProductDao
+import com.rutamercaderistas.data.local.EanSkuLookup
 import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.data.stock.CachedStock
 import com.rutamercaderistas.data.stock.EstadoTipo
@@ -18,6 +20,7 @@ import com.rutamercaderistas.data.stock.StockUpdater
 import com.rutamercaderistas.data.stock.conLocal
 import com.rutamercaderistas.data.stock.remote.KpiOneClient
 import com.rutamercaderistas.data.stock.remote.KpiSessionStore
+import com.rutamercaderistas.services.EanCatalogSyncer
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -31,6 +34,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -51,6 +56,8 @@ class StockViewModelTest {
     private val scheduler = mockk<StockSyncScheduler>(relaxed = true)
     private val client = mockk<KpiOneClient>(relaxed = true)
     private val cache = mockk<StockCache>(relaxed = true)
+    private val eanDao = mockk<EanProductDao>(relaxed = true)
+    private val eanSyncer = mockk<EanCatalogSyncer>(relaxed = true)
     private var vm: StockViewModel? = null
 
     @Before
@@ -71,6 +78,7 @@ class StockViewModelTest {
             marcas = listOf("CASO Y CIA"),
             rutas = listOf("EMU-3"),
         )
+        coEvery { eanSyncer.ensure() } returns Result.success(1)
         every { cache.load() } returns null
         every { cache.save(any(), any(), any()) } returns Unit
     }
@@ -96,7 +104,7 @@ class StockViewModelTest {
             StockResult(items = listOf(item("J503", 20.0)), source = StockSource.LIVE)
         }
 
-        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache)
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer)
 
         val cacheState = await { it.fuente == StockSource.CACHE }
         assertEquals(10.0, cacheState.result.items.single().stockUnits, 0.0)
@@ -122,7 +130,7 @@ class StockViewModelTest {
             source = StockSource.LIVE,
         )
 
-        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache)
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer)
         await { it.status == com.rutamercaderistas.data.stock.StockStatus.Idle }
 
         vm!!.onFilter { it.conLocal("J503") }
@@ -139,7 +147,7 @@ class StockViewModelTest {
             source = StockSource.LIVE,
         )
 
-        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache)
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer)
         vm!!.onFilter { it.conLocal("J503") }
         await { it.result.items.isNotEmpty() }
 
@@ -174,13 +182,41 @@ class StockViewModelTest {
         )
         coEvery { repo.completarOsa(any(), any()) } returns cruzado
 
-        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache)
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer)
         vm!!.onFilter { it.conLocal("J503") }
 
         val estado = await { it.result.osaConsultada }
         assertEquals(1, estado.result.conteoContradicen)
         assertTrue(estado.result.items.single().osa?.estaEnGondola == true)
         assertTrue(!estado.osaEnCurso)
+    }
+
+
+    @Test
+    fun eanParaSkuEnlazaElCodigoDelCatalogoEan() = runBlocking {
+        every { eanDao.eanPorSkuFlow("1986305") } returns flowOf("859547004701")
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer)
+
+        val emisiones = vm!!.eanParaSku("1986305").toList()
+
+        assertEquals(EanSkuLookup.Cargando, emisiones.first())
+        assertEquals(
+            "859547004701",
+            (emisiones.last() as EanSkuLookup.Resultado).ean,
+        )
+        // El detalle asegura el catalogo antes de consultar.
+        coVerify(exactly = 1) { eanSyncer.ensure() }
+    }
+
+    @Test
+    fun eanParaSkuSinCodigoQuedaEnBlanco() = runBlocking {
+        every { eanDao.eanPorSkuFlow(any()) } returns flowOf(null)
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer)
+
+        val emisiones = vm!!.eanParaSku("999999").toList()
+
+        assertEquals(EanSkuLookup.Cargando, emisiones.first())
+        assertEquals(null, (emisiones.last() as EanSkuLookup.Resultado).ean)
     }
 
     private suspend fun await(predicado: (StockUiState) -> Boolean): StockUiState =

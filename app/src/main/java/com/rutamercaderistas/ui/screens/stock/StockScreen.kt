@@ -139,6 +139,7 @@ import com.rutamercaderistas.ui.components.CollapsingBanner
 import com.rutamercaderistas.ui.components.ActualizacionDatos
 import com.rutamercaderistas.ui.components.ShimmerBlock
 import com.rutamercaderistas.ui.components.rememberCollapsingBannerState
+import com.rutamercaderistas.ui.screens.stock.StockItemZoom
 import com.rutamercaderistas.util.StockShareImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -178,6 +179,7 @@ fun StockScreen(
     val context = LocalContext.current
     val reducirMovimiento = LocalReducedMotionEnabled.current
     val scope = rememberCoroutineScope()
+    var zoomItem by remember { mutableStateOf<StockItem?>(null) }
     // En tablets la columna no se estira: se centra a un ancho legible.
     val anchoPantalla = LocalConfiguration.current.screenWidthDp
     val margenAncho = (((anchoPantalla - 720).coerceAtLeast(0)) / 2).dp
@@ -332,11 +334,12 @@ fun StockScreen(
     val cancelarActualizacion: (() -> Unit)? =
         if (state.actualizando) vm::cancelarActualizacion else null
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .nestedScroll(bannerState.nestedScrollConnection),
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .nestedScroll(bannerState.nestedScrollConnection),
+        ) {
         CollapsingBanner(
             titulo = stringResource(R.string.stock_title),
             subtitulo = when {
@@ -606,13 +609,23 @@ fun StockScreen(
                             } else {
                                 0f
                             },
+                            onItemClick = { zoomItem = fila.item },
                             modifier = modificador,
                         )
                     }
                 }
             }
         }
+
+        zoomItem?.let { item ->
+            StockItemZoom(
+                item = item,
+                flujoEan = vm::eanParaSku,
+                onDismiss = { zoomItem = null },
+            )
+        }
     }
+}
 }
 
 // ── Filas agrupadas ────────────────────────────────────────────────
@@ -1444,6 +1457,7 @@ private fun StockItemCard(
     mostrarFecha: Boolean,
     mostrarSinOsa: Boolean,
     fraccion: Float,
+    onItemClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val dimens = LocalAppDimens.current
@@ -1469,6 +1483,7 @@ private fun StockItemCard(
     }
 
     Card(
+        onClick = onItemClick,
         modifier = modifier
             .fillMaxWidth()
             .semantics(mergeDescendants = true) { contentDescription = descripcion },

@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.work.WorkInfo
+import com.rutamercaderistas.data.local.EanProductDao
+import com.rutamercaderistas.data.local.EanSkuLookup
 import com.rutamercaderistas.data.stock.CachedStock
 import com.rutamercaderistas.data.stock.StockCache
 import com.rutamercaderistas.data.stock.StockCatalog
@@ -24,12 +26,14 @@ import com.rutamercaderistas.data.stock.hayCriterio
 import com.rutamercaderistas.data.stock.remote.KpiOneClient
 import com.rutamercaderistas.data.stock.remote.KpiSessionStore
 import com.rutamercaderistas.data.stock.remote.SessionExpiredException
+import com.rutamercaderistas.services.EanCatalogSyncer
 import com.rutamercaderistas.worker.StockSyncWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,6 +41,10 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -84,6 +92,8 @@ class StockViewModel @Inject constructor(
     private val scheduler: StockSyncScheduler,
     private val client: KpiOneClient,
     private val stockCache: StockCache,
+    private val eanDao: EanProductDao,
+    private val eanSyncer: EanCatalogSyncer,
 ) : ViewModel() {
 
     private val _filters = MutableStateFlow(StockFilters())
@@ -747,6 +757,27 @@ class StockViewModel @Inject constructor(
             }
         }
     }
+
+    /**
+     * Código de barras del catálogo EAN para un SKU (Cód. Cencosud).
+     *
+     * Primero asegura el catálogo (importa si cambió la versión o los assets) y
+     * después observa la consulta: si el catálogo se reimporta con códigos
+     * nuevos, el detalle de stock abierto recibe el valor actualizado solo.
+     */
+    fun eanParaSku(sku: String): Flow<EanSkuLookup> = flow {
+        emit(EanSkuLookup.Cargando)
+        if (sku.isBlank()) {
+            emit(EanSkuLookup.Resultado(null))
+            return@flow
+        }
+        runCatching { eanSyncer.ensure() }
+        emitAll(
+            eanDao.eanPorSkuFlow(sku.trim()).map { codigo ->
+                EanSkuLookup.Resultado(codigo?.trim()?.takeIf { it.isNotBlank() })
+            },
+        )
+    }.flowOn(Dispatchers.IO)
 
     private companion object {
         const val REFRESCO_AL_VOLVER_MS = 60_000L

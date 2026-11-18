@@ -516,4 +516,17 @@
     <!-- Stock -->
     <string name="stock_title">Stock</string>
     <string name="nav_promos_label">Promos</string>
+
+    <!-- Stock item detail (QR + stock) -->
+    <string name="stock_subtitle_sku">SKU: %1$s</string>
+    <string name="stock_label_local">Local</string>
+    <string name="stock_label_marca">Marca</string>
+    <string name="stock_label_stock">Stock</string>
+    <string name="stock_label_unidades">unid.</string>
+    <string name="stock_label_transito">Tránsito</string>
+    <string name="stock_codigo_barras">Código de barras</string>
+    <string name="stock_copiar_sku">Copiar SKU</string>
+    <string name="stock_sku_copiado">SKU copiado al portapapeles</string>
+    <string name="stock_compartir_barras">Compartir código y stock</string>
+    <string name="stock_error_compartir">No se pudo preparar la imagen</string>
 </resources>

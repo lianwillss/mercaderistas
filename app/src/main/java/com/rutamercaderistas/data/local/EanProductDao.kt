@@ -7,6 +7,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.RawQuery
 import androidx.sqlite.db.SupportSQLiteQuery
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface EanProductDao {
@@ -46,6 +47,26 @@ interface EanProductDao {
     // Total exacto de resultados con los mismos filtros (ver buildCountSearch).
     @RawQuery(observedEntities = [EanProductEntity::class])
     suspend fun countForQuery(query: SupportSQLiteQuery): Int
+
+    /**
+     * Código de barras del catálogo EAN para un SKU (Cód. Cencosud).
+     *
+     * Prefiere el EAN principal y cae al "Código de Barra" cuando el principal
+     * viene vacío. Acepta coincidencia exacta y, como respaldo, igualdad
+     * ignorando ceros iniciales. Devuelve null si el producto no está catalogado.
+     */
+    @Query(
+        """
+        SELECT COALESCE(NULLIF(eanPrincipal, ''), NULLIF(codigoBarra, ''))
+        FROM ean_products
+        WHERE codCencosud = :sku
+           OR (:sku != '' AND codCencosud != '' AND ltrim(codCencosud, '0') = ltrim(:sku, '0'))
+        ORDER BY (codCencosud = :sku) DESC,
+                 length(COALESCE(NULLIF(eanPrincipal, ''), NULLIF(codigoBarra, ''))) DESC
+        LIMIT 1
+        """,
+    )
+    fun eanPorSkuFlow(sku: String): Flow<String?>
 }
 
 // Resultados de las facetas de filtro.
