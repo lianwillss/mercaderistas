@@ -14,8 +14,10 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
+import okhttp3.ConnectionPool
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
@@ -387,6 +389,10 @@ class KpiOneClient(
                 .connectTimeout(15, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
+                // HTTP/2 + Connection pooling: reusa conexiones TLS,
+                // evita handshake en cada request (KPI One en Railway soporta h2).
+                .protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))
+                .connectionPool(ConnectionPool(5, 5, TimeUnit.MINUTES))
                 .addInterceptor { chain ->
                     val cookie = session.cookie()
                     val request = if (cookie.isNullOrBlank()) {

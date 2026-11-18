@@ -5,6 +5,7 @@ import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.rutamercaderistas.Constants
+import com.rutamercaderistas.BuildConfig
 import com.rutamercaderistas.R
 import com.rutamercaderistas.data.preferences.PendingUpdate
 import com.rutamercaderistas.data.preferences.PreferencesRepository
@@ -33,69 +34,6 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import javax.inject.Inject
 
-/** Fase visible del aviso de actualización. */
-enum class UpdatePhase { AVAILABLE, DOWNLOADING, READY, INSTALLING, FAILED }
-
-/**
- * Único estado de actualización que consume la UI. No hay notificación ni
- * diálogo en paralelo: la tarjeta del banner es la única superficie.
- * La descarga no instala en primer plano: al quedar Ready se espera a que la
- * app pase a segundo plano (o a que el usuario toque Instalar). Installing
- * cubre la validación y la confirmación de Android.
- */
-sealed interface UpdateCardUiState {
-    val versionName: String
-    val versionCode: Int
-
-    data class Available(
-        override val versionName: String,
-        override val versionCode: Int,
-        /** Versión que está instalada ahora: la tarjeta muestra "12.52 → 12.53". */
-        val installedVersionName: String = "",
-        /** Tamaño publicado del APK; 0 si el release no lo informa. */
-        val apkSize: Long = 0L,
-    ) : UpdateCardUiState
-
-    data class Downloading(
-        override val versionName: String,
-        override val versionCode: Int,
-        val downloadedBytes: Long,
-        val totalBytes: Long,
-        /** Velocidad suavizada en bytes/s; 0 mientras se calcula. */
-        val bytesPerSecond: Long = 0L,
-        /** Segundos restantes estimados; null si aún no se puede calcular. */
-        val etaSeconds: Long? = null,
-        val installedVersionName: String = "",
-        val apkSize: Long = 0L,
-    ) : UpdateCardUiState {
-        val percent: Int
-            get() = if (totalBytes <= 0L) 0
-            else ((downloadedBytes * 100) / totalBytes).toInt().coerceIn(0, 100)
-    }
-
-    data class Ready(
-        override val versionName: String,
-        override val versionCode: Int,
-        /** Ya se intentó instalar sola y Android no completó la instalación. */
-        val installAttempted: Boolean = false,
-    ) : UpdateCardUiState
-
-    data class Installing(
-        override val versionName: String,
-        override val versionCode: Int,
-        val installedVersionName: String = "",
-        /** La sesión quedó esperando la autorización del usuario en Android. */
-        val waitingForUser: Boolean = false,
-    ) : UpdateCardUiState
-
-    data class Failed(
-        override val versionName: String,
-        override val versionCode: Int,
-        val message: String,
-        val retryable: Boolean = true,
-    ) : UpdateCardUiState
-}
-
 @HiltViewModel
 class UpdateViewModel @Inject constructor(
     application: Application,
@@ -107,29 +45,12 @@ class UpdateViewModel @Inject constructor(
         private const val UPDATE_CHECK_MIN_INTERVAL_MS = 15 * 60_000L
     }
 
-    private data class DownloadSnapshot(
-        val phase: UpdatePhase,
-        val downloadedBytes: Long = 0L,
-        val totalBytes: Long = 0L,
-        val bytesPerSecond: Long = 0L,
-        val etaSeconds: Long? = null,
-        val message: String = "",
-        val retryable: Boolean = true,
-        /** La sesión está commiteada y esperando la confirmación del sistema. */
-        val awaitingUserAction: Boolean = false,
-    )
+    private val _state = MutableStateFlow<UpdateState>(UpdateState.Idle)
+    val state: StateFlow<UpdateState> = _state
+        .stateIn(viewModelScope, SharingStarted.Eagerly, UpdateState.Idle)
 
     private val _pendingUpdate = MutableStateFlow<PendingUpdate?>(null)
     val pendingUpdate: StateFlow<PendingUpdate?> = _pendingUpdate.asStateFlow()
-
-    private val _suppressed = MutableStateFlow(false)
-    private val _download = MutableStateFlow<DownloadSnapshot?>(null)
-    private val _installedVersionName = MutableStateFlow(
-        InstalledVersion.buildConfig().versionName,
-    )
-
-    /** versionCode del último intento automático, para no repetirlo al abrir. */
-    private val _installAttemptedCode = MutableStateFlow(0)
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
@@ -137,155 +58,120 @@ class UpdateViewModel @Inject constructor(
     private val _checking = MutableStateFlow(false)
     val isChecking: StateFlow<Boolean> = _checking.asStateFlow()
 
-    /** Banner persistente: hay update pendiente y no está pospuesto. */
-    val showUpdateBanner: StateFlow<Boolean> =
-        combine(_pendingUpdate, _suppressed) { pending, suppressed ->
-            pending != null && !suppressed
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
-
-    /** Estado que pinta la tarjeta: Disponible, Descargando(%), Lista, Instalando, Error. */
-    val card: StateFlow<UpdateCardUiState?> =
-        combine(
-            _pendingUpdate,
-            _download,
-            _installedVersionName,
-            _installAttemptedCode,
-        ) { pending, snapshot, installedName, attemptedCode ->
-            if (pending == null) return@combine null
-            when (snapshot?.phase) {
-                UpdatePhase.DOWNLOADING -> UpdateCardUiState.Downloading(
-                    versionName = pending.versionName,
-                    versionCode = pending.versionCode,
-                    downloadedBytes = snapshot.downloadedBytes,
-                    totalBytes = snapshot.totalBytes,
-                    bytesPerSecond = snapshot.bytesPerSecond,
-                    etaSeconds = snapshot.etaSeconds,
-                    installedVersionName = installedName,
-                    apkSize = pending.apkSize,
-                )
-                UpdatePhase.READY -> UpdateCardUiState.Ready(
-                    versionName = pending.versionName,
-                    versionCode = pending.versionCode,
-                    installAttempted = attemptedCode == pending.versionCode,
-                )
-                UpdatePhase.INSTALLING -> UpdateCardUiState.Installing(
-                    versionName = pending.versionName,
-                    versionCode = pending.versionCode,
-                    installedVersionName = installedName,
-                    waitingForUser = snapshot.awaitingUserAction,
-                )
-                UpdatePhase.FAILED -> UpdateCardUiState.Failed(
-                    versionName = pending.versionName,
-                    versionCode = pending.versionCode,
-                    message = snapshot.message,
-                    retryable = snapshot.retryable,
-                )
-                UpdatePhase.AVAILABLE, null -> UpdateCardUiState.Available(
-                    versionName = pending.versionName,
-                    versionCode = pending.versionCode,
-                    installedVersionName = installedName,
-                    apkSize = pending.apkSize,
-                )
-            }
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
-
     private var awaitingInstallPermission = false
-
     /** Evita abrir dos sesiones de PackageInstaller si se toca dos veces. */
     private var installSessionActive = false
     /** Serializa reintentar/cancelar para no abandonar la sesión recién creada. */
     private var sessionMaintenanceActive = false
-
-    /** versionCode para el que ya se intentó instalar. */
-    private var installAttemptedCode = 0
 
     private var restoreJob: Job? = null
     private var downloadJob: Job? = null
     private var installJob: Job? = null
 
     init {
-        restoreJob = viewModelScope.launch { restorePendingUpdate() }
+        restoreJob = viewModelScope.launch { restoreState() }
         observeInstallOutcomes()
     }
 
-    /** Recupera el pendiente guardado y, si ya hay APK válido, lo marca listo. */
-    private suspend fun restorePendingUpdate() {
-        _suppressed.value = withContext(Dispatchers.IO) {
-            System.currentTimeMillis() < preferencesRepository.getUpdateSuppressedUntil()
+    /** Recupera el estado persistido y, si hay APK válido, lo verifica y avanza. */
+    private suspend fun restoreState() {
+        val storedState = withContext(Dispatchers.IO) {
+            preferencesRepository.getUpdateState()
         }
-        val stored = withContext(Dispatchers.IO) {
-            preferencesRepository.getPendingUpdate()
-        }
-        if (stored == null) return
+        if (storedState == null) return
 
-        // Un release ya rechazado no se restaura: evita mostrar la tarjeta
-        // de un APK que nunca se podrá instalar.
+        // Un release ya rechazado no se restaura
         val rejected = withContext(Dispatchers.IO) {
             preferencesRepository.getRejectedUpdateTag()
         }
-        if (UpdateChecker.isRejectedTag(stored.versionTag, rejected)) {
-            cleanupResolved(showMessage = false)
-            return
+        if (storedState is UpdateState.Downloading ||
+            storedState is UpdateState.Verifying ||
+            storedState is UpdateState.ReadyToInstall ||
+            storedState is UpdateState.Installing
+        ) {
+            if (UpdateChecker.isRejectedTag(storedState.versionName, rejected)) {
+                cleanupResolved(showMessage = false)
+                return
+            }
         }
 
         val installed = withContext(Dispatchers.IO) {
             InstalledVersion.read(getApplication())
         }
-        _installedVersionName.value = installed.versionName
-        if (!UpdateChecker.isPendingNewer(stored.versionTag, stored.versionCode, installed)) {
-            cleanupResolved(showMessage = false)
-            return
-        }
 
-        installAttemptedCode = withContext(Dispatchers.IO) {
-            preferencesRepository.getUpdateInstallAttemptedCode()
-        }
-        _installAttemptedCode.value = installAttemptedCode
-
-        _pendingUpdate.value = stored
-
-        // Si ya hay una sesión de PackageInstaller commiteada, no se crea
-        // otra: la app pudo reiniciarse mientras MIUI esperaba la
-        // confirmación. La tarjeta ofrece reintentar o esperar al sistema.
-        val context = getApplication<Application>()
-        val storedSessionId = withContext(Dispatchers.IO) {
-            preferencesRepository.getInstallSessionId()
-        }
-        val activeSessions = withContext(Dispatchers.IO) {
-            ApkDownloader.activeInstallSessionIds(context)
-        }
-        val storedSessionActive = storedSessionId != 0 && withContext(Dispatchers.IO) {
-            ApkDownloader.isInstallSessionActive(context, storedSessionId)
-        }
-        if (activeSessions.isNotEmpty() || storedSessionActive) {
-            installSessionActive = true
-            _download.value = DownloadSnapshot(
-                phase = UpdatePhase.INSTALLING,
-                awaitingUserAction = true,
-            )
-            return
-        }
-
-        // La sesión guardada ya no existe (se completó, se canceló o el
-        // sistema la limpió): se descarta para no mostrar un estado falso.
-        if (storedSessionId != 0) {
-            withContext(Dispatchers.IO) {
-                preferencesRepository.clearInstallSessionId()
+        // Si la versión instalada ya es la misma o más nueva, limpiar estado
+        if (storedState is UpdateState.Installed) {
+            if (installed.versionCode >= storedState.versionCode) {
+                cleanupResolved(showMessage = false)
+                return
+            }
+        } else if (storedState is UpdateState.ReadyToInstall ||
+            storedState is UpdateState.Installing ||
+            storedState is UpdateState.Downloading ||
+            storedState is UpdateState.Verifying
+        ) {
+            if (!UpdateChecker.isPendingNewer(storedState.versionName, storedState.versionCode, installed)) {
+                cleanupResolved(showMessage = false)
+                return
             }
         }
 
-        val ready = evaluateDownloadedApk(stored)
-        // No pisa un progreso que ya esté en curso. No instala al restaurar:
-        // la instalación la pide el usuario y la autoriza Android.
-        if (ready != null && downloadJob?.isActive != true) {
-            _download.value = ready
+        _state.value = storedState
+
+        // Restaurar el pending desde preferencias si el estado no es Idle/Installed/Error
+        if (storedState !is UpdateState.Idle && storedState !is UpdateState.Installed && storedState !is UpdateState.Error) {
+            val pending = withContext(Dispatchers.IO) {
+                preferencesRepository.getPendingUpdate()
+            }
+            if (pending != null) _pendingUpdate.value = pending
+        }
+
+        // Si hay sesión de instalación pendiente, restaurar estado Installing
+        if (storedState is UpdateState.Installing) {
+            val context = getApplication<Application>()
+            val activeSessions = withContext(Dispatchers.IO) {
+                ApkDownloader.activeInstallSessionIds(context)
+            }
+            val storedSessionActive = storedState.sessionId != 0 && withContext(Dispatchers.IO) {
+                ApkDownloader.isInstallSessionActive(context, storedState.sessionId)
+            }
+            if (activeSessions.isNotEmpty() || storedSessionActive) {
+                installSessionActive = true
+                _state.value = storedState.copy(waitingForUser = true)
+                return
+            }
+            // Sesión ya no existe, limpiar y volver a ReadyToInstall
+            if (storedState.sessionId != 0) {
+                withContext(Dispatchers.IO) {
+                    preferencesRepository.clearInstallSessionId()
+                }
+            }
+        }
+
+        // Si está en Downloading/Verifying/ReadyToInstall, verificar APK existente
+        when (storedState) {
+            is UpdateState.Downloading,
+            is UpdateState.Verifying,
+            is UpdateState.ReadyToInstall -> {
+                val evaluated = evaluateDownloadedApk(storedState.versionName, storedState.versionCode)
+                if (evaluated != null) {
+                    _state.value = evaluated
+                }
+            }
+            is UpdateState.Error -> {
+                // Mantener error para que el usuario vea el mensaje
+            }
+            is UpdateState.Installed -> {
+                // Mostrar aviso de actualizado
+            }
+            else -> {}
         }
     }
 
     /**
      * Consulta GitHub y deja el resultado en el único estado compartido.
      * En arranque (autoStartDownload) arranca la descarga dentro de la app.
-     * La instalación se dispara al salir de la app o al tocar "Instalar".
+     * Al terminar la descarga, verifica y lanza el instalador automáticamente.
      */
     fun checkForUpdate(
         force: Boolean = false,
@@ -293,7 +179,6 @@ class UpdateViewModel @Inject constructor(
         autoStartDownload: Boolean = false,
     ) {
         viewModelScope.launch {
-            // Restaurar primero evita que un pendiente viejo borre el nuevo.
             restoreJob?.join()
             if (_checking.value) return@launch
             if (!force) {
@@ -306,7 +191,6 @@ class UpdateViewModel @Inject constructor(
             _checking.value = true
             val context = getApplication<Application>()
             val installed = withContext(Dispatchers.IO) { InstalledVersion.read(context) }
-            _installedVersionName.value = installed.versionName
             val rejected = withContext(Dispatchers.IO) {
                 preferencesRepository.getRejectedUpdateTag()
             }
@@ -328,7 +212,6 @@ class UpdateViewModel @Inject constructor(
                 return@launch
             }
             if (info.error != null) {
-                // Un fallo transitorio no borra el pendiente ni el aviso.
                 if (showFeedback) {
                     _message.value = if (info.error.contains("conexión", ignoreCase = true)) {
                         context.getString(R.string.update_sin_internet)
@@ -352,10 +235,7 @@ class UpdateViewModel @Inject constructor(
                     apkSize = info.apkSize,
                     apkSha256 = info.apkSha256,
                 )
-                // Si no hay espacio para descargar e instalar (Android duplica el
-                // APK al instalar), no se guarda el pendiente ni se muestra el
-                // banner: el usuario solo vería una actualización que no puede
-                // aplicar. Se re-detecta en la próxima apertura si libera espacio.
+
                 if (pending.apkSize > 0L) {
                     val missingMb = withContext(Dispatchers.IO) {
                         val dir = context.filesDir
@@ -373,14 +253,18 @@ class UpdateViewModel @Inject constructor(
                     }
                 }
 
-                val previous = _pendingUpdate.value
-                val sameRelease = previous?.versionTag == pending.versionTag &&
-                    previous.versionCode == pending.versionCode
+                val currentState = _state.value
+                val sameRelease = when (currentState) {
+                    is UpdateState.Downloading,
+                    is UpdateState.Verifying,
+                    is UpdateState.ReadyToInstall,
+                    is UpdateState.Installing,
+                    is UpdateState.Error -> currentState.versionName == pending.versionName &&
+                        currentState.versionCode == pending.versionCode
+                    else -> false
+                }
 
                 if (!sameRelease) {
-                    // Otro release: el APK y el .part viejos no sirven. Se
-                    // borran ANTES de publicar el pendiente, para que una
-                    // descarga recién arrancada no pierda su estado.
                     downloadJob?.cancel()
                     downloadJob = null
                     discardInstallSession(context)
@@ -388,9 +272,7 @@ class UpdateViewModel @Inject constructor(
                         ApkDownloader.clearDownloadedApk(context)
                         preferencesRepository.clearUpdateInstallAttemptedCode()
                     }
-                    installAttemptedCode = 0
-                    _installAttemptedCode.value = 0
-                    _download.value = null
+                    _state.value = UpdateState.Idle
                 }
 
                 withContext(Dispatchers.IO) {
@@ -398,28 +280,27 @@ class UpdateViewModel @Inject constructor(
                 }
                 _pendingUpdate.value = pending
 
-                if (sameRelease && _download.value == null) {
-                    // Mismo release: si ya hay un APK verificado, se instala
-                    // sin volver a descargar.
-                    val evaluated = evaluateDownloadedApk(pending)
+                if (sameRelease) {
+                    // Mismo release: si ya hay APK verificado, ir a Verifying/ReadyToInstall
+                    val evaluated = evaluateDownloadedApk(pending.versionName, pending.versionCode)
                     if (evaluated != null) {
-                        _download.value = evaluated
+                        _state.value = evaluated
                     }
                 }
 
-                if (autoStartDownload) {
-                    if (_suppressed.value) {
-                        withContext(Dispatchers.IO) {
-                            preferencesRepository.setUpdateSuppressedUntil(0)
-                        }
-                        _suppressed.value = false
-                    }
-                    startUpdate()
+                if (autoStartDownload || !sameRelease) {
+                    startUpdate(pending)
                 }
             } else {
                 cleanupResolved(showMessage = showFeedback)
             }
         }
+    }
+
+    /** Inicia la descarga usando el pendiente guardado. */
+    fun startUpdate() {
+        val pending = _pendingUpdate.value ?: return
+        startUpdate(pending)
     }
 
     /** Consulta obligatoria al abrir: si hay versión nueva, descarga sola. */
@@ -443,12 +324,12 @@ class UpdateViewModel @Inject constructor(
      * Descarga el pendiente en el proceso de la app, actualizando el
      * porcentaje en la tarjeta. No usa WorkManager ni notificaciones.
      */
-    fun startUpdate() {
-        val pending = _pendingUpdate.value ?: return
-        val phase = _download.value?.phase
-        if (phase == UpdatePhase.DOWNLOADING ||
-            phase == UpdatePhase.READY ||
-            phase == UpdatePhase.INSTALLING
+    private fun startUpdate(pending: PendingUpdate) {
+        val currentState = _state.value
+        if (currentState is UpdateState.Downloading ||
+            currentState is UpdateState.Verifying ||
+            currentState is UpdateState.ReadyToInstall ||
+            currentState is UpdateState.Installing
         ) {
             return
         }
@@ -458,8 +339,15 @@ class UpdateViewModel @Inject constructor(
         installSessionActive = false
         downloadJob?.cancel()
         downloadJob = viewModelScope.launch {
-            _download.value = DownloadSnapshot(UpdatePhase.DOWNLOADING)
-            val speedMeter = DownloadSpeedMeter()
+            _state.value = UpdateState.Downloading(
+                versionName = pending.versionName,
+                versionCode = pending.versionCode,
+                downloadedBytes = 0L,
+                totalBytes = pending.apkSize,
+                installedVersionName = InstalledVersion.buildConfig().versionName,
+                apkSize = pending.apkSize,
+            )
+            val speedMeter = DownloadSpeedMeter(windowMillis = 1000L, maxSamples = 10)
             try {
                 val result = ApkDownloader.download(
                     context = context,
@@ -474,47 +362,59 @@ class UpdateViewModel @Inject constructor(
                         nowMillis = SystemClock.elapsedRealtime(),
                     )
                     val remainingBytes = progress.totalBytes - progress.bytes
-                    val etaSeconds = if (bytesPerSecond > 0L && remainingBytes > 0L) {
+                    val etaSeconds = if (speedMeter.hasReliableEta() && bytesPerSecond > 0L && remainingBytes > 0L) {
                         remainingBytes / bytesPerSecond
                     } else {
                         null
                     }
-                    _download.value = DownloadSnapshot(
-                        phase = UpdatePhase.DOWNLOADING,
+                    _state.value = UpdateState.Downloading(
+                        versionName = pending.versionName,
+                        versionCode = pending.versionCode,
                         downloadedBytes = progress.bytes,
                         totalBytes = progress.totalBytes,
                         bytesPerSecond = bytesPerSecond,
                         etaSeconds = etaSeconds,
+                        installedVersionName = InstalledVersion.buildConfig().versionName,
+                        apkSize = pending.apkSize,
                     )
                 }
 
                 when (result) {
                     is DownloadResult.Success -> {
-                        val evaluated = evaluateDownloadedApk(pending)
-                        _download.value = evaluated ?: DownloadSnapshot(
-                            phase = UpdatePhase.FAILED,
-                            message = context.getString(R.string.update_archivo_faltante),
-                            retryable = true,
+                        // Pasar a Verifying antes de instalar
+                        _state.value = UpdateState.Verifying(
+                            versionName = pending.versionName,
+                            versionCode = pending.versionCode,
+                            installedVersionName = InstalledVersion.buildConfig().versionName,
+                            apkSize = pending.apkSize,
                         )
+                        // Verificar y luego instalar automáticamente
+                        verifyAndAutoInstall(pending)
                     }
                     is DownloadResult.Error -> {
                         if (result.releaseRejected) {
                             markReleaseRejected(pending.versionTag)
                         }
-                        _download.value = DownloadSnapshot(
-                            phase = UpdatePhase.FAILED,
+                        _state.value = UpdateState.Error(
+                            versionName = pending.versionName,
+                            versionCode = pending.versionCode,
                             message = result.message,
                             retryable = result.retryable,
                         )
                     }
-                    DownloadResult.Cancelled -> _download.value = null
+                    DownloadResult.Cancelled -> {
+                        // Volver a estado previo o Idle
+                        val evaluated = evaluateDownloadedApk(pending.versionName, pending.versionCode)
+                        _state.value = evaluated ?: UpdateState.Idle
+                    }
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "Error inesperado descargando la actualización")
-                _download.value = DownloadSnapshot(
-                    phase = UpdatePhase.FAILED,
+                _state.value = UpdateState.Error(
+                    versionName = pending.versionName,
+                    versionCode = pending.versionCode,
                     message = context.getString(R.string.update_descarga_error),
                     retryable = true,
                 )
@@ -522,53 +422,133 @@ class UpdateViewModel @Inject constructor(
         }
     }
 
-    fun retryDownload() {
-        val pending = _pendingUpdate.value ?: return
-        val failed = _download.value
-        if (failed?.phase == UpdatePhase.FAILED && !failed.retryable) {
-            // Error permanente del release: se olvida en vez de reintentar.
-            viewModelScope.launch {
-                markReleaseRejected(pending.versionTag)
-                cleanupResolved(showMessage = false)
-            }
-            return
-        }
-        // Si el APK ya está descargado, reintentar significa reinstalar;
-        // no volver a bajar 52 MB por una confirmación cancelada.
+    /** Verifica el APK descargado y lanza el instalador automáticamente. */
+    private suspend fun verifyAndAutoInstall(pending: PendingUpdate) {
         val context = getApplication<Application>()
-        if (ApkDownloader.apkFile(context).exists()) {
-            installApk()
+        val validation = withContext(Dispatchers.IO) {
+            ApkDownloader.validateApk(
+                context,
+                ApkDownloader.apkFile(context),
+                pending.apkSize,
+                pending.apkSha256,
+                pending.versionName,
+                pending.versionCode,
+            )
+        }
+        if (validation is ApkValidation.Failed) {
+            withContext(Dispatchers.IO) {
+                ApkDownloader.clearDownloadedApk(context)
+                preferencesRepository.clearInstallSessionId()
+                if (validation.releaseRejected) {
+                    markReleaseRejected(pending.versionTag)
+                }
+            }
+            _state.value = UpdateState.Error(
+                versionName = pending.versionName,
+                versionCode = pending.versionCode,
+                message = validation.message,
+                retryable = validation.retryable,
+            )
             return
         }
-        startUpdate()
+
+        // APK válido: ir a ReadyToInstall y lanzar instalador
+        _state.value = UpdateState.ReadyToInstall(
+            versionName = pending.versionName,
+            versionCode = pending.versionCode,
+            installedVersionName = InstalledVersion.buildConfig().versionName,
+            apkSize = pending.apkSize,
+            installAttempted = false,
+        )
+
+        // Lanzar instalador automáticamente
+        installApk()
+    }
+
+    fun retryDownload() {
+        viewModelScope.launch {
+            val currentState = _state.value
+            val pending = when (currentState) {
+                is UpdateState.Downloading,
+                is UpdateState.Verifying,
+                is UpdateState.ReadyToInstall,
+                is UpdateState.Installing,
+                is UpdateState.Error -> currentState
+                else -> return@launch
+            }
+            if (currentState is UpdateState.Error && !currentState.retryable) {
+                markReleaseRejected(pending.versionName)
+                cleanupResolved(showMessage = false)
+                return@launch
+            }
+            val context = getApplication<Application>()
+            if (ApkDownloader.apkFile(context).exists()) {
+                installApk()
+                return@launch
+            }
+            val storedPending = withContext(Dispatchers.IO) {
+                preferencesRepository.getPendingUpdate()
+            }
+            storedPending?.let { startUpdate(it) }
+        }
     }
 
     /** Cancela y borra el .part: la tarjeta vuelve a "Disponible". */
     fun cancelDownload() {
-        if (_download.value?.phase == UpdatePhase.INSTALLING) return
-        downloadJob?.cancel()
-        downloadJob = null
-        _download.value = null
-        val context = getApplication<Application>()
-        viewModelScope.launch(Dispatchers.IO) {
-            ApkDownloader.clearPartial(context)
+        viewModelScope.launch {
+            val currentState = _state.value
+            if (currentState is UpdateState.Installing) return@launch
+            downloadJob?.cancel()
+            downloadJob = null
+            val context = getApplication<Application>()
+            withContext(Dispatchers.IO) {
+                ApkDownloader.clearPartial(context)
+            }
+            // Si hay pending guardado, volver a ReadyToInstall o Idle
+            val storedPending = withContext(Dispatchers.IO) {
+                preferencesRepository.getPendingUpdate()
+            }
+            if (storedPending != null) {
+                val evaluated = evaluateDownloadedApk(storedPending.versionName, storedPending.versionCode)
+                _state.value = evaluated ?: UpdateState.Idle
+            } else {
+                _state.value = UpdateState.Idle
+            }
         }
     }
 
     /**
-     * Verifica el APK y abre la sesión de PackageInstaller. Se llama solo
-     * desde "Instalar" o "Reintentar", con la app en primer plano para que
-     * Android muestre la confirmación nativa. Si hay una sesión vieja,
-     * [ApkDownloader.installApk] la abandona antes de crear la nueva.
+     * Verifica el APK y abre la sesión de PackageInstaller.
+     * Se llama desde "Instalar" (fallback si auto-install falla), "Reintentar",
+     * o automáticamente al terminar la descarga y verificación.
      */
     fun installApk() {
         if (installSessionActive || installJob?.isActive == true) return
+        val currentState = _state.value
+        val versionName = when (currentState) {
+            is UpdateState.Downloading,
+            is UpdateState.Verifying,
+            is UpdateState.ReadyToInstall,
+            is UpdateState.Installing,
+            is UpdateState.Error -> currentState.versionName
+            else -> return
+        }
+        val versionCode = when (currentState) {
+            is UpdateState.Downloading,
+            is UpdateState.Verifying,
+            is UpdateState.ReadyToInstall,
+            is UpdateState.Installing,
+            is UpdateState.Error -> currentState.versionCode
+            else -> return
+        }
+
         val context = getApplication<Application>()
         val apk = ApkDownloader.apkFile(context)
         if (!apk.exists()) {
             val message = context.getString(R.string.update_archivo_faltante)
-            _download.value = DownloadSnapshot(
-                phase = UpdatePhase.FAILED,
+            _state.value = UpdateState.Error(
+                versionName = versionName,
+                versionCode = versionCode,
                 message = message,
                 retryable = true,
             )
@@ -587,10 +567,18 @@ class UpdateViewModel @Inject constructor(
         }
 
         awaitingInstallPermission = false
-        _download.value = DownloadSnapshot(UpdatePhase.INSTALLING)
+        _state.value = UpdateState.Installing(
+            versionName = versionName,
+            versionCode = versionCode,
+            installedVersionName = InstalledVersion.buildConfig().versionName,
+            waitingForUser = false,
+            sessionId = 0,
+        )
         installJob = viewModelScope.launch {
             restoreJob?.join()
-            val pending = _pendingUpdate.value
+            val pending = withContext(Dispatchers.IO) {
+                preferencesRepository.getPendingUpdate()
+            }
             val validation = withContext(Dispatchers.IO) {
                 ApkDownloader.validateApk(
                     context,
@@ -610,8 +598,9 @@ class UpdateViewModel @Inject constructor(
                         markReleaseRejected(pending.versionTag)
                     }
                 }
-                _download.value = DownloadSnapshot(
-                    phase = UpdatePhase.FAILED,
+                _state.value = UpdateState.Error(
+                    versionName = versionName,
+                    versionCode = versionCode,
                     message = validation.message,
                     retryable = validation.retryable,
                 )
@@ -629,9 +618,12 @@ class UpdateViewModel @Inject constructor(
                     withContext(Dispatchers.IO) {
                         preferencesRepository.setInstallSessionId(start.sessionId)
                     }
-                    _download.value = DownloadSnapshot(
-                        phase = UpdatePhase.INSTALLING,
-                        awaitingUserAction = true,
+                    _state.value = UpdateState.Installing(
+                        versionName = versionName,
+                        versionCode = versionCode,
+                        installedVersionName = InstalledVersion.buildConfig().versionName,
+                        waitingForUser = true,
+                        sessionId = start.sessionId,
                     )
                     _message.value = context.getString(R.string.update_confirmar_instalacion)
                 }
@@ -640,8 +632,9 @@ class UpdateViewModel @Inject constructor(
                     withContext(Dispatchers.IO) {
                         preferencesRepository.clearInstallSessionId()
                     }
-                    _download.value = DownloadSnapshot(
-                        phase = UpdatePhase.FAILED,
+                    _state.value = UpdateState.Error(
+                        versionName = versionName,
+                        versionCode = versionCode,
                         message = start.message,
                         retryable = start.retryable,
                     )
@@ -663,10 +656,24 @@ class UpdateViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 discardInstallSession(context)
-                _download.value = DownloadSnapshot(
-                    phase = UpdatePhase.READY,
-                    downloadedBytes = ApkDownloader.apkFile(context).length(),
-                    totalBytes = ApkDownloader.apkFile(context).length(),
+                val currentState = _state.value
+                val versionName = when (currentState) {
+                    is UpdateState.Installing,
+                    is UpdateState.ReadyToInstall,
+                    is UpdateState.Error -> currentState.versionName
+                    else -> return@launch
+                }
+                val versionCode = when (currentState) {
+                    is UpdateState.Installing,
+                    is UpdateState.ReadyToInstall,
+                    is UpdateState.Error -> currentState.versionCode
+                    else -> return@launch
+                }
+                _state.value = UpdateState.ReadyToInstall(
+                    versionName = versionName,
+                    versionCode = versionCode,
+                    installedVersionName = InstalledVersion.buildConfig().versionName,
+                    installAttempted = true,
                 )
                 installApk()
             } finally {
@@ -684,11 +691,24 @@ class UpdateViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 discardInstallSession(context)
-                val apk = ApkDownloader.apkFile(context)
-                _download.value = DownloadSnapshot(
-                    phase = UpdatePhase.READY,
-                    downloadedBytes = apk.length(),
-                    totalBytes = apk.length(),
+                val currentState = _state.value
+                val versionName = when (currentState) {
+                    is UpdateState.Installing,
+                    is UpdateState.ReadyToInstall,
+                    is UpdateState.Error -> currentState.versionName
+                    else -> return@launch
+                }
+                val versionCode = when (currentState) {
+                    is UpdateState.Installing,
+                    is UpdateState.ReadyToInstall,
+                    is UpdateState.Error -> currentState.versionCode
+                    else -> return@launch
+                }
+                _state.value = UpdateState.ReadyToInstall(
+                    versionName = versionName,
+                    versionCode = versionCode,
+                    installedVersionName = InstalledVersion.buildConfig().versionName,
+                    installAttempted = true,
                 )
             } finally {
                 sessionMaintenanceActive = false
@@ -713,8 +733,6 @@ class UpdateViewModel @Inject constructor(
 
     /** Persiste el intento antes de commitear: un arranque en frío no lo repite. */
     private suspend fun markInstallAttempted(versionCode: Int) {
-        installAttemptedCode = versionCode
-        _installAttemptedCode.value = versionCode
         withContext(Dispatchers.IO) {
             preferencesRepository.setUpdateInstallAttemptedCode(versionCode)
         }
@@ -728,8 +746,22 @@ class UpdateViewModel @Inject constructor(
                     is InstallOutcome.Failed -> {
                         val context = getApplication<Application>()
                         discardInstallSession(context)
-                        _download.value = DownloadSnapshot(
-                            phase = UpdatePhase.FAILED,
+                        val currentState = _state.value
+                        val versionName = when (currentState) {
+                            is UpdateState.Installing,
+                            is UpdateState.ReadyToInstall,
+                            is UpdateState.Error -> currentState.versionName
+                            else -> "desconocida"
+                        }
+                        val versionCode = when (currentState) {
+                            is UpdateState.Installing,
+                            is UpdateState.ReadyToInstall,
+                            is UpdateState.Error -> currentState.versionCode
+                            else -> 0
+                        }
+                        _state.value = UpdateState.Error(
+                            versionName = versionName,
+                            versionCode = versionCode,
                             message = outcome.message.ifBlank {
                                 context.getString(R.string.update_instalacion_error)
                             },
@@ -744,8 +776,15 @@ class UpdateViewModel @Inject constructor(
     private suspend fun onInstalled() {
         val context = getApplication<Application>()
         discardInstallSession(context)
-        installAttemptedCode = 0
-        _installAttemptedCode.value = 0
+        val currentState = _state.value
+        val versionName = when (currentState) {
+            is UpdateState.Installing -> currentState.versionName
+            else -> BuildConfig.VERSION_NAME
+        }
+        val versionCode = when (currentState) {
+            is UpdateState.Installing -> currentState.versionCode
+            else -> BuildConfig.VERSION_CODE
+        }
         downloadJob?.cancel()
         downloadJob = null
         withContext(Dispatchers.IO) {
@@ -753,8 +792,10 @@ class UpdateViewModel @Inject constructor(
             preferencesRepository.setRejectedUpdateTag("")
             ApkDownloader.clearDownloadedApk(context)
         }
-        _pendingUpdate.value = null
-        _download.value = null
+        _state.value = UpdateState.Installed(
+            versionName = versionName,
+            versionCode = versionCode,
+        )
     }
 
     fun onActivityResumed() {
@@ -769,13 +810,24 @@ class UpdateViewModel @Inject constructor(
             }
             return
         }
+
+        // Si hay estado Installed, mostrar aviso y limpiar
+        val currentState = _state.value
+        if (currentState is UpdateState.Installed) {
+            val installed = InstalledVersion.read(getApplication())
+            if (installed.versionCode >= currentState.versionCode) {
+                _message.value = getApplication<Application>().getString(
+                    R.string.update_installed_notice,
+                    currentState.versionName
+                )
+                viewModelScope.launch { cleanupResolved(showMessage = false) }
+            }
+        }
     }
 
-
-
     fun suppressUntilTomorrow() {
-        val failed = _download.value
-        if (failed?.phase == UpdatePhase.FAILED && !failed.retryable) {
+        val currentState = _state.value
+        if (currentState is UpdateState.Error && !currentState.retryable) {
             viewModelScope.launch { cleanupResolved(showMessage = false) }
             return
         }
@@ -784,7 +836,7 @@ class UpdateViewModel @Inject constructor(
             withContext(Dispatchers.IO) {
                 preferencesRepository.setUpdateSuppressedUntil(manana)
             }
-            _suppressed.value = true
+            _state.value = UpdateState.Idle
         }
     }
 
@@ -796,50 +848,56 @@ class UpdateViewModel @Inject constructor(
     fun clearSnackbar() = clearMessage()
 
     /**
-     * Evalúa un APK ya descargado. Solo devuelve READY si pasa tamaño,
+     * Evalúa un APK ya descargado. Solo devuelve ReadyToInstall si pasa tamaño,
      * SHA-256, release anunciado, versión, paquete y firma. Si no, borra el
      * archivo y reporta el motivo.
      */
-    private suspend fun evaluateDownloadedApk(pending: PendingUpdate?): DownloadSnapshot? =
-        withContext(Dispatchers.IO) {
-            val context = getApplication<Application>()
-            val apk = ApkDownloader.apkFile(context)
-            if (!apk.exists()) return@withContext null
+    private suspend fun evaluateDownloadedApk(
+        versionName: String,
+        versionCode: Int,
+    ): UpdateState? = withContext(Dispatchers.IO) {
+        val context = getApplication<Application>()
+        val apk = ApkDownloader.apkFile(context)
+        if (!apk.exists()) return@withContext null
 
-            val info = ApkDownloader.readApkInfo(context, apk)
-            if (info == null) {
+        val info = ApkDownloader.readApkInfo(context, apk)
+        if (info == null) {
+            ApkDownloader.clearDownloadedApk(context)
+            return@withContext null
+        }
+
+        val pending = preferencesRepository.getPendingUpdate()
+        when (
+            val validation = ApkDownloader.validateApk(
+                context,
+                apk,
+                pending?.apkSize ?: 0L,
+                pending?.apkSha256.orEmpty(),
+                pending?.versionName.orEmpty(),
+                pending?.versionCode ?: 0,
+            )
+        ) {
+            ApkValidation.Ok -> UpdateState.ReadyToInstall(
+                versionName = versionName,
+                versionCode = versionCode,
+                installedVersionName = InstalledVersion.buildConfig().versionName,
+                apkSize = apk.length(),
+                installAttempted = false,
+            )
+            is ApkValidation.Failed -> {
                 ApkDownloader.clearDownloadedApk(context)
-                return@withContext null
-            }
-
-            when (
-                val validation = ApkDownloader.validateApk(
-                    context,
-                    apk,
-                    pending?.apkSize ?: 0L,
-                    pending?.apkSha256.orEmpty(),
-                    pending?.versionName.orEmpty(),
-                    pending?.versionCode ?: 0,
-                )
-            ) {
-                ApkValidation.Ok -> DownloadSnapshot(
-                    phase = UpdatePhase.READY,
-                    downloadedBytes = apk.length(),
-                    totalBytes = apk.length(),
-                )
-                is ApkValidation.Failed -> {
-                    ApkDownloader.clearDownloadedApk(context)
-                    if (validation.releaseRejected && pending != null) {
-                        markReleaseRejected(pending.versionTag)
-                    }
-                    DownloadSnapshot(
-                        phase = UpdatePhase.FAILED,
-                        message = validation.message,
-                        retryable = validation.retryable,
-                    )
+                if (validation.releaseRejected && pending != null) {
+                    markReleaseRejected(pending.versionTag)
                 }
+                UpdateState.Error(
+                    versionName = versionName,
+                    versionCode = versionCode,
+                    message = validation.message,
+                    retryable = validation.retryable,
+                )
             }
         }
+    }
 
     private suspend fun markReleaseRejected(tag: String) {
         if (tag.isBlank()) return
@@ -852,8 +910,6 @@ class UpdateViewModel @Inject constructor(
     private suspend fun cleanupResolved(showMessage: Boolean) {
         val context = getApplication<Application>()
         discardInstallSession(context)
-        installAttemptedCode = 0
-        _installAttemptedCode.value = 0
         downloadJob?.cancel()
         downloadJob = null
         withContext(Dispatchers.IO) {
@@ -861,7 +917,7 @@ class UpdateViewModel @Inject constructor(
             ApkDownloader.clearDownloadedApk(context)
         }
         _pendingUpdate.value = null
-        _download.value = null
+        _state.value = UpdateState.Idle
         if (showMessage) _message.value = context.getString(R.string.update_no_disponible)
     }
 }

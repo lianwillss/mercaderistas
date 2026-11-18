@@ -101,7 +101,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import com.rutamercaderistas.viewmodel.RouteUiState
 import com.rutamercaderistas.viewmodel.SyncUiState
 import com.rutamercaderistas.viewmodel.PlanillaChanges
-import com.rutamercaderistas.viewmodel.UpdateCardUiState
+import com.rutamercaderistas.viewmodel.UpdateState
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -127,7 +127,7 @@ fun MainRouteContent(
     onOpenSettings: () -> Unit = {},
     onRefreshPositioned: (Offset) -> Unit = {},
     showUpdateBanner: Boolean = false,
-    updateCardState: UpdateCardUiState? = null,
+    updateCardState: UpdateState? = null,
     onUpdateNow: () -> Unit = {},
     onUpdateLater: () -> Unit = {},
     onCancelUpdate: () -> Unit = {},

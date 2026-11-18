@@ -514,6 +514,14 @@ class StockViewModel @Inject constructor(
         // Fase 2: la versión en vivo. Mientras corre, la barra superior y la
         // lista local siguen visibles.
         var errorEnVivo: String? = null
+        // Avance inmediato al iniciar la búsqueda en vivo: evita quedarse pegado
+        // en 25 % mientras KPI One tarda en responder la primera página.
+        _state.update {
+            it.copy(
+                progresoCarga = 0.30f,
+                progresoCompleto = false,
+            )
+        }
         val enVivo = try {
             withContext(Dispatchers.Default) {
                 repo.searchLive(filtros, force) { cargados, total ->

@@ -38,6 +38,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.shadow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material.icons.outlined.Check
@@ -91,8 +93,10 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -154,6 +158,9 @@ import com.rutamercaderistas.ui.theme.QuiebreYellow
 import com.rutamercaderistas.ui.theme.AccentGreenText
 import com.rutamercaderistas.ui.theme.UrgencyOrangeSoft
 import com.rutamercaderistas.ui.theme.UrgencyOrangeText
+import com.rutamercaderistas.ui.theme.DownloadNeonViolet
+import com.rutamercaderistas.ui.theme.DownloadNeonGlow
+import com.rutamercaderistas.ui.theme.DownloadNeonIconEdge
 import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.ui.theme.metricValueCompact
 import com.rutamercaderistas.ui.theme.metricValue
@@ -194,6 +201,9 @@ fun StockScreen(
         val pct = (fraccion * 100f).roundToInt().coerceIn(0, 100)
         if (state.progresoCompleto || pct >= 100) {
             "Stock actualizado · 100%"
+        } else if (pct <= 30) {
+            // Fase inicial de conexión a KPI One: aún no hay % real.
+            "Conectando con KPI One…"
         } else {
             "Cargando stock… " + pct + "%"
         }
@@ -1696,33 +1706,79 @@ private fun CabeceraSeccion(
     modifier: Modifier = Modifier,
     onCompartir: (() -> Unit)? = null,
 ) {
+    val dimens = LocalAppDimens.current
+    val reducirMovimiento = LocalReducedMotionEnabled.current
+
+    // Animación de pulso para el halo fluorescente (fuera de remember, al nivel del composable)
+    val transicion = rememberInfiniteTransition(label = "marcaPulso")
+    val pulso by transicion.animateFloat(
+        initialValue = 0.6f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "alfaPulso",
+    )
+
+    // En movimiento reducido, congelar el pulso en 1f
+    val pulsoVisible = if (reducirMovimiento) 1f else pulso
+
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = LocalAppDimens.current.spacingSm),
+            .padding(top = dimens.spacingSm, bottom = dimens.spacingXs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = titulo,
-            style = MaterialTheme.typography.titleSmall,
-            // Permite saltar de local en local con TalkBack.
+        // Cápsula morada fluorescente para el nombre de la marca
+        Box(
             modifier = Modifier
-                .weight(1f)
-                .semantics { heading() },
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+                .padding(end = dimens.spacingMd)
+                .shadow(
+                    elevation = 8.dp,
+                    shape = RoundedCornerShape(999.dp),
+                    clip = false,
+                    ambientColor = DownloadNeonGlow.copy(alpha = pulsoVisible * 0.35f),
+                    spotColor = DownloadNeonGlow.copy(alpha = pulsoVisible * 0.5f),
+                )
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(DownloadNeonViolet.copy(alpha = 0.9f), DownloadNeonViolet),
+                        start = Offset(pulsoVisible * 0.5f, 0f),
+                        end = Offset(1f - pulsoVisible * 0.5f, 0f),
+                    ),
+                    shape = RoundedCornerShape(999.dp),
+                )
+                .border(1.5.dp, DownloadNeonIconEdge, RoundedCornerShape(999.dp))
+                .padding(horizontal = dimens.spacingMd, vertical = dimens.spacingXs),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = titulo,
+                style = MaterialTheme.typography.titleSmall.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .semantics { heading() }
+                    .padding(horizontal = 4.dp),
+            )
+        }
+        // Detalle y fecha
         Text(
             text = if (fecha != null) detalle + " · datos al " + fecha else detalle,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
         )
         if (onCompartir != null) {
             IconButton(onClick = onCompartir) {
                 Icon(
                     imageVector = Icons.Outlined.Share,
-                    contentDescription = "Compartir local " + titulo,
+                    contentDescription = "Compartir " + titulo,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp),
                 )

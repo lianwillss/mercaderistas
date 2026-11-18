@@ -139,6 +139,7 @@ class RemoteStockRepository @Inject constructor(
             var offset = 0
             var paginas = 0
             var cortadaPorTope = false
+            var primeraPaginaEmitida = false
             while (true) {
                 // collectLatest del ViewModel cancela la búsqueda anterior al
                 // cambiar de filtro; sin esto la paginación seguiría bajando
@@ -159,7 +160,14 @@ class RemoteStockRepository @Inject constructor(
                 total = maxOf(total, pagina.total)
                 items += pagina.items
                 paginas++
-                if (total > 0) onProgress(items.size.coerceAtMost(total), total)
+                
+                // Early return: tras la primera página, emitimos progreso inmediato
+                // para que la UI pinte resultados mientras seguimos paginando en background.
+                if (!primeraPaginaEmitida) {
+                    primeraPaginaEmitida = true
+                    if (total > 0) onProgress(items.size.coerceAtMost(total), total)
+                }
+                
                 if (pagina.items.isEmpty()) break
                 // Se avanza por filas recibidas y no por el límite pedido:
                 // KPI One recorta "limit" a 500, así el offset sigue alineado.
@@ -187,6 +195,9 @@ class RemoteStockRepository @Inject constructor(
                     at = ahora,
                 ),
             )
+            // Emitimos el progreso final solo si hubo más de una página
+            // (evita duplicado cuando todo entra en una sola request).
+            if (total > 0 && paginas > 1) onProgress(items.size.coerceAtMost(total), total)
 
             construirResultado(
                 items = items,
@@ -393,12 +404,12 @@ class RemoteStockRepository @Inject constructor(
     // ── Internos ───────────────────────────────────────────────────
 
     /**
-     * La marca no entra en la clave: no se manda a KPI One (se filtra en
-     * memoria), así que cambiar sólo la marca reutiliza la descarga.
+     * Cache key granular por LOCAL + SKU (sin ruta).
+     * Permite reusar datos al cambiar de ruta manteniendo el mismo local.
+     * La marca no entra: se filtra en memoria.
      */
     private fun cacheKey(filters: StockFilters): String =
         normalizarStock(filters.local.substringBefore("·")) + "|" +
-            normalizarRuta(filters.ruta) + "|" +
             normalizarStock(filters.sku)
 
     /**

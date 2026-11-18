@@ -81,11 +81,13 @@ class MainActivity : ComponentActivity() {
 
         setContent {
 
-            val showUpdateBanner by updateViewModel.showUpdateBanner.collectAsStateWithLifecycle()
-            val updateCard by updateViewModel.card.collectAsStateWithLifecycle()
+            val updateState by updateViewModel.state.collectAsStateWithLifecycle()
             val updateMessage by updateViewModel.message.collectAsStateWithLifecycle()
             val routeUiState by routeViewModel.uiState.collectAsStateWithLifecycle()
             val syncUiState by syncViewModel.state.collectAsStateWithLifecycle()
+
+            // Mostrar banner si hay estado distinto de Idle o Installed (que se limpia solo)
+            val showUpdateBanner = updateState !is com.rutamercaderistas.viewmodel.UpdateState.Idle
 
             val snackbarHostState = remember { SnackbarHostState() }
             val ctx = LocalContext.current
@@ -182,7 +184,7 @@ class MainActivity : ComponentActivity() {
                         routeUiState = routeUiState,
                         syncUiState = syncUiState,
                         showUpdateBanner = showUpdateBanner,
-                        updateCardState = updateCard,
+                        updateCardState = updateState,
                         onUpdateNow = { updateViewModel.startUpdate() },
                         onUpdateLater = { updateViewModel.suppressUntilTomorrow() },
                         onCancelUpdate = { updateViewModel.cancelDownload() },

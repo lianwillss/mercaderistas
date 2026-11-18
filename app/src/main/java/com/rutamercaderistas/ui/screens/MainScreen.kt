@@ -61,7 +61,7 @@ import com.rutamercaderistas.ui.theme.appWindowWidth
 
 import com.rutamercaderistas.viewmodel.RouteUiState
 import com.rutamercaderistas.viewmodel.SyncUiState
-import com.rutamercaderistas.viewmodel.UpdateCardUiState
+import com.rutamercaderistas.viewmodel.UpdateState
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import androidx.datastore.preferences.core.Preferences
@@ -110,7 +110,7 @@ fun MainScreen(
     onSharePromo: (PromotionEntity) -> Unit,
     onDismissSyncChanges: () -> Unit = {},
     showUpdateBanner: Boolean = false,
-    updateCardState: UpdateCardUiState? = null,
+    updateCardState: UpdateState? = null,
     onUpdateNow: () -> Unit = {},
     onUpdateLater: () -> Unit = {},
     onCancelUpdate: () -> Unit = {},

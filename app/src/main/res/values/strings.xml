@@ -256,6 +256,9 @@
     <string name="update_instalacion_timeout">La instalación tardó demasiado y Android la canceló. Reintentá.</string>
     <string name="update_confirmar_instalacion">Instalación iniciada. Completa la confirmación de Android si aparece.</string>
     <string name="update_apk_no_corresponde">El APK publicado no corresponde a la versión %1$s. Se ignorará este release; se publicará uno nuevo.</string>
+    <string name="update_verifying_title">Verificando APK descargado…</string>
+    <string name="update_installed_title">Actualización completada</string>
+    <string name="update_installed_subtitle">La versión %1$s ya está instalada. La app se actualizará al reabrir.</string>
 
     <!-- Manual screen -->
     <string name="manual_que_es">¿Qué es Mercaderistas?</string>

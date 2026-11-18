@@ -54,6 +54,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.rutamercaderistas.R
 import com.rutamercaderistas.ui.theme.BrandIndigoText
 import com.rutamercaderistas.ui.theme.DownloadGlassBorderBottom
@@ -72,8 +73,7 @@ import com.rutamercaderistas.ui.theme.GlassShadowSpot
 import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.ui.theme.LocalReducedMotionEnabled
 import com.rutamercaderistas.ui.theme.MotionSprings
-import com.rutamercaderistas.viewmodel.UpdateCardUiState
-import com.rutamercaderistas.viewmodel.UpdatePhase
+import com.rutamercaderistas.viewmodel.UpdateState
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -91,10 +91,14 @@ private val UpdateCardShape = RoundedCornerShape(999.dp)
  *
  * Accesibilidad: el bloque de título/subtítulo se anuncia como un solo
  * encabezado, los textos crecen sin truncarse y los targets mantienen 48 dp.
+ *
+ * Altura: usa animateContentSize con spring para transiciones suaves entre
+ * estados, evitando saltos en la lista de abajo. El contenedor principal
+ * reserva espacio mínimo para que el layout no salte.
  */
 @Composable
 fun UpdateCard(
-    state: UpdateCardUiState,
+    state: UpdateState,
     onUpdate: () -> Unit,
     onLater: () -> Unit,
     onCancel: () -> Unit,
@@ -123,7 +127,7 @@ fun UpdateCard(
                 .padding(if (expanded) dimens.spacingXl else dimens.spacingMd),
         ) {
             AnimatedContent(
-                targetState = state.phase,
+                targetState = state,
                 transitionSpec = {
                     if (reducedMotion) {
                         fadeIn(tween(150)) togetherWith fadeOut(tween(100))
@@ -132,40 +136,46 @@ fun UpdateCard(
                     }
                 },
                 label = "updateCardPhase",
-            ) { phase ->
+            ) { currentState ->
                 // AnimatedContent coloca a sus hijos en una Box: sin este
                 // Column, los bloques de una fase (cabecera, progreso,
                 // mensaje, botón) se dibujaban unos encima de otros.
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    when (phase) {
-                        UpdatePhase.AVAILABLE -> AvailableContent(
-                            state = state,
-                            onUpdate = onUpdate,
-                            onLater = onLater,
-                            expanded = expanded,
-                            onClose = onClose,
-                        )
-                        UpdatePhase.DOWNLOADING -> DownloadingContent(
-                            state = state,
+                    when (currentState) {
+                        is UpdateState.Idle -> {
+                            // No renderizar nada si está idle (la tarjeta se oculta desde el padre)
+                        }
+                        is UpdateState.Downloading -> DownloadingContent(
+                            state = currentState,
                             onCancel = onCancel,
                             expanded = expanded,
                             onClose = onClose,
                         )
-                        UpdatePhase.READY -> ReadyContent(
-                            state = state,
+                        is UpdateState.Verifying -> VerifyingContent(
+                            state = currentState,
+                            expanded = expanded,
+                            onClose = onClose,
+                        )
+                        is UpdateState.ReadyToInstall -> ReadyContent(
+                            state = currentState,
                             onInstall = onInstall,
                             expanded = expanded,
                             onClose = onClose,
                         )
-                        UpdatePhase.INSTALLING -> InstallingContent(
-                            state = state,
+                        is UpdateState.Installing -> InstallingContent(
+                            state = currentState,
                             onRetryInstall = onRetryInstall,
                             onCancelInstall = onCancelInstall,
                             expanded = expanded,
                             onClose = onClose,
                         )
-                        UpdatePhase.FAILED -> FailedContent(
-                            state = state,
+                        is UpdateState.Installed -> InstalledContent(
+                            state = currentState,
+                            expanded = expanded,
+                            onClose = onClose,
+                        )
+                        is UpdateState.Error -> FailedContent(
+                            state = currentState,
                             onRetry = onRetry,
                             onLater = onLater,
                             expanded = expanded,
@@ -222,63 +232,8 @@ private fun UpdateSurface(
 }
 
 @Composable
-private fun AvailableContent(
-    state: UpdateCardUiState,
-    onUpdate: () -> Unit,
-    onLater: () -> Unit,
-    expanded: Boolean,
-    onClose: (() -> Unit)?,
-) {
-    val dimens = LocalAppDimens.current
-    val available = state as? UpdateCardUiState.Available
-    val installedName = available?.installedVersionName.orEmpty()
-    val targetName = available?.versionName ?: state.versionName
-    val apkSize = available?.apkSize ?: 0L
-    val transition = versionTransition(installedName, targetName)
-    val size = if (apkSize > 0L) formatMb(apkSize) else null
-    val subtitle = when {
-        transition != null && size != null -> stringResource(
-            R.string.update_version_transition_size,
-            installedName,
-            targetName,
-            size,
-        )
-        transition != null -> transition
-        expanded -> stringResource(R.string.update_card_subtitle_expanded, targetName)
-        else -> stringResource(R.string.update_card_subtitle, targetName)
-    }
-    UpdateHeader(
-        icon = Icons.Rounded.SystemUpdate,
-        tint = MaterialTheme.colorScheme.primary,
-        title = stringResource(R.string.update_card_title),
-        subtitle = subtitle,
-        version = targetName,
-        expanded = expanded,
-        onClose = onClose,
-    )
-    Spacer(Modifier.height(if (expanded) dimens.spacingLg else dimens.spacingSm))
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.End,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        AppButton(
-            text = stringResource(R.string.mas_tarde),
-            onClick = onLater,
-            variant = AppButtonVariant.Text,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.width(4.dp))
-        PrimaryAction(
-            text = stringResource(R.string.actualizar_btn),
-            onClick = onUpdate,
-        )
-    }
-}
-
-@Composable
 private fun DownloadingContent(
-    state: UpdateCardUiState,
+    state: UpdateState.Downloading,
     onCancel: () -> Unit,
     expanded: Boolean,
     onClose: (() -> Unit)?,
@@ -286,14 +241,13 @@ private fun DownloadingContent(
     val colors = MaterialTheme.colorScheme
     val dimens = LocalAppDimens.current
     val reducedMotion = LocalReducedMotionEnabled.current
-    val downloading = state as UpdateCardUiState.Downloading
     val animatedPercent by animateIntAsState(
-        targetValue = downloading.percent,
+        targetValue = state.percent,
         animationSpec = if (reducedMotion) snap() else tween(280),
         label = "updatePercent",
     )
     val animatedProgress by animateFloatAsState(
-        targetValue = downloading.percent / 100f,
+        targetValue = state.percent / 100f,
         animationSpec = if (reducedMotion) snap() else tween(280),
         label = "updateProgress",
     )
@@ -305,13 +259,13 @@ private fun DownloadingContent(
     val announcedLabel = stringResource(R.string.update_download_percent, announcedPercent)
 
     DownloadHeader(
-        versionName = downloading.versionName,
+        versionName = state.versionName,
         expanded = expanded,
         onClose = onClose,
     )
 
     // Contexto del salto de versión (12.52 → 12.53), antes de la barra.
-    val transition = versionTransition(downloading.installedVersionName, downloading.versionName)
+    val transition = versionTransition(state.installedVersionName, state.versionName)
     if (transition != null) {
         Spacer(Modifier.height(if (expanded) dimens.spacingSm else 2.dp))
         Text(
@@ -343,7 +297,7 @@ private fun DownloadingContent(
         )
         Spacer(Modifier.weight(1f))
         Text(
-            text = downloadSizeText(downloading.downloadedBytes, downloading.totalBytes),
+            text = downloadSizeText(state.downloadedBytes, state.totalBytes),
             style = MaterialTheme.typography.labelMedium,
             color = colors.onSurfaceVariant,
             textAlign = TextAlign.End,
@@ -363,7 +317,7 @@ private fun DownloadingContent(
     // 3. Velocidad y tiempo restante (o "Calculando…" al arrancar).
     Spacer(Modifier.height(4.dp))
     Text(
-        text = downloadStatsText(downloading),
+        text = downloadStatsText(state),
         style = if (expanded) {
             MaterialTheme.typography.bodyMedium
         } else {
@@ -392,14 +346,55 @@ private fun DownloadingContent(
 }
 
 @Composable
+private fun VerifyingContent(
+    state: UpdateState.Verifying,
+    expanded: Boolean,
+    onClose: (() -> Unit)?,
+) {
+    val colors = MaterialTheme.colorScheme
+    val dimens = LocalAppDimens.current
+    val reducedMotion = LocalReducedMotionEnabled.current
+
+    DownloadHeader(
+        versionName = state.versionName,
+        expanded = expanded,
+        onClose = onClose,
+    )
+
+    Spacer(Modifier.height(if (expanded) dimens.spacingLg else dimens.spacingMd))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (!reducedMotion) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(if (expanded) 22.dp else 18.dp),
+                strokeWidth = 2.dp,
+                color = colors.primary,
+            )
+            Spacer(Modifier.width(dimens.spacingSm))
+        }
+        Text(
+            text = stringResource(R.string.update_verifying_title),
+            style = if (expanded) {
+                MaterialTheme.typography.bodyMedium
+            } else {
+                MaterialTheme.typography.bodySmall
+            },
+            color = colors.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
 private fun ReadyContent(
-    state: UpdateCardUiState,
+    state: UpdateState.ReadyToInstall,
     onInstall: () -> Unit,
     expanded: Boolean,
     onClose: (() -> Unit)?,
 ) {
     val dimens = LocalAppDimens.current
-    val installAttempted = (state as? UpdateCardUiState.Ready)?.installAttempted == true
+    val installAttempted = state.installAttempted
     UpdateHeader(
         icon = Icons.Rounded.CheckCircle,
         tint = MaterialTheme.colorScheme.primary,
@@ -430,7 +425,7 @@ private fun ReadyContent(
 
 @Composable
 private fun InstallingContent(
-    state: UpdateCardUiState,
+    state: UpdateState.Installing,
     onRetryInstall: () -> Unit,
     onCancelInstall: () -> Unit,
     expanded: Boolean,
@@ -439,16 +434,15 @@ private fun InstallingContent(
     val colors = MaterialTheme.colorScheme
     val dimens = LocalAppDimens.current
     val reducedMotion = LocalReducedMotionEnabled.current
-    val installing = state as? UpdateCardUiState.Installing
-    val versionName = installing?.versionName ?: state.versionName
-    val waitingForUser = installing?.waitingForUser == true
+    val waitingForUser = state.waitingForUser
+
     UpdateHeader(
         icon = Icons.Rounded.SystemUpdate,
         tint = colors.primary,
         title = if (waitingForUser) {
             stringResource(R.string.update_pending_title)
         } else {
-            stringResource(R.string.update_installing_title, versionName)
+            stringResource(R.string.update_installing_title, state.versionName)
         },
         subtitle = if (waitingForUser) {
             stringResource(R.string.update_pending_install_subtitle)
@@ -461,29 +455,36 @@ private fun InstallingContent(
     )
     Spacer(Modifier.height(if (expanded) dimens.spacingLg else dimens.spacingMd))
     if (waitingForUser) {
+        // Mostrar solo "Instalando... confirma en Android" con spinner
+        // SIN botones Cancelar/Reintentar para evitar doble lanzamiento
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            AppButton(
-                text = stringResource(R.string.update_cancelar),
-                onClick = onCancelInstall,
-                variant = AppButtonVariant.Text,
-                contentColor = colors.onSurfaceVariant,
-            )
-            Spacer(Modifier.width(dimens.spacingSm))
-            AppButton(
-                text = stringResource(R.string.update_reintentar),
-                onClick = onRetryInstall,
+            if (!reducedMotion) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(if (expanded) 22.dp else 18.dp),
+                    strokeWidth = 2.dp,
+                    color = colors.primary,
+                )
+                Spacer(Modifier.width(dimens.spacingSm))
+            }
+            Text(
+                text = stringResource(R.string.update_installing_waiting),
+                style = if (expanded) {
+                    MaterialTheme.typography.bodyMedium
+                } else {
+                    MaterialTheme.typography.bodySmall
+                },
+                color = colors.onSurfaceVariant,
             )
         }
     } else {
+        // Estado transitorio mientras se crea la sesión
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Sin animación en loop cuando el usuario pidió movimiento reducido.
             if (!reducedMotion) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(if (expanded) 22.dp else 18.dp),
@@ -506,8 +507,28 @@ private fun InstallingContent(
 }
 
 @Composable
+private fun InstalledContent(
+    state: UpdateState.Installed,
+    expanded: Boolean,
+    onClose: (() -> Unit)?,
+) {
+    val dimens = LocalAppDimens.current
+    UpdateHeader(
+        icon = Icons.Rounded.CheckCircle,
+        tint = MaterialTheme.colorScheme.primary,
+        title = stringResource(R.string.update_installed_title),
+        subtitle = stringResource(R.string.update_installed_subtitle, state.versionName),
+        version = null,
+        expanded = expanded,
+        onClose = onClose,
+    )
+    Spacer(Modifier.height(if (expanded) dimens.spacingLg else dimens.spacingMd))
+    // Sin botones: el aviso se muestra una vez y se limpia automáticamente
+}
+
+@Composable
 private fun FailedContent(
-    state: UpdateCardUiState,
+    state: UpdateState.Error,
     onRetry: () -> Unit,
     onLater: () -> Unit,
     expanded: Boolean,
@@ -515,12 +536,11 @@ private fun FailedContent(
 ) {
     val colors = MaterialTheme.colorScheme
     val dimens = LocalAppDimens.current
-    val failed = state as UpdateCardUiState.Failed
     UpdateHeader(
         icon = Icons.Rounded.ErrorOutline,
         tint = colors.error,
         title = stringResource(R.string.update_error_titulo),
-        subtitle = failed.message.ifBlank {
+        subtitle = state.message.ifBlank {
             stringResource(R.string.update_descarga_error)
         },
         version = null,
@@ -535,13 +555,13 @@ private fun FailedContent(
     ) {
         AppButton(
             text = stringResource(
-                if (failed.retryable) R.string.mas_tarde else R.string.update_ocultar,
+                if (state.retryable) R.string.mas_tarde else R.string.update_ocultar,
             ),
             onClick = onLater,
             variant = AppButtonVariant.Text,
             contentColor = colors.onSurfaceVariant,
         )
-        if (failed.retryable) {
+        if (state.retryable) {
             Spacer(Modifier.width(4.dp))
             PrimaryAction(
                 text = stringResource(R.string.update_reintentar),
@@ -741,7 +761,8 @@ private fun versionTransition(installedVersionName: String, versionName: String)
 
 /** "1,3 MB/s · quedan 24 s" o el estado de cálculo inicial. */
 @Composable
-private fun downloadStatsText(downloading: UpdateCardUiState.Downloading): String {
+private fun downloadStatsText(downloading: UpdateState.Downloading): String {
+    // No mostrar ETA hasta tener datos suficientes (al menos 2 muestras de velocidad)
     if (downloading.bytesPerSecond <= 0L) {
         return stringResource(R.string.update_eta_calculating)
     }
@@ -786,12 +807,3 @@ private fun formatMb(bytes: Long): String {
     }
     return number.format(bytes / 1_000_000.0)
 }
-
-private val UpdateCardUiState.phase: UpdatePhase
-    get() = when (this) {
-        is UpdateCardUiState.Available -> UpdatePhase.AVAILABLE
-        is UpdateCardUiState.Downloading -> UpdatePhase.DOWNLOADING
-        is UpdateCardUiState.Ready -> UpdatePhase.READY
-        is UpdateCardUiState.Installing -> UpdatePhase.INSTALLING
-        is UpdateCardUiState.Failed -> UpdatePhase.FAILED
-    }

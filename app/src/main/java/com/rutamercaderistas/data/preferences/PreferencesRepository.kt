@@ -354,6 +354,26 @@ class PreferencesRepository @Inject constructor(
         }
     }
 
+    private val KEY_UPDATE_STATE_JSON = stringPreferencesKey("update_state_json")
+
+    suspend fun getUpdateState(): com.rutamercaderistas.viewmodel.UpdateState? {
+        val prefs = context.prefsDataStore.data.first()
+        val json = prefs[KEY_UPDATE_STATE_JSON] ?: return null
+        return com.rutamercaderistas.viewmodel.UpdateState.fromJson(json)
+    }
+
+    suspend fun setUpdateState(state: com.rutamercaderistas.viewmodel.UpdateState) {
+        context.prefsDataStore.edit { prefs ->
+            prefs[KEY_UPDATE_STATE_JSON] = state.toJson()
+        }
+    }
+
+    suspend fun clearUpdateState() {
+        context.prefsDataStore.edit { prefs ->
+            prefs.remove(KEY_UPDATE_STATE_JSON)
+        }
+    }
+
     suspend fun getUpdateInstallAttemptedCode(): Int =
         context.prefsDataStore.data.first()[KEY_UPDATE_INSTALL_ATTEMPTED_CODE] ?: 0
 
