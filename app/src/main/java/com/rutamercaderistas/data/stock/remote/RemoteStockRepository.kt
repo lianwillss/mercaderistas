@@ -15,6 +15,7 @@ import com.rutamercaderistas.data.stock.construirStockResult
 import com.rutamercaderistas.data.stock.codigosDeRuta
 import com.rutamercaderistas.data.stock.normalizarRuta
 import com.rutamercaderistas.data.stock.normalizarStock
+import com.rutamercaderistas.data.stock.marcaExcluida
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -83,7 +84,7 @@ class RemoteStockRepository @Inject constructor(
         }.sortedBy { it.code }
         StockCatalog(
             locales = locales,
-            marcas = kpi?.brands.orEmpty(),
+            marcas = kpi?.brands.orEmpty().filterNot { marcaExcluida(it) },
             rutas = entradas.mapNotNull { it.rutero.trim().takeIf(String::isNotBlank) }
                 .distinct()
                 .sorted(),
@@ -420,6 +421,7 @@ class RemoteStockRepository @Inject constructor(
         val sku = normalizarStock(filtros.sku)
         val base = items.filter { item ->
             (permitidos.isEmpty() || item.storeCode in permitidos) &&
+                !marcaExcluida(item.brand) &&
                 (marca.isEmpty() || normalizarStock(item.brand).contains(marca)) &&
                 (sku.isEmpty() ||
                     normalizarStock(item.sku).contains(sku) ||
