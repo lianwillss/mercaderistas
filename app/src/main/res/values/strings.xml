@@ -262,50 +262,147 @@
 
     <!-- Manual screen -->
     <string name="manual_que_es">¿Qué es Mercaderistas?</string>
-    <string name="manual_funciona_sin_conexion">Funciona sin conexión después de la primera sincronización.</string>
-    <string name="manual_sincronizar">Sincronizar datos</string>
-    <string name="manual_seleccionar_ruta">Seleccionar una ruta</string>
-    <string name="manual_navegar_dias">Navegar entre días</string>
-    <string name="manual_colores_cadena">Colores de cada cadena</string>
+    <string name="manual_intro">Mercaderistas reúne tu ruta diaria, las promociones vigentes, el stock en vivo y los códigos de producto. Descarga la planilla desde Google Drive, ordena los locales por día y abre el manual de marcas en la página exacta de cada marca.</string>
+    <string name="manual_modulos">Módulos de la app</string>
+    <string name="manual_mod_b1">Rutero: tus locales y marcas, día por día.</string>
+    <string name="manual_mod_b2">Promos: promociones por marca y cadena, con vencimientos.</string>
+    <string name="manual_mod_b3">Locales: todos los locales de la ruta con búsqueda y filtros.</string>
+    <string name="manual_mod_b4">Stock: existencias por local, marca o SKU desde KPI One.</string>
+    <string name="manual_mod_b5">Cod. Prov y Cod. EAN: códigos de proveedor y de barras.</string>
+    <string name="manual_mod_b6">Manual de marcas: PDF que se abre en la página de cada marca.</string>
+    <string name="manual_funciona_sin_conexion">Funciona sin conexión con los últimos datos sincronizados: rutero, promociones, locales, stock guardado y catálogo EAN. Al volver la conexión se actualizan la planilla y el stock.</string>
+
+    <string name="manual_navegacion">Cómo moverte por la app</string>
+    <string name="manual_nav_texto">La barra inferior (o el riel lateral en tablet) cambia de módulo. En Cod. EAN la barra se oculta para dejar más espacio a la lista.</string>
+    <string name="manual_nav_b1">Rutero, Promos, Locales, Stock, Cod. Prov y Cod. EAN: toca un ícono para cambiar de módulo.</string>
+    <string name="manual_nav_b2">En el encabezado del Rutero: ↻ actualiza la planilla, la lupa busca en toda la app, el ícono de documento abre este manual y ⋮ abre el menú.</string>
+    <string name="manual_nav_b3">Menú ⋮: Compartir ruta (imagen), Buscar actualización y Ajustes.</string>
+    <string name="manual_nav_b4">El punto verde o rojo junto al título indica si hay conexión.</string>
+    <string name="manual_nav_b5">La primera vez aparece una guía de inicio; puedes omitirla y volver a este manual cuando quieras.</string>
+
+    <string name="manual_sincronizar">Sincronizar la planilla</string>
+    <string name="manual_sync_step1">La app sincroniza sola al abrir (con una ruta elegida) y un chequeo en segundo plano revisa cambios cada hora.</string>
+    <string name="manual_sync_step2">Para forzarla: toca ↻ en el encabezado o ⋮ → Forzar sincronización. También puedes deslizar hacia abajo sobre la lista.</string>
+    <string name="manual_sync_step3">Una barra muestra descarga, procesamiento e indexado; al terminar, la lista de rutas se actualiza.</string>
+    <string name="manual_sync_step4">Si la planilla cambió, aparece un aviso con agregados, quitados, movidos, direcciones y marcas actualizadas. Toca Ver detalle para ver qué afecta a tu ruta de hoy.</string>
+    <string name="manual_check_datos">La última revisión del Excel y el historial de sincronizaciones están en Ajustes. Sin conexión se muestran los datos guardados.</string>
+
+    <string name="manual_seleccionar_ruta">Ruta y día</string>
+    <string name="manual_ruta_step1">Toca "Buscar ruta…" y escribe el nombre (ej. RUTA 1) o elige una de las rutas recientes.</string>
+    <string name="manual_ruta_step2">La lista se filtra mientras escribes; toca la ruta para cargarla.</string>
+    <string name="manual_ruta_step3">Cambia de día con el selector LUN, MAR, MIÉ… o desliza la pantalla hacia los lados.</string>
+    <string name="manual_ruta_step4">Los días sin visitas no aparecen. En tablet, la lista de días queda a la izquierda.</string>
+
     <string name="manual_tarjeta_local">La tarjeta de local</string>
+    <string name="manual_tarjeta_texto">Cada local muestra:</string>
+    <string name="manual_tarjeta_b1">Icono y color de la cadena (tabla de abajo).</string>
+    <string name="manual_tarjeta_b2">Nombre del local y su código interno.</string>
+    <string name="manual_tarjeta_b3">Dirección en azul: tócala para abrir Google Maps con el modo de transporte elegido en Ajustes.</string>
+    <string name="manual_tarjeta_b4">Contador de marcas a visitar y, si corresponde, marcas con promoción.</string>
+    <string name="manual_tarjeta_b5">Mantén presionada la dirección para copiarla.</string>
+    <string name="manual_compartir_local">Compartir local: usa el botón de compartir de la tarjeta y elige Solo marcas, Con promociones, Copiar dirección o Incluir link de Maps. Se comparte por WhatsApp, correo o la app que elijas.</string>
+    <string name="manual_compartir_ruta">Compartir ruta (⋮): genera una imagen PNG con el resumen y los locales de cada día.</string>
+
+    <string name="manual_colores_cadena">Colores de cada cadena</string>
+
     <string name="manual_marcas">Marcas prioritarias y normales</string>
-    <string name="manual_abrir_pdf">Abrir PDF de una marca</string>
-    <string name="manual_ver_locales">Ver todos los locales</string>
-    <string name="manual_check_datos">La app verifica automáticamente si hay nuevos datos cada vez que abres la aplicación.</string>
-    <string name="manual_sin_visitas_selector">Los días sin visitas no aparecen en el selector.</string>
-    <string name="manual_navegacion_pdf">La navegación a la página exacta funciona gracias a un mapa interno de marcas con sus números de página correspondientes.</string>
-    <string name="manual_intro">Mercaderistas es una aplicación que te permite gestionar tus rutas de visita a locales comerciales. Descarga automáticamente un Excel desde Google Drive con la información de cada ruta, organiza los locales por día y te permite abrir el PDF del catalogador en la página exacta de cada marca.</string>
-    <string name="manual_sync_step1">Toca el botón ⋮ (tres puntos) en la esquina superior derecha.</string>
-    <string name="manual_sync_step2">Selecciona \"Forzar sincronización\".</string>
-    <string name="manual_sync_step3">Una barra de progreso indica que los datos se están descargando.</string>
-    <string name="manual_sync_step4">Al terminar, la lista de rutas se actualiza automáticamente.</string>
-    <string name="manual_ruta_step1">Toca el campo \"Buscar ruta…\" en la parte superior.</string>
-    <string name="manual_ruta_step2">Escribe el nombre de la ruta (ej. \"RUTA 1\").</string>
-    <string name="manual_ruta_step3">Selecciona la ruta de la lista desplegable.</string>
-    <string name="manual_ruta_step4">También puedes elegir una ruta reciente del historial.</string>
-    <string name="manual_dias_texto">Usa el selector de días (LUN, MAR, MIÉ, etc.) para cambiar de día. También puedes deslizar horizontalmente sobre la pantalla.</string>
-    <string name="manual_tarjeta_texto">Cada local se muestra como una tarjeta blanca con bordes redondeados y sombra sutil. Contiene:</string>
-    <string name="manual_tarjeta_b1">Icono con el color de la cadena (ver tabla arriba)</string>
-    <string name="manual_tarjeta_b2">Nombre del local en formato natural</string>
-    <string name="manual_tarjeta_b3">Código interno del local</string>
-    <string name="manual_tarjeta_b4">Dirección en azul (toca para abrir en Google Maps)</string>
-    <string name="manual_tarjeta_b5">Contador circular con el número de marcas a visitar</string>
     <string name="manual_prioritarias">Marcas prioritarias:</string>
-    <string name="manual_prio_b1">Tarjeta blanca independiente con barra naranja a la izquierda</string>
-    <string name="manual_prio_b2">Ícono de estrella dentro de un círculo naranja</string>
-    <string name="manual_prio_b3">Chip verde que indica la frecuencia de visita (ej. \"3×\" semanal)</string>
+    <string name="manual_prio_b1">Tarjeta blanca con barra naranja y estrella.</string>
+    <string name="manual_prio_b2">Chip con la frecuencia de visita (ej. 2× por semana).</string>
+    <string name="manual_prio_b3">Toca la marca para abrir el manual de marcas en su página.</string>
     <string name="manual_normales">Marcas normales:</string>
-    <string name="manual_norm_b1">Fila compacta sin tarjeta independiente</string>
-    <string name="manual_norm_b2">Círculo con iniciales de la marca en un color generado automáticamente</string>
-    <string name="manual_norm_b3">Badge de frecuencia cuando corresponde</string>
+    <string name="manual_norm_b1">Fila compacta con iniciales y color propio.</string>
+    <string name="manual_norm_b2">Badge de frecuencia cuando corresponde.</string>
+    <string name="manual_norm_b3">Icono de promoción si la marca tiene promos activas.</string>
+
+    <string name="manual_abrir_pdf">Manual de marcas (PDF)</string>
     <string name="manual_pdf_step1">Toca cualquier marca dentro de un local.</string>
-    <string name="manual_pdf_step2">La aplicación abre el PDF del catalogador en la página exacta de esa marca.</string>
-    <string name="manual_pdf_step3">Si la marca no se encuentra en el PDF, aparece un mensaje: \"Marca no encontrada\".</string>
-    <string name="manual_locales_step1">Toca la tarjeta \"Locales\" en la sección de estadísticas (arriba, junto a Marcas y Visitas).</string>
-    <string name="manual_locales_step2">Se abre una pantalla completa con todos los locales de la ruta.</string>
-    <string name="manual_locales_step3">Cada local muestra su nombre, dirección y código de colores por cadena.</string>
-    <string name="manual_locales_step4">Toca la dirección para abrirla en Google Maps.</string>
-    <string name="manual_locales_step5">Presiona ← para volver.</string>
+    <string name="manual_pdf_step2">La primera vez la app prepara el PDF y busca la página de esa marca; después abre directo.</string>
+    <string name="manual_pdf_step3">Si la marca no está en el manual, se abre el manual completo con el aviso "Marca no encontrada".</string>
+    <string name="manual_pdf_step4">En el visor puedes cambiar de página, abrir la cuadrícula de páginas y volver.</string>
+    <string name="manual_navegacion_pdf">La página exacta sale de un mapa interno de marcas. Si el catálogo cambia, la app vuelve a detectar las páginas.</string>
+
+    <string name="manual_promociones">Promos: promociones vigentes</string>
+    <string name="manual_promo_texto">Cada marca muestra sus promociones con producto, precio, cadena y vigencia.</string>
+    <string name="manual_promo_b1">Busca por marca, producto o cadena.</string>
+    <string name="manual_promo_b2">Chips: Solo mis marcas (las de tu ruta) y Solo hoy (las que vencen hoy).</string>
+    <string name="manual_promo_b3">Filtra por cadena con los chips de abajo; el número es la cantidad de promos.</string>
+    <string name="manual_promo_b4">Las promos se ordenan por urgencia: vencen hoy, mañana o en los próximos días.</string>
+    <string name="manual_promo_b5">El contador Por vencer del encabezado abre el detalle de las que vencen pronto.</string>
+    <string name="manual_promo_b6">Toca una marca para ver sus locales; comparte una promo con su botón de compartir.</string>
+    <string name="manual_promo_b7">Si diste permiso de notificaciones, recibes un aviso diario a las 7:00 con las promos que vencen hoy o mañana. Puedes desactivarlo en los ajustes de Android.</string>
+
+    <string name="manual_ver_locales">Locales</string>
+    <string name="manual_locales_step1">Abre Locales desde la barra inferior.</string>
+    <string name="manual_locales_step2">Busca por marca, local, código o dirección: tolera errores de tipeo y acentos.</string>
+    <string name="manual_locales_step3">Filtra por día de visita o toca una marca para ver solo sus locales.</string>
+    <string name="manual_locales_step4">Toca un local para ver sus días de visita, marcas y clientes.</string>
+    <string name="manual_locales_step5">Toca la dirección para abrir Maps o mantén presionada para copiarla.</string>
+    <string name="manual_locales_step6">Vuelve con ←.</string>
+
+    <string name="manual_stock">Stock en vivo (KPI One)</string>
+    <string name="manual_stock_texto">Muestra existencias, tránsito y quiebres desde KPI One. Se actualiza solo y, sin conexión, usa los datos guardados.</string>
+    <string name="manual_stock_b1">Filtra por Local, Ruta, Marca y Producto/SKU.</string>
+    <string name="manual_stock_b2">Cambia entre Por local y Por marca.</string>
+    <string name="manual_stock_b3">Chips de estado: Todas, Por verificar, Confirmados y Sin OSA.</string>
+    <string name="manual_stock_b4">Ordena por Gravedad, Menor cobertura, Producto A-Z o Stock (menor/mayor).</string>
+    <string name="manual_stock_b5">Toca un ítem para ver local, marca, stock, tránsito y su código de barras; copia el SKU o comparte una ficha con el código.</string>
+    <string name="manual_stock_b6">El botón Compartir de la cabecera comparte el stock del filtro o del local abierto.</string>
+    <string name="manual_stock_b7">Si falta el acceso, abre Ajustes → Acceso a KPI One (correo y clave) o toca Revisar acceso en el aviso. Si la descarga quedó incompleta, puedes Forzar de todos modos.</string>
+    <string name="manual_stock_osa">OSA es la revisión de góndola. Si OSA dice que el producto está exhibido pero el stock es negativo, la fila queda Por verificar porque el portal puede estar desactualizado.</string>
+
+    <string name="manual_cod_prov">Cod. Prov</string>
+    <string name="manual_cod_prov_step1">Abre Cod. Prov desde la barra inferior.</string>
+    <string name="manual_cod_prov_step2">Muestra el código interno que cada proveedor les asigna a sus productos.</string>
+    <string name="manual_cod_prov_step3">Busca por marca o por código; el contador indica cuántas marcas coinciden.</string>
+    <string name="manual_cod_prov_step4">Toca una fila para copiar el código al portapapeles.</string>
+    <string name="manual_cod_prov_step5">Puedes escribir ese código en el buscador de Cod. EAN.</string>
+
+    <string name="manual_ean">Cod. EAN</string>
+    <string name="manual_ean_step1">Busca por nombre, EAN, SKU o código de proveedor.</string>
+    <string name="manual_ean_step2">Toca el ícono de escaneo y apunta al código de barras (la primera vez Android pide permiso de cámara).</string>
+    <string name="manual_ean_step3">Filtra por marca o caja con los chips; cada chip muestra cuántos productos tiene.</string>
+    <string name="manual_ean_step4">Al pie están las búsquedas recientes y los atajos de marca.</string>
+    <string name="manual_ean_step5">Toca un producto para ampliar el código, copiar el EAN o compartir la imagen del código.</string>
+    <string name="manual_ean_step6">Seleccionar: marca varios productos para compartir la lista o copiar todos los EAN.</string>
+    <string name="manual_ean_step7">El botón de flejes muestra el código especial para impresión de flejes.</string>
+    <string name="manual_ean_step8">El catálogo se actualiza solo; si algo falla, toca Reintentar carga. Funciona sin conexión con el catálogo guardado.</string>
+
+    <string name="manual_buscar">Buscar en toda la app</string>
+    <string name="manual_buscar_texto">La lupa del encabezado abre la búsqueda de locales y promociones.</string>
+    <string name="manual_buscar_b1">Escribe al menos 2 caracteres; aparecen locales y promociones que coinciden.</string>
+    <string name="manual_buscar_b2">Chip Con promos: solo locales con promociones activas.</string>
+    <string name="manual_buscar_b3">Filtra por cadena con los chips.</string>
+    <string name="manual_buscar_b4">Toca un local para ver días y marcas; usa Cómo llegar para abrir Maps. Toca una promo para ver su detalle.</string>
+
+    <string name="manual_ajustes">Ajustes</string>
+    <string name="manual_ajustes_b1">Acceso a KPI One: correo y clave, con Conectar, Reconectar o Desconectar.</string>
+    <string name="manual_ajustes_b2">Tamaño de texto: de 0,8× a 1,8×; cambia el texto de toda la app.</string>
+    <string name="manual_ajustes_b3">Modo de transporte: transporte público, auto, bicicleta o a pie. Define cómo se abren los links de Maps.</string>
+    <string name="manual_ajustes_b4">Borrar caché del catálogo EAN: fuerza la reimportación al abrir Cod. EAN.</string>
+    <string name="manual_ajustes_b5">Borrar historial de búsqueda y borrar el historial de sincronizaciones.</string>
+    <string name="manual_ajustes_b6">Historial de sincronizaciones, última revisión del Excel y versión instalada.</string>
+
+    <string name="manual_actualizaciones">Actualizaciones de la app</string>
+    <string name="manual_upd_step1">La app revisa GitHub al abrir, al volver y cada 4 horas.</string>
+    <string name="manual_upd_step2">Si hay versión nueva, la tarjeta muestra la descarga con porcentaje, velocidad y tiempo restante; puedes cancelarla.</string>
+    <string name="manual_upd_step3">Al llegar al 100 % queda Lista para instalar. Toca Instalar y autoriza en Android.</string>
+    <string name="manual_upd_step4">Android cierra la app para reemplazarla: es normal. Al abrirla de nuevo verás "Actualizado a la versión X" y se revisa si hay otra.</string>
+    <string name="manual_upd_step5">Si no quieres instalar ahora, elige Más tarde; el aviso no vuelve hasta el día siguiente. También puedes usar ⋮ → Buscar actualización.</string>
+    <string name="manual_upd_step6">Antes de instalar se verifican tamaño, SHA-256 y firma del APK. Si no coincide, se descarta y ese release no se vuelve a ofrecer.</string>
+    <string name="manual_upd_nota">No hay notificaciones de actualización: todo se ve en la tarjeta del Rutero.</string>
+
+    <string name="manual_ayuda">Consejos y problemas frecuentes</string>
+    <string name="manual_ayuda_b1">Sin conexión: se muestran los últimos datos guardados; planilla y stock se actualizan al volver la conexión.</string>
+    <string name="manual_ayuda_b2">No aparece mi ruta: fuerza la sincronización y usa "Buscar ruta…".</string>
+    <string name="manual_ayuda_b3">Una marca no aparece en el PDF: se abre el manual completo con el aviso correspondiente.</string>
+    <string name="manual_ayuda_b4">El stock no carga: revisa Acceso a KPI One en Ajustes o toca Revisar acceso en el aviso.</string>
+    <string name="manual_ayuda_b5">El escáner no abre: concede el permiso de cámara a la app.</string>
+    <string name="manual_ayuda_b6">La actualización quedó pendiente: la tarjeta ofrece Instalar, Reintentar o Cancelar.</string>
+    <string name="manual_ayuda_b7">Para instalar la actualización, Android puede pedir "Instalar apps desconocidas" la primera vez.</string>
+    <string name="manual_ayuda_b8">Si no llegan los avisos de promos, revisa las notificaciones de la app en los ajustes de Android.</string>
+
+    <string name="manual_pie">Versión %1$s · Manual actualizado</string>
 
     <!-- Promo Expiring -->
     <string name="por_vencer_title">Por vencer</string>

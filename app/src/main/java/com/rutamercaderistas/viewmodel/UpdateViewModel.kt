@@ -929,22 +929,10 @@ class UpdateViewModel @Inject constructor(
                     is InstallOutcome.Failed -> {
                         val context = getApplication<Application>()
                         discardInstallSession(context)
-                        val versionName = when (currentState) {
-                            is UpdateState.Installing,
-                            is UpdateState.ReadyToInstall,
-                            is UpdateState.Error -> currentState.versionName
-                            else -> "desconocida"
-                        }
-                        val versionCode = when (currentState) {
-                            is UpdateState.Installing,
-                            is UpdateState.ReadyToInstall,
-                            is UpdateState.Error -> currentState.versionCode
-                            else -> 0
-                        }
                         setState(
                             UpdateState.Error(
-                                versionName = versionName,
-                                versionCode = versionCode,
+                                versionName = currentState.versionName,
+                                versionCode = currentState.versionCode,
                                 message = outcome.message.ifBlank {
                                     context.getString(R.string.update_instalacion_error)
                                 },
