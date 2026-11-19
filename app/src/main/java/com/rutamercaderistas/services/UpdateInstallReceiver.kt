@@ -21,6 +21,9 @@ class UpdateInstallReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ApkDownloader.ACTION_INSTALL_STATUS) return
 
+        // Identidad de la sesión: un estado atrasado de una sesión abandonada
+        // no debe marcar como fallido el intento en curso.
+        val sessionId = intent.getIntExtra(ApkDownloader.EXTRA_SESSION_ID, 0)
         val status = intent.getIntExtra(
             PackageInstaller.EXTRA_STATUS,
             PackageInstaller.STATUS_FAILURE,
@@ -36,7 +39,8 @@ class UpdateInstallReceiver : BroadcastReceiver() {
                     Timber.w("Instalación sin intent de confirmación del sistema")
                     UpdateInstallBus.post(
                         InstallOutcome.Failed(
-                            context.getString(R.string.update_instalacion_error),
+                            sessionId = sessionId,
+                            message = context.getString(R.string.update_instalacion_error),
                         ),
                     )
                     return
@@ -46,12 +50,14 @@ class UpdateInstallReceiver : BroadcastReceiver() {
                     Timber.w(it, "No se pudo abrir la confirmación de instalación")
                     UpdateInstallBus.post(
                         InstallOutcome.Failed(
-                            context.getString(R.string.update_instalacion_error),
+                            sessionId = sessionId,
+                            message = context.getString(R.string.update_instalacion_error),
                         ),
                     )
                 }
             }
-            PackageInstaller.STATUS_SUCCESS -> UpdateInstallBus.post(InstallOutcome.Success)
+            PackageInstaller.STATUS_SUCCESS ->
+                UpdateInstallBus.post(InstallOutcome.Success(sessionId))
             else -> {
                 val raw = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
                 Timber.w(
@@ -62,7 +68,8 @@ class UpdateInstallReceiver : BroadcastReceiver() {
                 Timber.d("Mensaje técnico del instalador: %s", raw)
                 UpdateInstallBus.post(
                     InstallOutcome.Failed(
-                        context.getString(UpdateInstallErrors.messageRes(status)),
+                        sessionId = sessionId,
+                        message = context.getString(UpdateInstallErrors.messageRes(status)),
                     ),
                 )
             }

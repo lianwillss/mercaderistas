@@ -87,6 +87,9 @@ object ApkDownloader {
     /** Acción que el sistema usa para devolver el resultado de la sesión. */
     const val ACTION_INSTALL_STATUS = "com.rutamercaderistas.action.UPDATE_INSTALL_STATUS"
 
+    /** Id de la sesión viajando en el intent de estado (para descartar atrasos). */
+    const val EXTRA_SESSION_ID = "com.rutamercaderistas.extra.INSTALL_SESSION_ID"
+
     private const val MIN_APK_BYTES = 1024L
     /** Android necesita aproximadamente otro tanto al instalar (copia en /data/app + metadatos). */
     internal const val INSTALL_SPACE_FACTOR = 2L
@@ -644,6 +647,7 @@ object ApkDownloader {
 
                 val statusIntent = Intent(context, UpdateInstallReceiver::class.java).apply {
                     action = ACTION_INSTALL_STATUS
+                    putExtra(EXTRA_SESSION_ID, id)
                 }
                 val flags = PendingIntent.FLAG_UPDATE_CURRENT or
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0

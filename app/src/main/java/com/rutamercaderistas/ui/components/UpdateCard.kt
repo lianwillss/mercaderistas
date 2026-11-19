@@ -455,8 +455,8 @@ private fun InstallingContent(
     )
     Spacer(Modifier.height(if (expanded) dimens.spacingLg else dimens.spacingMd))
     if (waitingForUser) {
-        // Mostrar solo "Instalando... confirma en Android" con spinner
-        // SIN botones Cancelar/Reintentar para evitar doble lanzamiento
+        // La confirmación vive en Android. Si el usuario vuelve sin completarla
+        // (o el OEM cerró la sesión), la tarjeta ofrece Reintentar/Cancelar.
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -477,6 +477,25 @@ private fun InstallingContent(
                     MaterialTheme.typography.bodySmall
                 },
                 color = colors.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.height(if (expanded) dimens.spacingMd else dimens.spacingSm))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AppButton(
+                text = stringResource(R.string.update_cancelar),
+                onClick = onCancelInstall,
+                variant = AppButtonVariant.Text,
+                contentColor = colors.onSurfaceVariant,
+                border = BorderStroke(1.dp, DownloadNeonTrackEdge),
+            )
+            Spacer(Modifier.width(4.dp))
+            PrimaryAction(
+                text = stringResource(R.string.update_reintentar),
+                onClick = onRetryInstall,
             )
         }
     } else {

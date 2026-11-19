@@ -120,6 +120,7 @@ class MercaderistasApp : Application(), Configuration.Provider {
         File(filesDir, com.rutamercaderistas.models.PdfDownloader.PDF_FILE_NAME).delete()
         brandPagesRepository.clearAll()
         preferencesRepository.clearPendingUpdate()
+        preferencesRepository.clearUpdateState()
         preferencesRepository.setRejectedUpdateTag("")
         preferencesRepository.setUpdateSuppressedUntil(0)
         preferencesRepository.setLastVersionCode(BuildConfig.VERSION_CODE)

@@ -30,8 +30,9 @@ class DownloadSpeedMeterTest {
         val meter = DownloadSpeedMeter(windowMillis = 750L)
         meter.update(bytes = 0L, nowMillis = 1_000L)
         assertEquals(1_000_000L, meter.update(bytes = 1_000_000L, nowMillis = 2_000L))
-        // 2 MB en el siguiente segundo: instantáneo 2 MB/s, EMA = 1,25 MB/s.
-        assertEquals(1_250_000L, meter.update(bytes = 3_000_000L, nowMillis = 3_000L))
+        // 2 MB en el siguiente segundo: instantáneo 2 MB/s con EMA alpha = 0,3:
+        // (1 MB/s · 7 + 2 MB/s · 3) / 10 = 1,3 MB/s.
+        assertEquals(1_300_000L, meter.update(bytes = 3_000_000L, nowMillis = 3_000L))
     }
 
     @Test

@@ -7,8 +7,7 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
-    <!-- Permite que PackageInstaller aplique la auto-actualización sin
-         confirmación cuando el sistema lo autorice (Android 12+). -->
+    <!-- Notificaciones de promociones/sync; el actualizador NO usa notificaciones. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
@@ -53,6 +52,15 @@
         <receiver
             android:name=".services.UpdateInstallReceiver"
             android:exported="false" />
+
+        <!-- Tras actualizar, intenta reabrir la app (best-effort, sin notificaciones). -->
+        <receiver
+            android:name=".services.UpdatePackageReplacedReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+            </intent-filter>
+        </receiver>
 
         <provider
             android:name="androidx.core.content.FileProvider"

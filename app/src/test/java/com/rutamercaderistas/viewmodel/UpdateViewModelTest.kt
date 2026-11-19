@@ -8,8 +8,10 @@ import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.services.ApkDownloader
 import com.rutamercaderistas.services.ApkValidation
 import com.rutamercaderistas.services.DownloadResult
+import com.rutamercaderistas.services.InstallOutcome
 import com.rutamercaderistas.services.InstallStart
 import com.rutamercaderistas.services.UpdateChecker
+import com.rutamercaderistas.services.UpdateInstallBus
 import com.rutamercaderistas.services.UpdateInfo
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -50,25 +52,36 @@ class UpdateViewModelTest {
 
         apkFile = File.createTempFile("update-test", ".apk").apply { delete() }
 
+        // Almacenamiento en memoria: los tests de restauración dependen de que
+        // lo que se persiste se pueda volver a leer, como en DataStore real.
+        var pendingStore: PendingUpdate? = null
+        var stateStore: UpdateState? = null
+        var sessionStore = 0
+        var attemptedStore = 0
+
         preferencesRepository = mockk {
             coEvery { getUpdateSuppressedUntil() } returns 0L
             coEvery { setUpdateSuppressedUntil(any()) } returns Unit
-            coEvery { getPendingUpdate() } returns null
-            coEvery { setPendingUpdate(any()) } returns Unit
-            coEvery { clearPendingUpdate() } returns Unit
-            coEvery { getUpdateInstallAttemptedCode() } returns 0
-            coEvery { setUpdateInstallAttemptedCode(any()) } returns Unit
-            coEvery { clearUpdateInstallAttemptedCode() } returns Unit
-            coEvery { getInstallSessionId() } returns 0
-            coEvery { setInstallSessionId(any()) } returns Unit
-            coEvery { clearInstallSessionId() } returns Unit
+            coEvery { getPendingUpdate() } answers { pendingStore }
+            coEvery { setPendingUpdate(any()) } answers { pendingStore = firstArg() }
+            coEvery { clearPendingUpdate() } answers {
+                pendingStore = null
+                sessionStore = 0
+                attemptedStore = 0
+            }
+            coEvery { getUpdateInstallAttemptedCode() } answers { attemptedStore }
+            coEvery { setUpdateInstallAttemptedCode(any()) } answers { attemptedStore = firstArg() }
+            coEvery { clearUpdateInstallAttemptedCode() } answers { attemptedStore = 0 }
+            coEvery { getInstallSessionId() } answers { sessionStore }
+            coEvery { setInstallSessionId(any()) } answers { sessionStore = firstArg() }
+            coEvery { clearInstallSessionId() } answers { sessionStore = 0 }
             coEvery { getRejectedUpdateTag() } returns ""
             coEvery { setRejectedUpdateTag(any()) } returns Unit
             coEvery { getLastUpdateCheck() } returns 0L
             coEvery { setLastUpdateCheck(any()) } returns Unit
-            coEvery { getUpdateState() } returns null
-            coEvery { setUpdateState(any()) } returns Unit
-            coEvery { clearUpdateState() } returns Unit
+            coEvery { getUpdateState() } answers { stateStore }
+            coEvery { setUpdateState(any()) } answers { stateStore = firstArg() }
+            coEvery { clearUpdateState() } answers { stateStore = null }
         }
 
         mockkObject(ApkDownloader)
@@ -159,15 +172,15 @@ class UpdateViewModelTest {
     }
 
     @Test
-    fun `available persists pending y muestra la tarjeta`() = runTest {
+    fun `available persists pending y descarga sola`() = runTest {
         mockAvailableUpdate()
         try {
             viewModel.checkForUpdate(force = true, showFeedback = false)
-            testDispatcher.scheduler.advanceUntilIdle()
-            assertEquals(
-                PendingUpdate("12.53", 12053, "http://x.apk", "v12.53"),
-                viewModel.pendingUpdate.value
-            )
+            awaitOnMain {
+                viewModel.pendingUpdate.value ==
+                    PendingUpdate("12.53", 12053, "http://x.apk", "v12.53")
+            }
+            awaitOnMain { viewModel.state.value is UpdateState.ReadyToInstall }
             awaitCoVerify {
                 coVerify {
                     preferencesRepository.setPendingUpdate(
@@ -175,8 +188,6 @@ class UpdateViewModelTest {
                     )
                 }
             }
-            // Con autoStartDownload=false, el estado queda Idle pero pendingUpdate está seteado
-            assertEquals(UpdateState.Idle, viewModel.state.value)
         } finally {
             unmockkObject(UpdateChecker)
         }
@@ -187,11 +198,11 @@ class UpdateViewModelTest {
         mockAvailableUpdate()
         try {
             viewModel.checkForUpdate(force = true, showFeedback = false)
-            awaitOnMain { viewModel.pendingUpdate.value != null }
+            awaitOnMain { viewModel.state.value is UpdateState.ReadyToInstall }
             viewModel.checkForUpdate(force = true, showFeedback = false)
-            // Segunda consulta sin autoStartDownload no cambia el estado
-            awaitOnMain { viewModel.state.value == UpdateState.Idle }
-            coVerify(exactly = 0) {
+            testDispatcher.scheduler.advanceUntilIdle()
+            assertEquals(UpdateState.ReadyToInstall::class.java, viewModel.state.value.javaClass)
+            coVerify(exactly = 1) {
                 ApkDownloader.download(any(), any(), any(), any(), any(), any(), any())
             }
         } finally {
@@ -205,7 +216,7 @@ class UpdateViewModelTest {
         coEvery { preferencesRepository.getPendingUpdate() } returns newer
         val restored = track(UpdateViewModel(application, preferencesRepository))
         awaitOnMain { restored.pendingUpdate.value == newer }
-        // Al restaurar sin autoStartDownload, el estado queda Idle pero pendingUpdate está seteado
+        // Sin APK descargado, la restauración deja el pendiente pero no inventa estado
         awaitOnMain { restored.state.value == UpdateState.Idle }
     }
 
@@ -237,14 +248,16 @@ class UpdateViewModelTest {
     }
 
     @Test
-    fun `download verifies and auto installs`() = runTest {
+    fun `download verifies and waits for the user to install`() = runTest {
         mockAvailableUpdate()
         try {
             viewModel.checkForUpdate(force = true, showFeedback = false)
-            awaitOnMain { viewModel.pendingUpdate.value != null }
+            awaitOnMain { viewModel.state.value is UpdateState.ReadyToInstall }
+            // La descarga NO abre el instalador por su cuenta.
+            verify(exactly = 0) { ApkDownloader.installApk(any(), any()) }
+
             apkFile.writeBytes(ByteArray(2048))
-            viewModel.startUpdate()
-            awaitOnMain { viewModel.state.value is UpdateState.ReadyToInstall || viewModel.state.value is UpdateState.Installing }
+            viewModel.installApk()
             awaitCoVerify {
                 coVerify(exactly = 1) { ApkDownloader.installApk(any(), any()) }
             }
@@ -423,11 +436,7 @@ class UpdateViewModelTest {
         try {
             apkFile.writeBytes(ByteArray(2048))
             viewModel.onActivityResumed()
-            viewModel.checkForUpdate(
-                force = true,
-                showFeedback = false,
-                autoStartDownload = true,
-            )
+            viewModel.checkForUpdate(force = true, showFeedback = false)
             awaitOnMain { viewModel.state.value is UpdateState.ReadyToInstall || viewModel.state.value is UpdateState.Installing }
             coVerify(exactly = 1) {
                 ApkDownloader.download(any(), any(), any(), any(), any(), any(), any())
@@ -546,6 +555,63 @@ class UpdateViewModelTest {
             awaitOnMain {
                 viewModel.message.value == "El release no publica el SHA-256 del APK"
             }
+        } finally {
+            unmockkObject(UpdateChecker)
+        }
+    }
+
+    @Test
+    fun `launch check respects suppress until tomorrow`() = runTest {
+        mockAvailableUpdate()
+        coEvery { preferencesRepository.getUpdateSuppressedUntil() } returns Long.MAX_VALUE
+        try {
+            viewModel.checkForUpdateOnLaunch()
+            awaitOnMain { viewModel.pendingUpdate.value != null }
+            testDispatcher.scheduler.advanceUntilIdle()
+            assertEquals(UpdateState.Idle, viewModel.state.value)
+            coVerify(exactly = 0) {
+                ApkDownloader.download(any(), any(), any(), any(), any(), any(), any())
+            }
+        } finally {
+            unmockkObject(UpdateChecker)
+        }
+    }
+
+    @Test
+    fun `stale install session outcome is ignored`() = runTest {
+        mockAvailableUpdate()
+        try {
+            viewModel.checkForUpdate(force = true, showFeedback = false)
+            awaitOnMain { viewModel.state.value is UpdateState.ReadyToInstall }
+            apkFile.writeBytes(ByteArray(2048))
+            viewModel.installApk()
+            awaitOnMain { (viewModel.state.value as? UpdateState.Installing)?.sessionId == 1 }
+
+            UpdateInstallBus.post(InstallOutcome.Failed(sessionId = 99, message = "sesión vieja"))
+            testDispatcher.scheduler.advanceUntilIdle()
+            assertTrue(viewModel.state.value is UpdateState.Installing)
+
+            UpdateInstallBus.post(InstallOutcome.Failed(sessionId = 1, message = "cancelada"))
+            awaitOnMain { viewModel.state.value is UpdateState.Error }
+        } finally {
+            unmockkObject(UpdateChecker)
+        }
+    }
+
+    @Test
+    fun `install success clears persisted state`() = runTest {
+        mockAvailableUpdate()
+        try {
+            viewModel.checkForUpdate(force = true, showFeedback = false)
+            awaitOnMain { viewModel.state.value is UpdateState.ReadyToInstall }
+            apkFile.writeBytes(ByteArray(2048))
+            viewModel.installApk()
+            awaitOnMain { (viewModel.state.value as? UpdateState.Installing)?.sessionId == 1 }
+
+            UpdateInstallBus.post(InstallOutcome.Success(1))
+            awaitOnMain { viewModel.state.value is UpdateState.Installed }
+            awaitCoVerify { coVerify { preferencesRepository.clearPendingUpdate() } }
+            awaitCoVerify { coVerify { preferencesRepository.clearUpdateState() } }
         } finally {
             unmockkObject(UpdateChecker)
         }
