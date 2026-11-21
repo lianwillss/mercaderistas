@@ -144,7 +144,9 @@ import com.rutamercaderistas.data.stock.conMarca
 import com.rutamercaderistas.data.stock.conRuta
 import com.rutamercaderistas.data.stock.estadoDe
 import com.rutamercaderistas.data.stock.marcaFueraDeRuta
+import com.rutamercaderistas.data.stock.marcaExcluida
 import com.rutamercaderistas.data.stock.marcasPara
+import com.rutamercaderistas.data.stock.marcasParaSelector
 import com.rutamercaderistas.data.stock.normalizarRuta
 import com.rutamercaderistas.data.stock.normalizarStock
 import com.rutamercaderistas.ui.components.AppButton
@@ -233,6 +235,14 @@ fun StockScreen(
     var verCobertura by rememberSaveable { mutableStateOf(false) }
     val maxStock = remember(state.result.items) {
         state.result.items.maxOfOrNull { it.stockUnits } ?: 0.0
+    }
+    // Marcas que ya aparecen en el listado: con un snapshot viejo pueden no
+    // estar en catalog.marcas y aun así ser resultados reales en vivo.
+    val marcasVisibles = remember(state.result.items) {
+        state.result.items.map { it.brand }
+            .filter { it.isNotBlank() && !marcaExcluida(it) }
+            .distinct()
+            .sorted()
     }
 
     fun compartir(productos: List<StockItem>, tituloLocal: String? = null) {
@@ -439,6 +449,7 @@ fun StockScreen(
                     onElegirLocal = vm::elegirLocal,
                     onElegirRuta = vm::elegirRuta,
                     onElegirMarca = vm::elegirMarca,
+                    marcasVisibles = marcasVisibles,
                     modo = filters.modo,
                     onModo = { modo -> vm.onFilter { it.copy(modo = modo) } },
                 )
@@ -576,6 +587,7 @@ fun StockScreen(
                             onElegirLocal = vm::elegirLocal,
                             onElegirRuta = vm::elegirRuta,
                             onElegirMarca = vm::elegirMarca,
+                            marcasVisibles = marcasVisibles,
                             onActualizar = { vm.iniciarActualizacion() },
                         )
                     }
@@ -710,6 +722,7 @@ private fun StockFiltersCard(
     onElegirLocal: (String) -> Unit,
     onElegirRuta: (String) -> Unit,
     onElegirMarca: (String) -> Unit,
+    marcasVisibles: List<String> = emptyList(),
     modo: StockMode,
     onModo: (StockMode) -> Unit,
 ) {
@@ -759,7 +772,7 @@ private fun StockFiltersCard(
             }
             // Las marcas del combo se limitan a las presentes en los
             // locales de la ruta elegida.
-            val marcasRuta = catalog.marcasPara(filters.ruta)
+            val marcasRuta = marcasParaSelector(catalog, filters.ruta, marcasVisibles)
             val hayRuta = filters.ruta.isNotBlank()
             // Si la ruta cambia y la marca guardada ya no existe ahí, se
             // limpia una sola vez. Nunca mientras el usuario escribe: el
@@ -1863,6 +1876,7 @@ private fun StockVacio(
     onElegirLocal: (String) -> Unit,
     onElegirRuta: (String) -> Unit,
     onElegirMarca: (String) -> Unit,
+    marcasVisibles: List<String> = emptyList(),
     onActualizar: () -> Unit,
 ) {
     val textoLocal = filters.local.trim()
@@ -1880,7 +1894,11 @@ private fun StockVacio(
     // cadena/nombre): ahí el vacío se explica por los filtros, no por el texto.
     val localParcial = localesCoincidentes > 0
     val localSinCoincidencia = localElegido == null && textoLocal.length >= 2 && !localParcial
-    val marcasPosibles = if (textoMarca.length >= 2) catalog.marcasPara(textoRuta) else emptyList()
+    val marcasPosibles = if (textoMarca.length >= 2) {
+        marcasParaSelector(catalog, textoRuta, marcasVisibles)
+    } else {
+        emptyList()
+    }
     val marcaEnCatalogo = marcasPosibles.any {
         normalizarStock(it) == normalizarStock(textoMarca)
     }

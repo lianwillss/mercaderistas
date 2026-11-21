@@ -473,6 +473,26 @@ fun StockCatalog.marcasPara(ruta: String): List<String> {
 }
 
 /**
+ * Marcas que ofrece el selector: las del catálogo más las que ya trae el
+ * listado.
+ *
+ * El snapshot local puede estar viejo (marcas nuevas de KPI One) y el listado,
+ * en cambio, las trae en vivo; sin esta unión el autocompletado contradice a la
+ * lista. Las dadas de baja no se ofrecen nunca.
+ */
+fun marcasParaSelector(
+    catalog: StockCatalog,
+    ruta: String,
+    visibles: List<String>,
+): List<String> {
+    // Ruta dada de baja: no hay nada que ofrecer, ni siquiera marcas visibles.
+    if (ruta.isNotBlank() && rutaExcluida(ruta)) return emptyList()
+    return (catalog.marcasPara(ruta) + visibles.filter { it.isNotBlank() && !marcaExcluida(it) })
+        .distinct()
+        .sorted()
+}
+
+/**
  * ¿La marca escrita dejó de existir en la ruta elegida? Sólo se considera
  * inválida una marca **completa** del catálogo que no está en la ruta.
  *

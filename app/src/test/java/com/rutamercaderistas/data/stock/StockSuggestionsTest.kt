@@ -1,6 +1,7 @@
 package com.rutamercaderistas.data.stock
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -99,5 +100,45 @@ class StockSuggestionsTest {
         // aunque CUKY tenga mas usos, el exacto sigue primero.
         val resultado = sugerenciasStock("cuk", marcas, usos = mapOf("CUKY" to 100))
         assertEquals("CUK", resultado.items.first().valor)
+    }
+
+    @Test
+    fun `el prefijo encuentra la marca sin importar mayusculas ni tildes`() {
+        val marcas = opcionesDeMarcas(listOf("KHATAR", "CASO Y CIA"))
+        assertEquals(listOf("KHATAR"), sugerenciasStock("kh", marcas).items.map { it.valor })
+        assertEquals(listOf("KHATAR"), sugerenciasStock("Kh", marcas).items.map { it.valor })
+        assertEquals(listOf("AGUILA"), sugerenciasStock("águila", opcionesDeMarcas(listOf("AGUILA"))).items.map { it.valor })
+    }
+
+    @Test
+    fun `la busqueda de marca tambien es por contiene`() {
+        val marcas = opcionesDeMarcas(listOf("DISTRIBUIDORA KHATAR SA"))
+        assertEquals(
+            listOf("DISTRIBUIDORA KHATAR SA"),
+            sugerenciasStock("khatar", marcas).items.map { it.valor },
+        )
+    }
+
+    @Test
+    fun `una marca que solo esta en el listado tambien se ofrece`() {
+        val catalogo = StockCatalog(
+            marcas = listOf("CASO Y CIA"),
+            rutas = listOf("EMU-3"),
+            marcasPorRuta = mapOf("EMU-3" to listOf("CASO Y CIA")),
+        )
+        // El snapshot viejo no trae KHATAR, pero el listado en vivo sí.
+        assertEquals(
+            listOf("CASO Y CIA", "KHATAR"),
+            marcasParaSelector(catalogo, "", listOf("KHATAR", "CASO Y CIA")),
+        )
+        // Con ruta se respetan las marcas de esa ruta y se suman las visibles.
+        assertEquals(
+            listOf("CASO Y CIA", "KHATAR"),
+            marcasParaSelector(catalogo, "EMU-3", listOf("KHATAR")),
+        )
+        // Una ruta dada de baja no ofrece nada, ni con marcas visibles.
+        assertTrue(marcasParaSelector(catalogo, "PITUTO", listOf("KHATAR")).isEmpty())
+        // Las dadas de baja nunca se ofrecen.
+        assertFalse(marcasParaSelector(catalogo, "", listOf("BERRYSUR")).contains("BERRYSUR"))
     }
 }
