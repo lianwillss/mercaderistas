@@ -51,13 +51,13 @@ descarga por URL/Drive se conserva para una próxima fase.
 
 ### Cifras actuales (RM)
 
-- **296 locales** con stock, de 315 códigos del rutero en RM.
-- La app **excluye PITUTO y PROPAL**: trabaja con **208 locales**. Sólo quedan
-  fuera los **88 exclusivos** de esas rutas; los **41 compartidos** con una ruta
-  de la RM siguen visibles por ella (mismo local, otras marcas), así ninguna
-  ruta se recorta ni queda vacía (ver §7).
-- **40 rutas** (42 en el rutero menos PITUTO y PROPAL): EMU-1…7, DMU-1/5/6/8, FMU, GMU, HMU, BR.
-- **52 marcas**, ~**13.100 filas**, archivo de ~1,95 MB.
+- **289 locales** con stock, de 315 códigos del rutero en RM.
+- La app **excluye PITUTO y PROPAL**: salen sólo los **locales exclusivos** de
+  esas rutas (85 en la foto vigente); los **41 compartidos** con una ruta de la
+  RM siguen visibles por ella, con otras marcas. El total se verifica contra el
+  propio asset en cada regeneración, no contra un número fijo.
+- **58 marcas**, ~**18.100 filas**, archivo de ~2,7 MB. Incluye las altas de
+  KPI One (KHATAR, HUENTELAUQUEN, KOMBUCHACHA, SANGRIA CANDELA).
 - **172 filas con stock negativo** en 89 locales.
 - 71 locales pertenecen a más de una ruta.
 

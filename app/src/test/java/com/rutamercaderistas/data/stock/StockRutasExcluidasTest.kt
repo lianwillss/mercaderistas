@@ -86,9 +86,11 @@ class StockRutasExcluidasTest {
         val catalogo = DemoStockRepository(StockDemoData.parse(archivo!!.readText())).catalog()
         assertFalse(catalogo.rutas.any { it.equals("PITUTO", true) || it.equals("PROPAL", true) })
         assertTrue(catalogo.locales.none { localExcluido(it.rutas) })
-        // 296 menos los 88 exclusivos de PITUTO/PROPAL: los 41 compartidos
-        // siguen por su ruta de la RM y ninguna ruta queda vacía.
-        assertEquals(208, catalogo.locales.size)
+        // El total exacto cambia con cada regeneración del asset: se verifica
+        // contra los propios datos, no contra un número fijo.
+        val esperados = StockDemoData.parse(archivo!!.readText()).locales
+            .count { !localExcluido(it.rutas) }
+        assertEquals(esperados, catalogo.locales.size)
         val br14 = catalogo.rutas.firstOrNull { it.startsWith("BR-14") }
         assertNotNull(br14)
         assertTrue(catalogo.marcasPorRuta.getValue(normalizarRuta(br14!!)).isNotEmpty())
