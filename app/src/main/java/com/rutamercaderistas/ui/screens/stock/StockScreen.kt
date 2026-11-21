@@ -44,6 +44,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Lock
@@ -113,9 +114,20 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rutamercaderistas.R
+import com.rutamercaderistas.data.stock.ConsultaStock
 import com.rutamercaderistas.data.stock.StockCatalog
 import com.rutamercaderistas.data.stock.StockFilters
 import com.rutamercaderistas.data.stock.StockItem
+import com.rutamercaderistas.data.stock.StockLocal
+import com.rutamercaderistas.data.stock.StockSugerencia
+import com.rutamercaderistas.data.stock.StockBusquedas
+import com.rutamercaderistas.data.stock.StockSeleccion
+import com.rutamercaderistas.data.stock.TipoBusquedaStock
+import com.rutamercaderistas.data.stock.usosPorTipo
+import com.rutamercaderistas.data.stock.opcionesDeLocales
+import com.rutamercaderistas.data.stock.opcionesDeMarcas
+import com.rutamercaderistas.data.stock.opcionesDeRutas
+import com.rutamercaderistas.data.stock.sugerenciasStock
 import com.rutamercaderistas.data.stock.StockMode
 import com.rutamercaderistas.data.stock.StockResult
 import com.rutamercaderistas.data.stock.StockSort
@@ -143,6 +155,7 @@ import com.rutamercaderistas.ui.components.BannerAlturas
 import com.rutamercaderistas.ui.components.BannerMensaje
 import com.rutamercaderistas.ui.components.CollapsingBanner
 import com.rutamercaderistas.ui.components.ActualizacionDatos
+import com.rutamercaderistas.ui.components.HighlightedText
 import com.rutamercaderistas.ui.components.ShimmerBlock
 import com.rutamercaderistas.ui.components.rememberCollapsingBannerState
 import com.rutamercaderistas.ui.screens.stock.StockItemZoom
@@ -184,6 +197,7 @@ fun StockScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val filters by vm.filters.collectAsStateWithLifecycle()
+    val historial by vm.historial.collectAsStateWithLifecycle()
     // Al volver a la pestaña, si el dato tiene más de un minuto, se refresca
     // en segundo plano sin ocultar la lista que ya está en pantalla.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.alVolver() }
@@ -421,6 +435,10 @@ fun StockScreen(
                     catalog = state.catalog,
                     filters = filters,
                     onFilter = vm::onFilter,
+                    historial = historial,
+                    onElegirLocal = vm::elegirLocal,
+                    onElegirRuta = vm::elegirRuta,
+                    onElegirMarca = vm::elegirMarca,
                     modo = filters.modo,
                     onModo = { modo -> vm.onFilter { it.copy(modo = modo) } },
                 )
@@ -548,57 +566,18 @@ fun StockScreen(
                             onAccion = { vm.iniciarActualizacion(force = true) },
                         )
                     } else {
-                    EstadoCard(
-                        icono = Icons.Outlined.Inventory2,
-                        titulo = when {
-                            state.osaEnCurso && filters.validacion != null ->
-                                "Cruzando negativos con OSA…"
-                            filters.validacion == ValidacionNegativo.CONTRADICE ->
-                                "Sin negativos por verificar"
-                            filters.validacion == ValidacionNegativo.CONFIRMADO ->
-                                "Sin negativos confirmados"
-                            filters.validacion == ValidacionNegativo.SIN_DATO ->
-                                "Sin negativos sin OSA"
-                            filters.soloNegativos -> "Sin negativos"
-                            filters.cobertura != null -> "Ningún producto en ese tramo"
-                            localElegido != null -> "Sin stock para este local"
-                            else -> "Sin resultados"
-                        },
-                        detalle = when {
-                            state.osaEnCurso && filters.validacion != null ->
-                                "Consultando la última visita de cada local."
-                            filters.validacion == ValidacionNegativo.CONTRADICE ->
-                                "Ningún negativo coincide con OSA sí en este corte."
-                            filters.validacion == ValidacionNegativo.CONFIRMADO ->
-                                "Ningún negativo está confirmado por OSA en este corte."
-                            filters.validacion == ValidacionNegativo.SIN_DATO ->
-                                "Todos los negativos de este corte tienen respuesta OSA."
-                            filters.soloNegativos -> "No hay stock negativo con estos filtros."
-                            filters.cobertura != null -> "No hay productos en ese tramo de cobertura con los filtros actuales."
-                            localElegido != null -> localElegido.label + ": todavía no hay stock cargado."
-                            else -> "Prueba con otro local, otra ruta, otra marca u otro código."
-                        },
-                        accion = if (filters.cobertura != null) "Ver todos" else "Limpiar filtros",
-                        onAccion = {
-                            if (filters.cobertura != null) {
-                                vm.onFilter { it.copy(cobertura = null) }
-                            } else {
-                                vm.onFilter {
-                                    it.copy(
-                                        local = "",
-                                        ruta = "",
-                                        marca = "",
-                                        sku = "",
-                                        estado = null,
-                                        cobertura = null,
-                                        validacion = null,
-                                        soloQuiebre = false,
-                                        soloNegativos = false,
-                                    )
-                                }
-                            }
-                        },
-                    )
+                        StockVacio(
+                            catalog = state.catalog,
+                            filters = filters,
+                            localElegido = localElegido,
+                            osaEnCurso = state.osaEnCurso,
+                            fechaDatos = state.fechaDatos,
+                            onFilter = vm::onFilter,
+                            onElegirLocal = vm::elegirLocal,
+                            onElegirRuta = vm::elegirRuta,
+                            onElegirMarca = vm::elegirMarca,
+                            onActualizar = { vm.iniciarActualizacion() },
+                        )
                     }
                 }
                 StockStatus.Ready -> items(filas, key = { it.key }) { fila ->
@@ -727,6 +706,10 @@ private fun StockFiltersCard(
     catalog: StockCatalog,
     filters: StockFilters,
     onFilter: ((StockFilters) -> StockFilters) -> Unit,
+    historial: StockBusquedas,
+    onElegirLocal: (String) -> Unit,
+    onElegirRuta: (String) -> Unit,
+    onElegirMarca: (String) -> Unit,
     modo: StockMode,
     onModo: (StockMode) -> Unit,
 ) {
@@ -751,25 +734,23 @@ private fun StockFiltersCard(
             modifier = Modifier.padding(dimens.spacingMd),
             verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
         ) {
-            val localMostrado = catalog.locales
-                .firstOrNull { it.code == filters.local }
-                ?.label
-                ?: filters.local
+            // El campo muestra lo que realmente se busca (código o texto); el
+            // nombre del local va debajo. Antes se mostraba la etiqueta pero se
+            // buscaba el código: editarla rompía la búsqueda en los locales
+            // cuyo nombre ya empieza con el código ("J503-JUMBO MAIPU").
+            val localElegido = catalog.locales.firstOrNull { it.code == filters.local }
 
             // Fila 1: Local (ancho completo)
             StockCombo(
                 label = "Local",
-                texto = localMostrado,
+                texto = filters.local,
+                detalle = localElegido?.nombreCorto,
                 placeholder = "Código o nombre",
-                opciones = catalog.locales.map {
-                    ComboOpcion(
-                        valor = it.code,
-                        etiqueta = it.label,
-                        claves = it.code + " " + it.name,
-                    )
-                },
+                opciones = opcionesDeLocales(catalog.locales),
+                recientes = historial.locales,
+                usos = usosPorTipo(historial, TipoBusquedaStock.LOCAL),
                 onTexto = { texto -> onFilter { it.conLocal(texto) } },
-                onElegir = { opcion -> onFilter { it.conLocal(opcion.valor) } },
+                onElegir = { opcion -> onElegirLocal(opcion.valor) },
             )
 
             // Fila 2: Ruta | Marca (horizontal, dos combos)
@@ -807,15 +788,17 @@ private fun StockFiltersCard(
                         opciones = catalog.rutas
                             .sortedByDescending { localesPorRuta[it] ?: 0 }
                             .map { ruta ->
-                                ComboOpcion(
+                                StockSugerencia(
                                     valor = ruta,
                                     etiqueta = ruta + " · " + (localesPorRuta[ruta] ?: 0),
                                     claves = ruta + " " + normalizarRuta(ruta) + " " +
                                         ruta.replace("-", " "),
                                 )
                             },
+                        recientes = historial.rutas,
+                        usos = usosPorTipo(historial, TipoBusquedaStock.RUTA),
                         onTexto = { texto -> onFilter { it.conRuta(texto) } },
-                        onElegir = { opcion -> onFilter { it.conRuta(opcion.valor) } },
+                        onElegir = { opcion -> onElegirRuta(opcion.valor) },
                     )
                 }
                 // Marca - peso 0.5
@@ -825,7 +808,7 @@ private fun StockFiltersCard(
                         texto = filters.marca,
                         placeholder = "Marca",
                         opciones = marcasRuta.map { marca ->
-                            ComboOpcion(
+                            StockSugerencia(
                                 valor = marca,
                                 // El conteo de locales sólo tiene sentido con ruta.
                                 etiqueta = if (hayRuta) {
@@ -836,8 +819,10 @@ private fun StockFiltersCard(
                                 claves = marca,
                             )
                         },
+                        recientes = historial.marcas,
+                        usos = usosPorTipo(historial, TipoBusquedaStock.MARCA),
                         onTexto = { texto -> onFilter { it.conMarca(texto) } },
-                        onElegir = { opcion -> onFilter { it.conMarca(opcion.valor) } },
+                        onElegir = { opcion -> onElegirMarca(opcion.valor) },
                     )
                 }
             }
@@ -1855,6 +1840,199 @@ private fun CabeceraSeccion(
 
 // ── Estados ────────────────────────────────────────────────────────
 
+private data class SugerenciaVacia(
+    val etiqueta: String,
+    val onClick: () -> Unit,
+)
+
+/**
+ * Estado vacío de Stock: explica el motivo real y, cuando el texto no
+ * corresponde a ninguna opción, ofrece la sugerencia más parecida
+ * ("¿Quisiste decir…?"). Antes todo terminaba en "Sin resultados / prueba con
+ * otro local", aunque el local no existiera o la marca no estuviera en el
+ * snapshot.
+ */
+@Composable
+private fun StockVacio(
+    catalog: StockCatalog,
+    filters: StockFilters,
+    localElegido: StockLocal?,
+    osaEnCurso: Boolean,
+    fechaDatos: String?,
+    onFilter: ((StockFilters) -> StockFilters) -> Unit,
+    onElegirLocal: (String) -> Unit,
+    onElegirRuta: (String) -> Unit,
+    onElegirMarca: (String) -> Unit,
+    onActualizar: () -> Unit,
+) {
+    val textoLocal = filters.local.trim()
+    val textoMarca = filters.marca.trim()
+    val textoRuta = filters.ruta.trim()
+    val textoProducto = filters.sku.trim()
+
+    val consultaLocal = ConsultaStock(textoLocal)
+    val localesCoincidentes = if (textoLocal.length >= 2) {
+        catalog.locales.count { consultaLocal.coincide(it.code + " " + it.name) }
+    } else {
+        0
+    }
+    // No es "no existe" si el texto coincide con varios locales (búsqueda por
+    // cadena/nombre): ahí el vacío se explica por los filtros, no por el texto.
+    val localParcial = localesCoincidentes > 0
+    val localSinCoincidencia = localElegido == null && textoLocal.length >= 2 && !localParcial
+    val marcasPosibles = if (textoMarca.length >= 2) catalog.marcasPara(textoRuta) else emptyList()
+    val marcaEnCatalogo = marcasPosibles.any {
+        normalizarStock(it) == normalizarStock(textoMarca)
+    }
+    // "caso" es parcial de "CASO Y CIA": no es una marca fuera del catálogo.
+    val marcaParcial = marcaEnCatalogo || marcasPosibles.any {
+        ConsultaStock(textoMarca).coincide(it)
+    }
+    val buscadaRuta = normalizarRuta(textoRuta)
+    val rutaExiste = textoRuta.length >= 2 && catalog.rutas.any {
+        val normalizada = normalizarRuta(it)
+        normalizada == buscadaRuta ||
+            (buscadaRuta.length >= 3 && normalizada.startsWith(buscadaRuta))
+    }
+    val sugerencias: List<SugerenciaVacia> = when {
+        localSinCoincidencia -> sugerenciasStock(
+            textoLocal,
+            opcionesDeLocales(catalog.locales),
+            3,
+        ).items.map { sugerencia ->
+            SugerenciaVacia(sugerencia.etiqueta) {
+                onElegirLocal(sugerencia.valor)
+            }
+        }
+        textoRuta.length >= 2 && !rutaExiste -> sugerenciasStock(
+            textoRuta,
+            opcionesDeRutas(catalog.rutas),
+            3,
+        ).items.map { sugerencia ->
+            SugerenciaVacia(sugerencia.etiqueta) {
+                onElegirRuta(sugerencia.valor)
+            }
+        }
+        textoMarca.length >= 2 && !marcaEnCatalogo -> sugerenciasStock(
+            textoMarca,
+            opcionesDeMarcas(catalog.marcasPara(textoRuta)),
+            3,
+        ).items.map { sugerencia ->
+            SugerenciaVacia(sugerencia.etiqueta) {
+                onElegirMarca(sugerencia.valor)
+            }
+        }
+        else -> emptyList()
+    }
+
+    val snapshot = fechaDatos?.let { fechaCorta(it) }
+    val marcaSoloSnapshot = textoMarca.length >= 2 && textoLocal.isEmpty() &&
+        textoRuta.isEmpty() && textoProducto.length < 2
+    val (titulo, detalle) = when {
+        osaEnCurso && filters.validacion != null ->
+            "Cruzando negativos con OSA…" to "Consultando la última visita de cada local."
+        filters.validacion == ValidacionNegativo.CONTRADICE ->
+            "Sin negativos por verificar" to "Ningún negativo coincide con OSA sí en este corte."
+        filters.validacion == ValidacionNegativo.CONFIRMADO ->
+            "Sin negativos confirmados" to "Ningún negativo está confirmado por OSA en este corte."
+        filters.validacion == ValidacionNegativo.SIN_DATO ->
+            "Sin negativos sin OSA" to "Todos los negativos de este corte tienen respuesta OSA."
+        localSinCoincidencia ->
+            "No encontramos ese local" to
+                "«" + filters.local + "» no coincide con ningún local del rutero. " +
+                "Prueba con el código o con el nombre."
+        textoRuta.length >= 2 && !rutaExiste ->
+            "No encontramos esa ruta" to
+                "«" + filters.ruta + "» no coincide con ninguna ruta del rutero."
+        textoMarca.length >= 2 && !marcaEnCatalogo ->
+            "Marca no encontrada" to
+                "«" + filters.marca + "» no coincide con ninguna marca del stock descargado" +
+                (if (snapshot != null) " (snapshot del " + snapshot + ")" else "") +
+                ". Si es un error de tipeo, toca una sugerencia; si es una marca " +
+                "nueva, actualiza el stock o ábrela con un local o ruta."
+        filters.cobertura != null ->
+            "Ningún producto en ese tramo" to
+                "No hay productos en ese tramo de cobertura con los filtros actuales."
+        filters.soloNegativos ->
+            "Sin negativos" to "No hay stock negativo con estos filtros."
+        filters.soloQuiebre ->
+            "Sin quiebres" to "No hay productos en quiebre con estos filtros."
+        filters.estado != null ->
+            "Sin productos en estado «" + filters.estado.texto + "»" to
+                "Ningún producto de esta búsqueda está en ese estado."
+        textoProducto.length >= 2 ->
+            "Sin resultados para «" + filters.sku + "»" to if (localElegido != null) {
+                localElegido.label + ": no hay coincidencias con ese producto."
+            } else {
+                "Prueba con parte del nombre del producto o con el SKU."
+            }
+        localParcial && localElegido == null ->
+            "Sin stock para «" + filters.local + "»" to
+                "«" + filters.local + "» coincide con " +
+                plural(localesCoincidentes, "local", "locales") +
+                ", pero ninguno tiene filas con estos filtros."
+        textoMarca.length >= 2 && marcaParcial ->
+            "Sin stock para «" + filters.marca + "»" to when {
+                localElegido != null ->
+                    localElegido.label + ": no hay productos de esa marca."
+                textoRuta.isNotEmpty() ->
+                    "La marca no tiene filas en los locales de la ruta «" + filters.ruta + "»."
+                snapshot != null ->
+                    "No hay filas en el stock descargado (snapshot del " + snapshot + "). " +
+                        "Puede estar desactualizado: actualízalo o combínala con un local o ruta."
+                else -> "No hay filas con los filtros actuales."
+            }
+        localElegido != null ->
+            "Sin stock para este local" to
+                localElegido.label + ": todavía no hay stock cargado."
+        else -> "Sin resultados" to
+            "Prueba con otro local, otra ruta, otra marca u otro código."
+    }
+
+    val quitarFiltroEstado = filters.estado != null || filters.cobertura != null ||
+        filters.soloNegativos || filters.soloQuiebre
+    EstadoCard(
+        icono = Icons.Outlined.Inventory2,
+        titulo = titulo,
+        detalle = detalle,
+        sugerencias = sugerencias,
+        accion = if (quitarFiltroEstado) "Quitar filtro de estado" else "Limpiar filtros",
+        onAccion = {
+            if (quitarFiltroEstado) {
+                onFilter {
+                    it.copy(
+                        estado = null,
+                        cobertura = null,
+                        validacion = null,
+                        soloQuiebre = false,
+                        soloNegativos = false,
+                    )
+                }
+            } else {
+                onFilter {
+                    it.copy(
+                        local = "",
+                        ruta = "",
+                        marca = "",
+                        sku = "",
+                        estado = null,
+                        cobertura = null,
+                        validacion = null,
+                        soloQuiebre = false,
+                        soloNegativos = false,
+                    )
+                }
+            }
+        },
+        accionSecundaria = if (marcaSoloSnapshot || (textoMarca.length >= 2 && !marcaEnCatalogo)) {
+            "Actualizar stock"
+        } else {
+            null
+        },
+        onAccionSecundaria = onActualizar,
+    )
+}
+
 @Composable
 private fun EstadoCard(
     icono: androidx.compose.ui.graphics.vector.ImageVector,
@@ -1862,6 +2040,9 @@ private fun EstadoCard(
     detalle: String,
     accion: String? = null,
     onAccion: (() -> Unit)? = null,
+    sugerencias: List<SugerenciaVacia> = emptyList(),
+    accionSecundaria: String? = null,
+    onAccionSecundaria: (() -> Unit)? = null,
 ) {
     Card(
         colors = CardDefaults.cardColors(
@@ -1886,10 +2067,45 @@ private fun EstadoCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (sugerencias.isNotEmpty()) {
+                Text(
+                    text = "¿Quisiste decir…?",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    sugerencias.forEach { sugerencia ->
+                        AppFilterChip(
+                            selected = false,
+                            onClick = sugerencia.onClick,
+                            label = {
+                                Text(
+                                    text = sugerencia.etiqueta,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            },
+                        )
+                    }
+                }
+            }
             if (accion != null && onAccion != null) {
                 AppButton(
                     text = accion,
                     onClick = onAccion,
+                    variant = AppButtonVariant.Text,
+                )
+            }
+            if (accionSecundaria != null && onAccionSecundaria != null) {
+                AppButton(
+                    text = accionSecundaria,
+                    onClick = onAccionSecundaria,
                     variant = AppButtonVariant.Text,
                 )
             }
@@ -1930,44 +2146,42 @@ private fun SkeletonCard() {
 
 // ── Combos ─────────────────────────────────────────────────────────
 
-private data class ComboOpcion(
-    val valor: String,
-    val etiqueta: String,
-    val claves: String,
-)
-
 @Composable
 private fun StockCombo(
     label: String,
     texto: String,
     placeholder: String,
-    opciones: List<ComboOpcion>,
+    opciones: List<StockSugerencia>,
     onTexto: (String) -> Unit,
-    onElegir: (ComboOpcion) -> Unit,
+    onElegir: (StockSugerencia) -> Unit,
+    detalle: String? = null,
+    recientes: List<StockSeleccion> = emptyList(),
+    usos: Map<String, Int> = emptyMap(),
 ) {
     var expandido by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
-    val consulta = normalizarStock(texto.substringBefore("·"))
-    val sugerencias = remember(opciones, consulta) {
-        val base = if (consulta.isBlank()) {
-            opciones
-        } else {
-            opciones.filter { opcion ->
-                normalizarStock(opcion.claves).contains(consulta) ||
-                    normalizarRuta(opcion.claves).contains(normalizarRuta(consulta))
-            }
-        }
-        // Sin texto se respeta el orden recibido (las rutas vienen por cantidad).
-        if (consulta.isBlank()) {
-            base.take(6)
-        } else {
-            base.sortedWith(
-                compareBy(
-                    { if (normalizarStock(it.etiqueta).startsWith(consulta)) 0 else 1 },
-                    { normalizarStock(it.etiqueta) },
-                ),
-            ).take(6)
-        }
+    // Misma regla de coincidencia que la búsqueda (normal + compacta) y
+    // ranking por relevancia: la opción más probable va primero y se ve
+    // cuántas coincidencias hay en total. Con texto, el desempate por uso va
+    // DESPUÉS de la relevancia, sin pisar exacto > prefijo > contiene > typo.
+    val consultaTexto = texto.substringBefore("·")
+    val consulta = ConsultaStock(consultaTexto)
+    val sugerencias = remember(opciones, consulta.normal, consulta.compacto, usos) {
+        sugerenciasStock(consultaTexto, opciones, usos = usos)
+    }
+    // Con el campo vacío se muestran primero las recientes y después el resto.
+    // Las que ya no existen en el catálogo (ruta o local dado de baja) no se
+    // muestran: no deben poder aplicarse.
+    val recientesValidas = recientes.filter { reciente ->
+        opciones.any { it.valor == reciente.valor }
+    }
+    val recientesMostradas = if (consulta.vacia) recientesValidas.take(5) else emptyList()
+    // "El resto" no repite lo que ya aparece en "Recientes".
+    val itemsMostradas = if (consulta.vacia) {
+        val recientesValores = recientesMostradas.map { it.valor }.toSet()
+        sugerencias.items.filterNot { it.valor in recientesValores }
+    } else {
+        sugerencias.items
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -1980,6 +2194,15 @@ private fun StockCombo(
             label = { Text(label) },
             placeholder = { Text(placeholder) },
             singleLine = true,
+            supportingText = detalle?.let { nombre ->
+                {
+                    Text(
+                        text = nombre,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            },
             trailingIcon = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (texto.isNotEmpty()) {
@@ -2011,7 +2234,7 @@ private fun StockCombo(
         )
 
         // Sugerencias en línea: el foco sigue en el campo y el teclado no se cierra.
-        if (expandido && (sugerencias.isNotEmpty() || consulta.isNotBlank())) {
+        if (expandido && (sugerencias.items.isNotEmpty() || recientesMostradas.isNotEmpty() || !consulta.vacia)) {
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -2022,10 +2245,69 @@ private fun StockCombo(
             ) {
                 Column(
                     modifier = Modifier
-                        .heightIn(max = 216.dp)
+                        .heightIn(max = 264.dp)
                         .verticalScroll(rememberScrollState()),
                 ) {
-                    if (sugerencias.isEmpty()) {
+                    // Sección "Recientes": sólo con el campo vacío, antes del resto.
+                    if (recientesMostradas.isNotEmpty()) {
+                        Text(
+                            text = "Recientes",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(
+                                start = 12.dp,
+                                end = 12.dp,
+                                top = 10.dp,
+                            ),
+                        )
+                        recientesMostradas.forEach { reciente ->
+                            val opcion = opciones.firstOrNull { it.valor == reciente.valor }
+                                ?: StockSugerencia(valor = reciente.valor, etiqueta = reciente.valor)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 48.dp)
+                                    .clickable(role = Role.Button) {
+                                        onElegir(opcion)
+                                        expandido = false
+                                        focusManager.clearFocus()
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                                    .semantics(mergeDescendants = true) {},
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.History,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = opcion.etiqueta,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    }
+                    if (!consulta.vacia && sugerencias.total > 0) {
+                        Text(
+                            text = plural(sugerencias.total, "coincidencia", "coincidencias"),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(
+                                start = 12.dp,
+                                end = 12.dp,
+                                top = 10.dp,
+                            ),
+                        )
+                    }
+                    if (sugerencias.items.isEmpty()) {
                         Text(
                             text = "Sin coincidencias",
                             style = MaterialTheme.typography.bodyMedium,
@@ -2033,7 +2315,7 @@ private fun StockCombo(
                             modifier = Modifier.padding(12.dp),
                         )
                     }
-                    sugerencias.forEach { opcion ->
+                    itemsMostradas.forEach { opcion ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -2054,11 +2336,14 @@ private fun StockCombo(
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Spacer(Modifier.width(8.dp))
-                            Text(
+                            HighlightedText(
                                 text = opcion.etiqueta,
+                                query = consultaTexto,
                                 style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
                             )
                         }
                     }

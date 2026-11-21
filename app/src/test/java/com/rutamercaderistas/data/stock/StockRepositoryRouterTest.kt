@@ -1,6 +1,10 @@
 package com.rutamercaderistas.data.stock
 
+import com.rutamercaderistas.data.stock.remote.KpiHttpException
 import com.rutamercaderistas.data.stock.remote.RemoteStockRepository
+import com.rutamercaderistas.data.stock.remote.SessionExpiredException
+import com.rutamercaderistas.data.stock.remote.StockQueryException
+import com.rutamercaderistas.data.stock.remote.StockQueryTooLargeException
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -83,6 +87,78 @@ class StockRepositoryRouterTest {
         val resultado = router.search(StockFilters(sku = "192"))
 
         assertEquals(StockSource.LIVE, resultado.source)
+    }
+
+    @Test
+    fun `una consulta de mas de 60 locales avisa que usa datos guardados`() = runBlocking {
+        online = true
+        coEvery { remote.search(any(), any(), any()) } throws StockQueryTooLargeException(131)
+        coEvery { local.search(any()) } returns StockResult(items = listOf(item("J503")))
+
+        val resultado = router.search(StockFilters(ruta = "PITUTO"))
+
+        assertEquals(StockSource.SNAPSHOT, resultado.source)
+        assertTrue(resultado.aviso!!.contains("131"))
+        assertTrue(resultado.aviso!!.contains("guardados", ignoreCase = true))
+    }
+
+    @Test
+    fun `un 503 de KPI One avisa que el reporte esta ocupado`() = runBlocking {
+        online = true
+        coEvery { remote.search(any(), any(), any()) } throws
+            KpiHttpException(503, "El reporte está temporalmente ocupado")
+        coEvery { local.search(any()) } returns StockResult(items = listOf(item("J503")))
+
+        val resultado = router.search(StockFilters(local = "J503"))
+
+        assertTrue(resultado.aviso!!.contains("ocupado", ignoreCase = true))
+        assertEquals(StockSource.SNAPSHOT, resultado.source)
+    }
+
+    @Test
+    fun `una sesion vencida avisa que hay que reconectar en Ajustes`() = runBlocking {
+        online = true
+        coEvery { remote.search(any(), any(), any()) } throws SessionExpiredException()
+        coEvery { local.search(any()) } returns StockResult(items = listOf(item("J503")))
+
+        val resultado = router.search(StockFilters(local = "J503"))
+
+        assertTrue(resultado.aviso!!.contains("Ajustes", ignoreCase = true))
+    }
+
+    @Test
+    fun `un error de red avisa que no se pudo conectar`() = runBlocking {
+        online = true
+        coEvery { remote.search(any(), any(), any()) } throws IOException("timeout")
+        coEvery { local.search(any()) } returns StockResult(items = listOf(item("J503")))
+
+        val resultado = router.search(StockFilters(local = "J503"))
+
+        assertTrue(resultado.aviso!!.contains("conectar", ignoreCase = true))
+    }
+
+    @Test
+    fun `un local sin coincidencias cae al snapshot sin banner de error`() = runBlocking {
+        online = true
+        coEvery { remote.search(any(), any(), any()) } throws
+            StockQueryException("Sin locales para la búsqueda")
+        coEvery { local.search(any()) } returns StockResult(items = emptyList())
+
+        val resultado = router.search(StockFilters(local = "JUMBOMAIPU"))
+
+        assertEquals(StockSource.SNAPSHOT, resultado.source)
+        // No es un problema de red: no debe mostrar "No se pudo consultar KPI One".
+        assertTrue(resultado.aviso == null)
+    }
+
+    @Test
+    fun `un local de un caracter no dispara la consulta en vivo`() = runBlocking {
+        online = true
+        coEvery { local.search(any()) } returns StockResult(items = listOf(item("J503")))
+
+        router.search(StockFilters(local = "J"))
+
+        coVerify(exactly = 0) { remote.search(any(), any(), any()) }
     }
 
     @Test

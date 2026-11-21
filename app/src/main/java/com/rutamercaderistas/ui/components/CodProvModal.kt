@@ -84,6 +84,7 @@ val CodProvItems = listOf(
     CodProvItem(R.string.cod_prov_dusoleil, "11546"),
     CodProvItem(R.string.cod_prov_olimpia, "1000325189"),
     CodProvItem(R.string.cod_prov_beshos, "76166609 / 76166609-6"),
+    CodProvItem(R.string.cod_prov_khatar, "1000293727"),
 )
 
 private val avatarColors = listOf(

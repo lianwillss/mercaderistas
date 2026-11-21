@@ -4,6 +4,7 @@ import com.rutamercaderistas.data.local.RouteEntryDao
 import com.rutamercaderistas.data.local.RouteEntryEntity
 import com.rutamercaderistas.data.stock.OsaRespuesta
 import com.rutamercaderistas.data.stock.OsaRespuestaRemota
+import com.rutamercaderistas.data.stock.ConsultaStock
 import com.rutamercaderistas.data.stock.StockCatalog
 import com.rutamercaderistas.data.stock.StockFilters
 import com.rutamercaderistas.data.stock.StockItem
@@ -16,6 +17,9 @@ import com.rutamercaderistas.data.stock.codigosDeRuta
 import com.rutamercaderistas.data.stock.normalizarRuta
 import com.rutamercaderistas.data.stock.normalizarStock
 import com.rutamercaderistas.data.stock.marcaExcluida
+import com.rutamercaderistas.data.stock.localExcluido
+import com.rutamercaderistas.data.stock.rutaExcluida
+import com.rutamercaderistas.data.stock.rutasDeStock
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -35,6 +39,14 @@ import javax.inject.Singleton
 
 /** La búsqueda no se puede resolver en vivo con los filtros actuales. */
 class StockQueryException(message: String) : Exception(message)
+
+/**
+ * La consulta abarca más locales de los que KPI One responde bien en vivo
+ * (la ruta PITUTO tiene 131: el servidor la rechaza con "reporte ocupado" o
+ * tarda ~30 s). Se resuelve con el snapshot y un aviso que explica por qué.
+ */
+class StockQueryTooLargeException(val locales: Int) :
+    Exception("La consulta en vivo abarca $locales locales")
 
 /**
  * Búsqueda en vivo contra KPI One.
@@ -69,9 +81,11 @@ class RemoteStockRepository @Inject constructor(
         val kpi = runCatching { client.catalog() }.getOrNull()
         val rutasPorCodigo = entradas.groupBy { it.codigo.trim().uppercase() }
             .mapValues { (_, lista) ->
-                lista.mapNotNull { it.rutero.trim().takeIf(String::isNotBlank) }
-                    .distinct()
-                    .sorted()
+                rutasDeStock(
+                    lista.mapNotNull { it.rutero.trim().takeIf(String::isNotBlank) }
+                        .distinct()
+                        .sorted(),
+                )
             }
         val locales = rutasPorCodigo.map { (codigo, rutas) ->
             StockLocal(
@@ -88,6 +102,11 @@ class RemoteStockRepository @Inject constructor(
             rutas = entradas.mapNotNull { it.rutero.trim().takeIf(String::isNotBlank) }
                 .distinct()
                 .sorted(),
+            // KPI One no trae marcas por local ni por ruta: se completa con lo
+            // aprendido de las búsquedas en vivo. Una ruta sin datos queda
+            // vacía y StockCatalog.marcasPara() cae a la lista completa.
+            marcasPorRuta = marcasPorRutaAprendido(),
+            localesPorRutaMarca = localesPorRutaMarcaAprendido(),
         )
     }
 
@@ -110,6 +129,10 @@ class RemoteStockRepository @Inject constructor(
                     // La caché guarda las filas crudas de la API: la marca se
                     // filtra acá y no en la descarga, así cambiarla no obliga
                     // a paginar de nuevo la ruta entera.
+                    //
+                    // Esas mismas filas crudas (storeCode + brand) alimentan el
+                    // mapa de marcas por ruta aprendido, sin volver a consultar.
+                    aprenderDe(cache.items, entradas())
                     return@withContext construirResultado(
                         items = cache.items,
                         codigos = cache.codigos,
@@ -125,6 +148,12 @@ class RemoteStockRepository @Inject constructor(
 
             val entradas = entradas()
             val todosLosCodigos = resolverCodigos(entradas, filters)
+            // KPI One entrega bien las consultas chicas; las muy grandes
+            // (PITUTO = 131 locales) responden "reporte ocupado" tras ~30 s.
+            // Antes de esperar ese castigo, se resuelve con el snapshot.
+            if (todosLosCodigos.size > MAX_LOCALES_EN_VIVO) {
+                throw StockQueryTooLargeException(todosLosCodigos.size)
+            }
             val codigos = todosLosCodigos.take(MAX_LOCALES)
             val truncadoPorLocales = todosLosCodigos.size > codigos.size
             if ((filters.local.isNotBlank() || filters.ruta.isNotBlank()) && codigos.isEmpty()) {
@@ -195,6 +224,9 @@ class RemoteStockRepository @Inject constructor(
                     at = ahora,
                 ),
             )
+            // Cada búsqueda en vivo exitosa enseña marcas por ruta para el
+            // catálogo remoto, que no trae ese desglose de la API.
+            aprenderDe(items, entradas)
             // Emitimos el progreso final solo si hubo más de una página
             // (evita duplicado cuando todo entra en una sola request).
             if (total > 0 && paginas > 1) onProgress(items.size.coerceAtMost(total), total)
@@ -404,12 +436,16 @@ class RemoteStockRepository @Inject constructor(
     // ── Internos ───────────────────────────────────────────────────
 
     /**
-     * Cache key granular por LOCAL + SKU (sin ruta).
-     * Permite reusar datos al cambiar de ruta manteniendo el mismo local.
-     * La marca no entra: se filtra en memoria.
+     * Cache key granular por LOCAL + RUTA + SKU.
+     *
+     * La ruta ES parte de la clave: sin ella dos rutas distintas compartían
+     * la entrada "|" y la segunda búsqueda devolvía las filas (y los códigos)
+     * de la ruta anterior durante los 60 s de la caché. La marca no entra:
+     * se filtra en memoria.
      */
     private fun cacheKey(filters: StockFilters): String =
         normalizarStock(filters.local.substringBefore("·")) + "|" +
+            normalizarRuta(filters.ruta) + "|" +
             normalizarStock(filters.sku)
 
     /**
@@ -428,12 +464,12 @@ class RemoteStockRepository @Inject constructor(
         osaConsultada: Boolean = false,
     ): StockResult {
         val permitidos = codigos.toSet()
-        val marca = normalizarStock(filtros.marca)
+        val marca = ConsultaStock(filtros.marca)
         val sku = normalizarStock(filtros.sku)
         val base = items.filter { item ->
             (permitidos.isEmpty() || item.storeCode in permitidos) &&
                 !marcaExcluida(item.brand) &&
-                (marca.isEmpty() || normalizarStock(item.brand).contains(marca)) &&
+                (marca.vacia || marca.coincide(item.brand)) &&
                 (sku.isEmpty() ||
                     normalizarStock(item.sku).contains(sku) ||
                     normalizarStock(item.product).contains(sku))
@@ -470,7 +506,14 @@ class RemoteStockRepository @Inject constructor(
         val ahora = System.currentTimeMillis()
         val actual = routeIndex
         if (actual != null && ahora - actual.at < RUTAS_TTL_MS) return actual.entries
-        val nuevas = routeDao.getAllEntries()
+        val todas = routeDao.getAllEntries()
+        // PITUTO y PROPAL están dados de baja. Un local compartido con una ruta
+        // de la RM sigue visible por esa ruta: se descarta sólo si TODAS sus
+        // rutas están excluidas.
+        val rutasPorCodigo = todas.groupBy({ it.codigo.trim().uppercase() }) { it.rutero }
+        val nuevas = todas.filterNot { entry ->
+            localExcluido(rutasPorCodigo[entry.codigo.trim().uppercase()].orEmpty())
+        }
         routeIndex = RouteIndex(nuevas, ahora)
         return nuevas
     }
@@ -481,14 +524,16 @@ class RemoteStockRepository @Inject constructor(
     ): List<String> {
         val local = filters.local.trim()
         if (local.isNotBlank()) {
-            val texto = normalizarStock(local.substringBefore("·"))
-            val completo = normalizarStock(local)
-            val porCodigo = entradas.filter {
-                val codigo = normalizarStock(it.codigo)
-                codigo == texto || (texto.length >= 2 && codigo.startsWith(texto))
-            }
-            val elegidos = porCodigo.ifEmpty {
-                entradas.filter { normalizarStock(it.local).contains(completo) }
+            // Misma regla que el snapshot: código o nombre, normalizados y
+            // compactos ("jumbomaipu" encuentra "JUMBO MAIPU"). Antes el vivo
+            // pedía prefijo exacto y el nombre tal cual, así que el texto que
+            // el combo sí sugería no resolvía ningún local y terminaba como
+            // un falso error de red.
+            val codigo = ConsultaStock(local.substringBefore("·"))
+            val completo = ConsultaStock(local)
+            val elegidos = entradas.filter {
+                (!codigo.vacia && codigo.coincide(it.codigo)) ||
+                    completo.coincide(it.local)
             }
             return elegidos.map { it.codigo.trim().uppercase() }
                 .distinct()
@@ -496,6 +541,54 @@ class RemoteStockRepository @Inject constructor(
 
         return codigosDeRuta(entradas, filters.ruta)
     }
+
+    // ── Marcas por ruta aprendidas ─────────────────────────────────
+
+    /**
+     * Enseña marcas por ruta a partir de filas crudas (storeCode + brand).
+     *
+     * KPI One no expone marcas por local ni por ruta: el catálogo remoto las
+     * aprende de cada búsqueda en vivo. Las rutas salen del rutero indexado en
+     * Room ([RouteEntryEntity.rutero]), igual que [resolverCodigos].
+     */
+    private fun aprenderDe(items: List<StockItem>, entradas: List<RouteEntryEntity>) {
+        if (items.isEmpty()) return
+        val rutasPorCodigo = entradas
+            .groupBy { it.codigo.trim().uppercase() }
+            .mapValues { (_, lista) ->
+                lista.mapNotNull { it.rutero.trim().takeIf(String::isNotBlank) }
+                    .map { normalizarRuta(it) }
+                    .distinct()
+            }
+        for (item in items) {
+            if (marcaExcluida(item.brand)) continue
+            val rutas = rutasPorCodigo[item.storeCode.trim().uppercase()].orEmpty()
+            if (rutas.isEmpty()) continue
+            val marca = item.brand
+            val codigo = item.storeCode
+            for (ruta in rutas) {
+                val porMarca: ConcurrentHashMap<String, MutableSet<String>> =
+                    aprendido.getOrPut(ruta) { ConcurrentHashMap() }
+                val locales: MutableSet<String> =
+                    porMarca.getOrPut(marca) { ConcurrentHashMap.newKeySet() }
+                locales.add(codigo)
+            }
+        }
+    }
+
+    /** Marcas (sin las dadas de baja) que se vieron en cada ruta. */
+    private fun marcasPorRutaAprendido(): Map<String, List<String>> =
+        aprendido.mapValues { (_, porMarca) ->
+            porMarca.keys.filterNot { marcaExcluida(it) }.sorted()
+        }
+
+    /** Locales por ruta+marca aprendidos: ruta -> marca -> #locales. */
+    private fun localesPorRutaMarcaAprendido(): Map<String, Map<String, Int>> =
+        aprendido.mapValues { (_, porMarca) ->
+            porMarca.entries
+                .filterNot { marcaExcluida(it.key) }
+                .associate { (marca, locales) -> marca to locales.size }
+        }
 
     private data class CacheEntry(
         /** Filas crudas de KPI One: los filtros se aplican al leer. */
@@ -529,13 +622,29 @@ class RemoteStockRepository @Inject constructor(
     @Volatile
     private var routeIndex: RouteIndex? = null
 
+    /**
+     * Marcas por ruta aprendidas de las búsquedas en vivo (por proceso).
+     * ruta normalizada -> (marca -> set de códigos de local).
+     */
+    private val aprendido =
+        ConcurrentHashMap<String, ConcurrentHashMap<String, MutableSet<String>>>()
+
     private companion object {
         /**
          * Tope de locales por consulta. La ruta más grande del rutero real
-         * (PITUTO) tiene 124 locales: con 60 se perdían más de 2.000 filas.
-         * 150 deja margen sin que la URL crezca de más.
+         * (PITUTO) tenía 124: con 60 se perdían más de 2.000 filas.
+         * 150 deja margen sin que la URL crezca de más. PITUTO/PROPAL están
+         * excluidas del módulo, pero el tope cubre una ruta futura grande.
          */
         const val MAX_LOCALES = 150
+        /**
+         * Tope de locales para una consulta en vivo. Por encima de esto el
+         * servidor de KPI One carga el reporte hasta ~30 s y devuelve 503
+         * "reporte temporalmente ocupado": mejor snapshot inmediato y aviso.
+         * PITUTO (131) era la única que lo superaba; hoy está excluida del
+         * módulo y el tope queda como resguardo para una ruta futura.
+         */
+        const val MAX_LOCALES_EN_VIVO = 60
         /**
          * Tope de filas por búsqueda en vivo. Una ruta de 40 locales tipo
          * Jumbo (~250 SKU cada uno) ronda las 10.000 filas; si se supera, la

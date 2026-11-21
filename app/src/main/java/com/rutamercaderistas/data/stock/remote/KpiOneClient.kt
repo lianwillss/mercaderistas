@@ -240,7 +240,11 @@ class KpiOneClient(
             try {
                 val respuesta = http.newCall(request).execute()
                 if (respuesta.code == 429 || respuesta.code >= 500) {
-                    if (intento >= MAX_REINTENTOS) return respuesta
+                    // El reporte "ocupado" del servidor tarda ~30 s por intento:
+                    // reintentarlo 3 veces dejaba la búsqueda colgada minuto y
+                    // medio antes de caer al snapshot. Un solo reintento.
+                    val max = if (reporteOcupado(respuesta)) MAX_REINTENTOS_OCUPADO else MAX_REINTENTOS
+                    if (intento >= max) return respuesta
                     val espera = respuesta.header("Retry-After")
                         ?.toLongOrNull()
                         ?.times(1_000)
@@ -258,6 +262,16 @@ class KpiOneClient(
             }
         }
     }
+
+    /**
+     * KPI One responde 503 con "El reporte está temporalmente ocupado" cuando la
+     * consulta es grande y el servidor está cargado. Se detecta sin consumir el
+     * cuerpo para poder avisar distinto y no reintentar de más.
+     */
+    private fun reporteOcupado(respuesta: Response): Boolean =
+        respuesta.code == 503 && runCatching {
+            respuesta.peekBody(256).string().contains("ocupado", ignoreCase = true)
+        }.getOrDefault(false)
 
     private fun nombresDeLocales(): Map<String, String> {
         val salida = linkedMapOf<String, String>()
@@ -379,6 +393,8 @@ class KpiOneClient(
         const val LIMIT = 500
         private const val CATALOG_TTL_MS = 60 * 60 * 1000L
         private const val MAX_REINTENTOS = 3
+        /** Un reintento extra cuando el server avisa "reporte ocupado". */
+        private const val MAX_REINTENTOS_OCUPADO = 1
         private const val MAX_PAGINAS_STORES = 10
         private val BACKOFF_MS = longArrayOf(800L, 2_000L, 4_000L)
         private const val USER_AGENT = "RutaMercaderistas/" + BuildConfig.VERSION_NAME + " (Android)"
@@ -395,17 +411,14 @@ class KpiOneClient(
                 .connectionPool(ConnectionPool(5, 5, TimeUnit.MINUTES))
                 .addInterceptor { chain ->
                     val cookie = session.cookie()
-                    val request = if (cookie.isNullOrBlank()) {
-                        chain.request().newBuilder()
-                            .header("Accept-Encoding", "gzip")
-                            .build()
-                    } else {
-                        chain.request().newBuilder()
-                            .header("Cookie", cookie)
-                            .header("Accept-Encoding", "gzip")
-                            .build()
-                    }
-                    chain.proceed(request)
+                    val builder = chain.request().newBuilder()
+                    // No fijar "Accept-Encoding": OkHttp agrega "gzip" y
+                    // descomprime la respuesta él mismo. Si el interceptor lo
+                    // ponía a mano, el servidor comprimía igual y el cuerpo
+                    // llegaba comprimido: json.parseToJsonElement fallaba con
+                    // los bytes 1f 8b de gzip y la búsqueda caía al snapshot.
+                    if (!cookie.isNullOrBlank()) builder.header("Cookie", cookie)
+                    chain.proceed(builder.build())
                 }
                 .build()
     }

@@ -14,6 +14,9 @@ import com.rutamercaderistas.data.stock.StockFilters
 import com.rutamercaderistas.data.stock.StockRepository
 import com.rutamercaderistas.data.stock.StockResult
 import com.rutamercaderistas.data.stock.StockSource
+import com.rutamercaderistas.data.stock.StockBusquedas
+import com.rutamercaderistas.data.stock.StockSearchHistory
+import com.rutamercaderistas.data.stock.TipoBusquedaStock
 import com.rutamercaderistas.data.stock.StockStatus
 import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.data.stock.StockSyncPhase
@@ -21,8 +24,12 @@ import com.rutamercaderistas.data.stock.StockSyncProgress
 import com.rutamercaderistas.data.stock.StockSyncRequest
 import com.rutamercaderistas.data.stock.StockSyncScheduler
 import com.rutamercaderistas.data.stock.StockUpdater
+import com.rutamercaderistas.data.stock.conLocal
+import com.rutamercaderistas.data.stock.conMarca
+import com.rutamercaderistas.data.stock.conRuta
 import com.rutamercaderistas.data.stock.construirStockResult
 import com.rutamercaderistas.data.stock.hayCriterio
+import com.rutamercaderistas.data.stock.ordenarStock
 import com.rutamercaderistas.data.stock.remote.KpiOneClient
 import com.rutamercaderistas.data.stock.remote.KpiSessionStore
 import com.rutamercaderistas.data.stock.remote.SessionExpiredException
@@ -94,6 +101,7 @@ class StockViewModel @Inject constructor(
     private val stockCache: StockCache,
     private val eanDao: EanProductDao,
     private val eanSyncer: EanCatalogSyncer,
+    private val historialStore: StockSearchHistory,
 ) : ViewModel() {
 
     private val _filters = MutableStateFlow(StockFilters())
@@ -101,6 +109,10 @@ class StockViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(StockUiState())
     val state: StateFlow<StockUiState> = _state.asStateFlow()
+
+    /** Selecciones de Local/Ruta/Marca persistidas: alimenta "Recientes" y el desempate. */
+    private val _historial = MutableStateFlow(StockBusquedas())
+    val historial: StateFlow<StockBusquedas> = _historial.asStateFlow()
 
     private var trabajoActual: UUID? = null
     private var ultimoTerminado: UUID? = null
@@ -120,6 +132,10 @@ class StockViewModel @Inject constructor(
     private var generacionConsulta = 0
 
     init {
+        // El historial se observa para "Recientes" y para el desempate por uso.
+        viewModelScope.launch {
+            historialStore.busquedas.collect { _historial.value = it }
+        }
         // Recuerda la última búsqueda y, si hay caché en disco, la pinta de
         // inmediato. Después el flujo de filtros pide la versión nueva.
         viewModelScope.launch {
@@ -181,7 +197,7 @@ class StockViewModel @Inject constructor(
             // collectLatest cancela la búsqueda anterior si el usuario sigue
             // escribiendo: con red no conviene encolar consultas viejas.
             _filters
-                .debounce(250)
+                .debounce(300)
                 .distinctUntilChanged()
                 .collectLatest { filtros -> cargar(filtros) }
         }
@@ -435,6 +451,23 @@ class StockViewModel @Inject constructor(
     }
 
     private suspend fun cargar(filtros: StockFilters, force: Boolean = false) {
+        // Cambiar sólo el orden no cambia las filas: se reordena en memoria,
+        // sin consultar, sin skeleton y sin invalidar una búsqueda en curso.
+        val previo = _state.value.result
+        val conservar = mismaBase(filtrosMostrados, filtros) && previo.items.isNotEmpty()
+        if (conservar && filtrosMostrados?.orden != filtros.orden && !force) {
+            ultimaConsulta = filtros
+            filtrosMostrados = filtros
+            _state.update { estado ->
+                estado.copy(
+                    result = estado.result.copy(
+                        items = ordenarStock(estado.result.items, filtros.orden),
+                    ),
+                )
+            }
+            return
+        }
+
         val generacion = ++generacionConsulta
         if (repo.requiereSesion && !_state.value.hasSession) {
             _state.update { it.copy(status = StockStatus.SinSesion) }
@@ -470,9 +503,6 @@ class StockViewModel @Inject constructor(
         }
         consultaEnCurso = filtros
         try {
-        val previo = _state.value.result
-        val conservar = mismaBase(filtrosMostrados, filtros) && previo.items.isNotEmpty()
-
         // Fase 1: pintar ya. Si la base es la misma, se conserva la lista; si
         // es nueva, se intenta el snapshot local antes de tocar la red.
         _state.update {
@@ -569,10 +599,13 @@ class StockViewModel @Inject constructor(
         // Sólo hay "100 %" si KPI One respondió de verdad. Si se cayó al
         // snapshot por red/error, se oculta la barra y manda el aviso.
         val actualizado = enVivo != null && enVivo.source == StockSource.LIVE
-        // Sólo actualizar ultimaConsulta y filtrosMostrados cuando la búsqueda
-        // en vivo tuvo éxito. Si falló y caímos a snapshot/previo, NO marcamos
-        // la consulta como resuelta para permitir reintentar al cambiar de ruta.
-        if (actualizado) {
+        // Una búsqueda que no va en vivo (p. ej. sólo marca) se resuelve con el
+        // snapshot: es la fuente autoritativa, no queda "pendiente". Sin esto
+        // la pantalla rehacía la búsqueda en cada cambio y nunca refrescaba al
+        // volver a la pestaña. Si la consulta en vivo falló y caímos a
+        // snapshot/previo, NO se marca resuelta para poder reintentar.
+        val resuelta = actualizado || enVivo == null
+        if (resuelta) {
             ultimaConsulta = filtros
             filtrosMostrados = filtros
         }
@@ -621,6 +654,13 @@ class StockViewModel @Inject constructor(
             iniciarCruceOsa(generacion, filtros)
         }
         if (actualizado) ocultarProgreso(generacion)
+        // El catálogo remoto "aprende" marcas por ruta con cada búsqueda en
+        // vivo: al terminar una exitosa se refresca para que el selector de
+        // Marca se acote a las marcas vistas en esa ruta. No dispara una
+        // búsqueda nueva, así que no hay bucle de recarga.
+        if (enVivo?.source == StockSource.LIVE) {
+            viewModelScope.launch { cargarCatalogo() }
+        }
         } finally {
             if (generacion == generacionConsulta && consultaEnCurso == filtros) {
                 consultaEnCurso = null
@@ -698,6 +738,32 @@ class StockViewModel @Inject constructor(
 
     fun onFilter(cambio: (StockFilters) -> StockFilters) {
         _filters.update(cambio)
+    }
+
+    /**
+     * Aplica una SELECCIÓN (elegida del combo o de una sugerencia del estado
+     * vacío) y la registra en el historial. Se distingue de [onFilter], que
+     * también captura cada tecla: el historial sólo guarda elecciones.
+     */
+    fun elegirLocal(valor: String) {
+        onFilter { it.conLocal(valor) }
+        registrarSeleccion(TipoBusquedaStock.LOCAL, valor)
+    }
+
+    fun elegirRuta(valor: String) {
+        onFilter { it.conRuta(valor) }
+        registrarSeleccion(TipoBusquedaStock.RUTA, valor)
+    }
+
+    fun elegirMarca(valor: String) {
+        onFilter { it.conMarca(valor) }
+        registrarSeleccion(TipoBusquedaStock.MARCA, valor)
+    }
+
+    /** El registro no bloquea la UI: corre en el scope del ViewModel. */
+    private fun registrarSeleccion(tipo: TipoBusquedaStock, valor: String) {
+        if (valor.isBlank()) return
+        viewModelScope.launch { historialStore.registrar(tipo, valor) }
     }
 
     fun reintentar() {

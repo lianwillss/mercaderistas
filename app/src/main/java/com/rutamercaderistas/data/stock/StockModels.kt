@@ -171,6 +171,30 @@ fun normalizarRuta(texto: String): String =
     normalizarStock(texto).filter { it.isLetterOrDigit() }
 
 /**
+ * Consulta de stock con sus formas de comparación ya calculadas.
+ *
+ * Se arma UNA vez por búsqueda: normalizar cada fila contra cada texto deja
+ * miles de [java.text.Normalizer] por tecla. La forma compacta ignora espacios
+ * y signos, así "VEG MONKEY", "VEGMONKEY" y "veg-monkey" son lo mismo: es la
+ * misma regla que ya usan las sugerencias del combo, para que lo que se sugiere
+ * y lo que se encuentra no divergan.
+ */
+class ConsultaStock(texto: String) {
+    val normal: String = normalizarStock(texto)
+    val compacto: String = normal.filter { it.isLetterOrDigit() }
+    val vacia: Boolean get() = normal.isEmpty()
+
+    /** true si el objetivo contiene la consulta (normal o compacta). */
+    fun coincide(objetivo: String): Boolean {
+        if (normal.isEmpty()) return true
+        val valor = normalizarStock(objetivo)
+        if (valor.contains(normal)) return true
+        return compacto.isNotEmpty() &&
+            valor.filter { it.isLetterOrDigit() }.contains(compacto)
+    }
+}
+
+/**
  * Marcas dadas de baja: no deben aparecer en ninguna pantalla (selector,
  * búsqueda, conteos, compartir). Se comparan sin espacios ni signos porque la
  * misma marca llega como "BERRY SUR" en el catálogo EAN y "BERRYSUR" en stock.
@@ -186,6 +210,40 @@ fun marcaExcluida(marca: String): Boolean =
     normalizarStock(marca).filter { it.isLetterOrDigit() } in MARCAS_EXCLUIDAS
 
 /**
+ * Rutas dadas de baja del módulo Stock: PITUTO y PROPAL no se muestran, no se
+ * consultan en vivo ni se guardan en el snapshot.
+ *
+ * La exclusión es por ruta, pero como los locales pertenecen a rutas, quedan
+ * fuera también del selector de Local los 129 locales que tocan alguna de las
+ * dos (decisión explícita: que no se cargue nada de ellas).
+ */
+private val RUTAS_EXCLUIDAS = setOf("PITUTO", "PROPAL")
+    .map { normalizarRuta(it) }
+    .toSet()
+
+/** ¿La ruta está dada de baja del módulo Stock? */
+fun rutaExcluida(ruta: String): Boolean = normalizarRuta(ruta) in RUTAS_EXCLUIDAS
+
+/**
+ * Un local sólo se da de baja si **todas** sus rutas están excluidas.
+ *
+ * Si además pertenece a una ruta de un supervisor (la RM), el local sigue
+ * visible por esa ruta: mismo local, otras marcas. Sacarlo por PITUTO/PROPAL
+ * le recortaría locales a las rutas de la RM (BR-14 (PT) quedaba vacía).
+ */
+fun localExcluido(rutas: List<String>): Boolean =
+    rutas.isNotEmpty() && rutas.all(::rutaExcluida)
+
+/**
+ * Rutas de un local sin las dadas de baja.
+ *
+ * Un local compartido (PITUTO + EMU-3) sigue en el catálogo, pero su ruta
+ * PITUTO no debe reaparecer en el combo ni alimentar `marcasPorRuta`.
+ */
+fun rutasDeStock(rutas: List<String>): List<String> =
+    rutas.filterNot(::rutaExcluida)
+
+/**
  * Local y ruta son caminos alternativos: escribir un local o una marca suelta
  * la ruta. La ruta, en cambio, **acota** en vez de reiniciar: conserva la marca
  * y el producto, para que "aceite en EMU-3" y "EMU-3 con aceite" den lo mismo.
@@ -193,38 +251,47 @@ fun marcaExcluida(marca: String): Boolean =
  * recomponer (ver [marcaFueraDeRuta]).
  */
 fun StockFilters.conLocal(valor: String): StockFilters {
-    val buscar = valor.isNotBlank()
+    val buscar = valor.trim().isNotEmpty()
+    val teniaEstado = estado != null || cobertura != null || validacion != null ||
+        soloQuiebre || soloNegativos
     return copy(
         local = valor,
         ruta = "",
-        // Al buscar por local, la tarjeta por defecto es Disponible.
-        estado = if (buscar) EstadoTipo.Disponible else estado,
-        soloQuiebre = if (buscar) false else soloQuiebre,
-        soloNegativos = if (buscar) false else soloNegativos,
-        validacion = if (buscar) null else validacion,
+        // La tarjeta Disponible es el default, pero no pisamos nunca un filtro
+        // de estado que el usuario ya eligió (quiebres, negativos, cobertura).
+        estado = if (buscar && !teniaEstado) EstadoTipo.Disponible else estado,
     )
 }
 
 fun StockFilters.conMarca(valor: String): StockFilters = copy(marca = valor)
 
 fun StockFilters.conRuta(valor: String): StockFilters {
-    val buscar = valor.isNotBlank()
+    val buscar = valor.trim().isNotEmpty()
+    val teniaEstado = estado != null || cobertura != null || validacion != null ||
+        soloQuiebre || soloNegativos
     return copy(
         ruta = valor,
         // Sólo el local se descarta: es el camino alternativo. Marca y
         // producto se conservan porque la ruta los acota, no los reemplaza.
         local = "",
-        // Al buscar por ruta, la tarjeta por defecto es Disponible.
-        estado = if (buscar) EstadoTipo.Disponible else estado,
-        soloQuiebre = if (buscar) false else soloQuiebre,
-        soloNegativos = if (buscar) false else soloNegativos,
-        validacion = if (buscar) null else validacion,
+        // La tarjeta Disponible es el default, pero no pisamos un filtro de
+        // estado elegido por el usuario.
+        estado = if (buscar && !teniaEstado) EstadoTipo.Disponible else estado,
     )
 }
 
-/** Sin local, marca o producto no se muestra stock: la pantalla queda en blanco. */
+/**
+ * Sin local, marca o producto no se muestra stock: la pantalla queda en blanco.
+ *
+ * Cada texto pide al menos 2 caracteres. Con uno solo la búsqueda por
+ * subcadena devolvía cientos de locales ("1" = 113 locales y 5.500 filas) y
+ * disparaba consultas en vivo enormes con la primera letra.
+ */
 val StockFilters.hayCriterio: Boolean
-    get() = local.isNotBlank() || ruta.isNotBlank() || marca.isNotBlank() || sku.isNotBlank()
+    get() = local.trim().length >= 2 ||
+        ruta.trim().length >= 2 ||
+        marca.trim().length >= 2 ||
+        sku.trim().length >= 2
 
 enum class StockSort(val label: String) {
     GRAVEDAD("Gravedad"),
@@ -400,6 +467,8 @@ data class StockCatalog(
  */
 fun StockCatalog.marcasPara(ruta: String): List<String> {
     if (ruta.isBlank()) return marcas
+    // Ruta dada de baja: no hay marcas que ofrecer, sin el fallback a todas.
+    if (rutaExcluida(ruta)) return emptyList()
     return marcasPorRuta[normalizarRuta(ruta)]?.takeIf { it.isNotEmpty() } ?: marcas
 }
 
@@ -425,6 +494,14 @@ data class StockLocal(
     /** "L207 · Líder Plaza Vespucio"; si el nombre ya trae el código, no se repite. */
     val label: String
         get() = if (name.startsWith(code, ignoreCase = true)) name else "$code · $name"
+
+    /** Nombre sin el código al inicio: "J503-JUMBO MAIPU" → "JUMBO MAIPU". */
+    val nombreCorto: String
+        get() = if (name.startsWith(code, ignoreCase = true)) {
+            name.drop(code.length).trimStart(' ', '-', '·', ':', '—')
+        } else {
+            name
+        }
 }
 
 enum class StockStatus { Loading, Ready, Empty, Error, Idle, SinSesion }

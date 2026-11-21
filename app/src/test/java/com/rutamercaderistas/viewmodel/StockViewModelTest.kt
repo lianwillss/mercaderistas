@@ -5,12 +5,16 @@ import com.rutamercaderistas.data.local.EanSkuLookup
 import com.rutamercaderistas.data.preferences.PreferencesRepository
 import com.rutamercaderistas.data.stock.CachedStock
 import com.rutamercaderistas.data.stock.EstadoTipo
+import com.rutamercaderistas.data.stock.StockBusquedas
 import com.rutamercaderistas.data.stock.StockCache
 import com.rutamercaderistas.data.stock.StockCatalog
+import com.rutamercaderistas.data.stock.StockSearchHistory
 import com.rutamercaderistas.data.stock.StockFilters
 import com.rutamercaderistas.data.stock.OsaRespuesta
 import com.rutamercaderistas.data.stock.StockItem
 import com.rutamercaderistas.data.stock.StockLocal
+import com.rutamercaderistas.data.stock.StockMode
+import com.rutamercaderistas.data.stock.StockSort
 import com.rutamercaderistas.data.stock.StockRepository
 import com.rutamercaderistas.data.stock.StockResult
 import com.rutamercaderistas.data.stock.StockSource
@@ -58,6 +62,7 @@ class StockViewModelTest {
     private val cache = mockk<StockCache>(relaxed = true)
     private val eanDao = mockk<EanProductDao>(relaxed = true)
     private val eanSyncer = mockk<EanCatalogSyncer>(relaxed = true)
+    private val historialStore = mockk<StockSearchHistory>(relaxed = true)
     private var vm: StockViewModel? = null
 
     @Before
@@ -65,6 +70,7 @@ class StockViewModelTest {
         Dispatchers.setMain(Dispatchers.Unconfined)
         every { cookies.hasSession } returns MutableStateFlow(false)
         every { scheduler.observar() } returns emptyFlow()
+        every { historialStore.busquedas } returns flowOf(StockBusquedas())
         coEvery { prefs.getStockLocal() } returns ""
         coEvery { prefs.getStockMarca() } returns ""
         coEvery { prefs.getStockRuta() } returns ""
@@ -104,7 +110,7 @@ class StockViewModelTest {
             StockResult(items = listOf(item("J503", 20.0)), source = StockSource.LIVE)
         }
 
-        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer)
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer, historialStore)
 
         val cacheState = await { it.fuente == StockSource.CACHE }
         assertEquals(10.0, cacheState.result.items.single().stockUnits, 0.0)
@@ -130,7 +136,7 @@ class StockViewModelTest {
             source = StockSource.LIVE,
         )
 
-        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer)
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer, historialStore)
         await { it.status == com.rutamercaderistas.data.stock.StockStatus.Idle }
 
         vm!!.onFilter { it.conLocal("J503") }
@@ -147,7 +153,7 @@ class StockViewModelTest {
             source = StockSource.LIVE,
         )
 
-        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer)
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer, historialStore)
         vm!!.onFilter { it.conLocal("J503") }
         await { it.result.items.isNotEmpty() }
 
@@ -182,7 +188,7 @@ class StockViewModelTest {
         )
         coEvery { repo.completarOsa(any(), any()) } returns cruzado
 
-        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer)
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer, historialStore)
         vm!!.onFilter { it.conLocal("J503") }
 
         val estado = await { it.result.osaConsultada }
@@ -195,7 +201,7 @@ class StockViewModelTest {
     @Test
     fun eanParaSkuEnlazaElCodigoDelCatalogoEan() = runBlocking {
         every { eanDao.eanPorSkuFlow("1986305") } returns flowOf("859547004701")
-        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer)
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer, historialStore)
 
         val emisiones = vm!!.eanParaSku("1986305").toList()
 
@@ -211,12 +217,57 @@ class StockViewModelTest {
     @Test
     fun eanParaSkuSinCodigoQuedaEnBlanco() = runBlocking {
         every { eanDao.eanPorSkuFlow(any()) } returns flowOf(null)
-        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer)
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer, historialStore)
 
         val emisiones = vm!!.eanParaSku("999999").toList()
 
         assertEquals(EanSkuLookup.Cargando, emisiones.first())
         assertEquals(null, (emisiones.last() as EanSkuLookup.Resultado).ean)
+    }
+
+    @Test
+    fun `la busqueda solo por marca queda resuelta y no se repite`() = runBlocking {
+        coEvery { repo.searchLocal(any()) } returns StockResult(
+            items = listOf(item("J503", 8.0)),
+            source = StockSource.SNAPSHOT,
+        )
+
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer, historialStore)
+        await { it.status == com.rutamercaderistas.data.stock.StockStatus.Idle }
+        vm!!.onFilter { it.copy(marca = "CASO Y CIA") }
+        await { it.result.items.isNotEmpty() }
+        delay(600)
+
+        // Cambiar sólo el modo de agrupación no cambia las filas: la consulta
+        // anterior vale y no se vuelve a buscar.
+        vm!!.onFilter { it.copy(modo = StockMode.POR_MARCA) }
+        delay(900)
+
+        coVerify(exactly = 1) { repo.searchLocal(any()) }
+    }
+
+    @Test
+    fun `cambiar el orden de una busqueda solo por marca reordena sin consultar`() = runBlocking {
+        val positivo = item("J503", 8.0).copy(sku = "1")
+        val negativo = item("J503", -2.0).copy(sku = "2")
+        coEvery { repo.searchLocal(any()) } returns StockResult(
+            items = listOf(positivo, negativo),
+            source = StockSource.SNAPSHOT,
+        )
+
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer, historialStore)
+        await { it.status == com.rutamercaderistas.data.stock.StockStatus.Idle }
+        vm!!.onFilter { it.copy(marca = "CASO Y CIA") }
+        await { it.result.items.isNotEmpty() }
+        delay(600)
+
+        vm!!.onFilter { it.copy(orden = StockSort.GRAVEDAD) }
+        delay(900)
+
+        // La gravedad manda los negativos al principio y se reordena en
+        // memoria: no hay una segunda consulta ni skeleton.
+        assertEquals("2", vm!!.state.value.result.items.first().sku)
+        coVerify(exactly = 1) { repo.searchLocal(any()) }
     }
 
     private suspend fun await(predicado: (StockUiState) -> Boolean): StockUiState =

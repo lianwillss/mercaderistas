@@ -1,9 +1,15 @@
 package com.rutamercaderistas.data.stock
 
+import com.rutamercaderistas.data.stock.remote.KpiHttpException
 import com.rutamercaderistas.data.stock.remote.RemoteStockRepository
+import com.rutamercaderistas.data.stock.remote.SessionExpiredException
+import com.rutamercaderistas.data.stock.remote.StockQueryException
+import com.rutamercaderistas.data.stock.remote.StockQueryTooLargeException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import timber.log.Timber
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -92,11 +98,49 @@ class StockRepositoryRouter @Inject constructor(
             remote.search(filters, force, onProgress)
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
-            localSearch(filters).copy(
-                source = StockSource.SNAPSHOT,
-                aviso = "No se pudo consultar KPI One: datos guardados",
+        } catch (_: StockQueryException) {
+            // Los filtros no resuelven ningún local en el rutero: no es un
+            // problema de red. Se devuelve null para que la pantalla use el
+            // snapshot sin pintar un banner de error que confunde.
+            null
+        } catch (e: StockQueryTooLargeException) {
+            Timber.d("Stock en vivo: %d locales, se usa el snapshot", e.locales)
+            snapshotConAviso(
+                filters,
+                "Consulta grande (" + e.locales + " locales): KPI One no la " +
+                    "entrega bien en vivo. Se muestran datos guardados; acota " +
+                    "por local para ver el stock en vivo.",
             )
+        } catch (e: SessionExpiredException) {
+            Timber.w(e, "Stock en vivo: sesión de KPI One vencida")
+            snapshotConAviso(
+                filters,
+                "Sesión de KPI One vencida. Vuelve a conectar en Ajustes; " +
+                    "mostrando datos guardados.",
+            )
+        } catch (e: KpiHttpException) {
+            Timber.w(e, "Stock en vivo: KPI One respondió HTTP %d", e.statusCode)
+            if (e.statusCode == 503) {
+                snapshotConAviso(
+                    filters,
+                    "KPI One está temporalmente ocupado (HTTP 503). " +
+                        "Mostrando datos guardados; reintenta en unos segundos.",
+                )
+            } else {
+                snapshotConAviso(
+                    filters,
+                    "KPI One respondió HTTP " + e.statusCode + ": datos guardados.",
+                )
+            }
+        } catch (e: IOException) {
+            Timber.w(e, "Stock en vivo: no se pudo conectar con KPI One")
+            snapshotConAviso(
+                filters,
+                "No se pudo conectar con KPI One. Mostrando datos guardados.",
+            )
+        } catch (e: Exception) {
+            Timber.w(e, "Stock en vivo: error inesperado")
+            snapshotConAviso(filters, "No se pudo consultar KPI One: datos guardados")
         }
     }
 
@@ -119,9 +163,17 @@ class StockRepositoryRouter @Inject constructor(
     private suspend fun localSearch(filters: StockFilters): StockResult =
         withContext(Dispatchers.Default) { local.search(filters) }
 
-    /** Una marca sola puede ser todo el catálogo; en vivo sólo con local/ruta/SKU. */
+    /** Snapshot con un aviso que explica por qué no se pudo consultar en vivo. */
+    private suspend fun snapshotConAviso(filters: StockFilters, aviso: String): StockResult =
+        localSearch(filters).copy(source = StockSource.SNAPSHOT, aviso = aviso)
+
+    /**
+     * Una marca sola puede ser todo el catálogo; en vivo sólo con local, ruta
+     * o SKU. El local y la ruta piden 2 caracteres: con uno solo la resolución
+     * por subcadena arrastra cientos de locales y consulta media región.
+     */
     private fun puedeEnVivo(filters: StockFilters): Boolean =
-        filters.local.isNotBlank() ||
-            filters.ruta.isNotBlank() ||
+        filters.local.trim().length >= 2 ||
+            filters.ruta.trim().length >= 2 ||
             filters.sku.trim().length >= 3
 }

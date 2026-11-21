@@ -4,6 +4,7 @@ import com.rutamercaderistas.data.local.RouteEntryDao
 import com.rutamercaderistas.data.local.RouteEntryEntity
 import com.rutamercaderistas.data.stock.StockFilters
 import com.rutamercaderistas.data.stock.StockSource
+import com.rutamercaderistas.data.stock.marcasPara
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
@@ -134,6 +135,38 @@ class RemoteStockRepositoryTest {
     }
 
     /**
+     * Regresión: la clave de caché no incluía la ruta, así que dos rutas
+     * distintas compartían la entrada "|" y la segunda búsqueda mostraba las
+     * filas de la primera durante los 60 s de la caché.
+     */
+    @Test
+    fun `cambiar de ruta no reusa la cache de otra ruta`() = runBlocking {
+        QueueHttpServer(
+            respuestaLogin(),
+            response(200, inventario(fila("J503", "JUMBO MAIPU", "CASO Y CIA", "1", 10.0), total = 1)),
+            response(200, inventario(fila("EX603", "EXPRESS LA REINA", "CASO Y CIA", "2", 10.0), total = 1)),
+        ).use { server ->
+            val session = InMemoryKpiSessionStore()
+            val client = client(server, session)
+            val dao = mockk<RouteEntryDao>()
+            coEvery { dao.getAllEntries() } returns listOf(
+                entrada("J503", "EMU-3"),
+                entrada("EX603", "FMU-1"),
+            )
+            val repo = RemoteStockRepository(client, session, dao)
+            assertTrue(repo.ensureSession())
+
+            val a = repo.search(StockFilters(ruta = "EMU-3"))
+            val b = repo.search(StockFilters(ruta = "FMU-1"))
+
+            assertEquals(listOf("J503"), a.items.map { it.storeCode })
+            assertEquals(listOf("EX603"), b.items.map { it.storeCode })
+            // login + una consulta por ruta
+            assertEquals(3, server.requestCount())
+        }
+    }
+
+    /**
      * Una ruta real trae más de 1.500 filas (el tope viejo de 3 páginas):
      * la descarga debe seguir hasta el total que informa la API.
      */
@@ -188,9 +221,7 @@ class RemoteStockRepositoryTest {
     }
 
     @Test
-    fun `una ruta de 124 locales entra completa en una sola consulta`() = runBlocking {
-        // PITUTO es la ruta más grande del rutero; con el tope viejo de 60
-        // locales se perdían más de 2.000 filas.
+    fun `una ruta de 60 locales entra completa en una sola consulta`() = runBlocking {
         QueueHttpServer(
             respuestaLogin(),
             response(200, inventario(total = 0)),
@@ -198,38 +229,88 @@ class RemoteStockRepositoryTest {
             val session = InMemoryKpiSessionStore()
             val client = client(server, session)
             val dao = mockk<RouteEntryDao>()
-            coEvery { dao.getAllEntries() } returns (1..124).map {
-                entrada("S" + it.toString().padStart(3, '0'), "PITUTO")
+            coEvery { dao.getAllEntries() } returns (1..60).map {
+                entrada("S" + it.toString().padStart(3, '0'), "EMU-3")
             }
             val repo = RemoteStockRepository(client, session, dao)
 
             assertTrue(repo.ensureSession())
-            val resultado = repo.search(StockFilters(ruta = "PITUTO"))
+            val resultado = repo.search(StockFilters(ruta = "EMU-3"))
 
             assertFalse(resultado.truncated)
-            assertTrue(server.lastRequest()!!.contains("S124"))
+            assertTrue(server.lastRequest()!!.contains("S060"))
+        }
+    }
+
+    /**
+     * KPI One se cae (503 "reporte ocupado", ~30 s) con consultas de más de
+     * ~100 locales: PITUTO tiene 131. En vez de colgar la búsqueda, se resuelve
+     * con el snapshot sin hacer el request.
+     */
+    @Test
+    fun `una ruta de mas de 60 locales no consulta en vivo`() = runBlocking {
+        QueueHttpServer(
+            respuestaLogin(),
+        ).use { server ->
+            val session = InMemoryKpiSessionStore()
+            val client = client(server, session)
+            val dao = mockk<RouteEntryDao>()
+            // Ruta sintética: PITUTO (la real con >60) está excluida del módulo.
+            coEvery { dao.getAllEntries() } returns (1..61).map {
+                entrada("S" + it.toString().padStart(3, '0'), "ZETA-9")
+            }
+            val repo = RemoteStockRepository(client, session, dao)
+
+            assertTrue(repo.ensureSession())
+            var error: Throwable? = null
+            try {
+                repo.search(StockFilters(ruta = "ZETA-9"))
+            } catch (e: Throwable) {
+                error = e
+            }
+
+            assertTrue("Esperaba StockQueryTooLargeException: $error",
+                error is StockQueryTooLargeException)
+            assertEquals(61, (error as StockQueryTooLargeException).locales)
+            // Sólo el login: la consulta en vivo no se hizo.
+            assertEquals(1, server.requestCount())
         }
     }
 
     @Test
-    fun `una ruta con mas de 150 locales se marca como parcial`() = runBlocking {
-        QueueHttpServer(
-            respuestaLogin(),
-            response(200, inventario(total = 0)),
-        ).use { server ->
+    fun `PITUTO y PROPAL no consultan en vivo ni por local`() = runBlocking {
+        QueueHttpServer(respuestaLogin()).use { server ->
             val session = InMemoryKpiSessionStore()
             val client = client(server, session)
             val dao = mockk<RouteEntryDao>()
-            coEvery { dao.getAllEntries() } returns (1..151).map {
-                entrada("S" + it.toString().padStart(3, '0'), "PITUTO")
-            }
+            coEvery { dao.getAllEntries() } returns listOf(
+                entrada("S001", "PITUTO"),
+                entrada("S002", "PROPAL"),
+                entrada("J503", "EMU-3"),
+            )
             val repo = RemoteStockRepository(client, session, dao)
-
             assertTrue(repo.ensureSession())
-            val resultado = repo.search(StockFilters(ruta = "PITUTO"))
 
-            assertTrue(resultado.truncated)
-            assertTrue(!server.lastRequest()!!.contains("S151"))
+            var errorRuta: Throwable? = null
+            try {
+                repo.search(StockFilters(ruta = "PITUTO"))
+            } catch (e: Throwable) {
+                errorRuta = e
+            }
+            assertTrue("Esperaba StockQueryException: $errorRuta",
+                errorRuta is StockQueryException)
+
+            var errorLocal: Throwable? = null
+            try {
+                repo.search(StockFilters(local = "S001"))
+            } catch (e: Throwable) {
+                errorLocal = e
+            }
+            assertTrue("El local de PITUTO tampoco consulta: $errorLocal",
+                errorLocal is StockQueryException)
+
+            // Sólo el login: ninguna consulta en vivo llegó a KPI One.
+            assertEquals(1, server.requestCount())
         }
     }
 
@@ -263,6 +344,34 @@ class RemoteStockRepositoryTest {
             assertEquals("CASO Y CIA", conMarca.items.single().brand)
             // login + una sola consulta de inventario
             assertEquals(2, server.requestCount())
+        }
+    }
+
+    @Test
+    fun `el nombre compacto del local resuelve la consulta en vivo`() = runBlocking {
+        QueueHttpServer(
+            respuestaLogin(),
+            response(
+                200,
+                inventario(fila("J503", "JUMBO MAIPU", "CASO Y CIA", "1", 10.0), total = 1),
+            ),
+        ).use { server ->
+            val session = InMemoryKpiSessionStore()
+            val client = client(server, session)
+            val dao = mockk<RouteEntryDao>()
+            coEvery { dao.getAllEntries() } returns listOf(
+                entrada("J503").copy(local = "JUMBO MAIPU"),
+            )
+            val repo = RemoteStockRepository(client, session, dao)
+
+            assertTrue(repo.ensureSession())
+            // El combo ya sugería "JUMBO MAIPU" al escribir "jumbomaipu";
+            // ahora la consulta en vivo también lo resuelve.
+            val resultado = repo.search(StockFilters(local = "jumbomaipu"))
+
+            assertEquals(StockSource.LIVE, resultado.source)
+            assertEquals(listOf("J503"), resultado.items.map { it.storeCode })
+            assertTrue(server.lastRequest()!!.contains("storeCodes=J503"))
         }
     }
 
@@ -359,6 +468,105 @@ class RemoteStockRepositoryTest {
             assertEquals(0, cruzado.conteoConfirmados)
             assertTrue(cruzado.osaConsultada)
             assertTrue(server.lastRequest()!!.startsWith("GET /api/admin/photos/survey-data/99"))
+        }
+    }
+
+    /**
+     * Tarea A: KPI One no trae marcas por ruta, así que el catálogo remoto las
+     * aprende de las búsquedas en vivo. Tras buscar una ruta, el selector de
+     * marca se acota y trae conteos por local.
+     */
+    @Test
+    fun `tras una busqueda en vivo de una ruta el catalogo acota sus marcas`() = runBlocking {
+        QueueHttpServer(
+            respuestaLogin(),
+            response(200, inventario(
+                fila("J503", "JUMBO MAIPU", "CASO Y CIA", "1", 10.0),
+                fila("J502", "JUMBO LA FLORIDA", "SUK", "2", 20.0),
+                total = 2,
+            )),
+            response(200, """{"storeCodes":["J503","J502"],"brands":["CASO Y CIA","SUK","CUK"]}"""),
+            response(200, """[{"storeCode":"J503","name":"JUMBO MAIPU"},{"storeCode":"J502","name":"JUMBO LA FLORIDA"}]"""),
+        ).use { server ->
+            val session = InMemoryKpiSessionStore()
+            val client = client(server, session)
+            val dao = mockk<RouteEntryDao>()
+            coEvery { dao.getAllEntries() } returns listOf(
+                entrada("J503", "EMU-3"),
+                entrada("J502", "EMU-3"),
+            )
+            val repo = RemoteStockRepository(client, session, dao)
+            assertTrue(repo.ensureSession())
+
+            val resultado = repo.search(StockFilters(ruta = "EMU-3"))
+            assertEquals(2, resultado.items.size)
+
+            val catalogo = repo.catalog()
+            // Sólo las marcas vistas en la búsqueda, no el catálogo completo.
+            assertEquals(listOf("CASO Y CIA", "SUK"), catalogo.marcasPara("EMU-3"))
+            // Conteo de locales por ruta+marca: una por cada marca.
+            assertEquals(1, catalogo.localesPorRutaMarca["EMU3"]?.get("CASO Y CIA"))
+            assertEquals(1, catalogo.localesPorRutaMarca["EMU3"]?.get("SUK"))
+            assertEquals(null, catalogo.localesPorRutaMarca["EMU3"]?.get("CUK"))
+        }
+    }
+
+    /** Una ruta nunca buscada no inventa marcas: conserva el fallback completo. */
+    @Test
+    fun `una ruta sin datos conserva el fallback de la lista completa`() = runBlocking {
+        QueueHttpServer(
+            respuestaLogin(),
+            response(200, inventario(
+                fila("J503", "JUMBO MAIPU", "CASO Y CIA", "1", 10.0),
+                total = 1,
+            )),
+            response(200, """{"storeCodes":["J503"],"brands":["CASO Y CIA","CUK","SUK"]}"""),
+            response(200, """[{"storeCode":"J503","name":"JUMBO MAIPU"}]"""),
+        ).use { server ->
+            val session = InMemoryKpiSessionStore()
+            val client = client(server, session)
+            val dao = mockk<RouteEntryDao>()
+            coEvery { dao.getAllEntries() } returns listOf(entrada("J503", "EMU-3"))
+            val repo = RemoteStockRepository(client, session, dao)
+            assertTrue(repo.ensureSession())
+
+            repo.search(StockFilters(ruta = "EMU-3"))
+            val catalogo = repo.catalog()
+
+            // EMU-3 aprendió "CASO Y CIA"; FMU-9 no tiene datos → lista completa.
+            assertEquals(listOf("CASO Y CIA"), catalogo.marcasPara("EMU-3"))
+            assertEquals(catalogo.marcas, catalogo.marcasPara("FMU-9"))
+        }
+    }
+
+    /** Aprender una ruta no contamina lo aprendido de otra. */
+    @Test
+    fun `cambiar de ruta no mezcla las marcas aprendidas`() = runBlocking {
+        QueueHttpServer(
+            respuestaLogin(),
+            response(200, inventario(fila("J503", "JUMBO MAIPU", "CASO Y CIA", "1", 10.0), total = 1)),
+            response(200, inventario(fila("EX603", "EXPRESS LA REINA", "SUK", "2", 10.0), total = 1)),
+            response(200, """{"storeCodes":["J503","EX603"],"brands":["CASO Y CIA","SUK"]}"""),
+            response(200, """[{"storeCode":"J503","name":"JUMBO MAIPU"},{"storeCode":"EX603","name":"EXPRESS LA REINA"}]"""),
+        ).use { server ->
+            val session = InMemoryKpiSessionStore()
+            val client = client(server, session)
+            val dao = mockk<RouteEntryDao>()
+            coEvery { dao.getAllEntries() } returns listOf(
+                entrada("J503", "EMU-3"),
+                entrada("EX603", "FMU-1"),
+            )
+            val repo = RemoteStockRepository(client, session, dao)
+            assertTrue(repo.ensureSession())
+
+            repo.search(StockFilters(ruta = "EMU-3"))
+            repo.search(StockFilters(ruta = "FMU-1"))
+            val catalogo = repo.catalog()
+
+            assertEquals(listOf("CASO Y CIA"), catalogo.marcasPara("EMU-3"))
+            assertEquals(listOf("SUK"), catalogo.marcasPara("FMU-1"))
+            assertTrue(!catalogo.marcasPara("EMU-3").contains("SUK"))
+            assertTrue(!catalogo.marcasPara("FMU-1").contains("CASO Y CIA"))
         }
     }
 

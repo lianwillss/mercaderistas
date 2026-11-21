@@ -106,7 +106,7 @@ class OsaNegativosTest {
     }
 
     @Test
-    fun `limpiar local o ruta apaga el filtro de validacion`() {
+    fun `cambiar de local o ruta conserva el filtro de validacion`() {
         val filtros = StockFilters(
             local = "J503",
             soloNegativos = true,
@@ -116,9 +116,11 @@ class OsaNegativosTest {
         // Vaciar el buscador no borra el cruce: la pantalla queda en blanco.
         assertEquals(ValidacionNegativo.CONTRADICE, filtros.conLocal("").validacion)
         assertEquals(ValidacionNegativo.CONTRADICE, filtros.conRuta("").validacion)
-        // Una búsqueda nueva sí lo apaga (es otro corte de negativos).
-        assertEquals(null, filtros.conLocal("J502").validacion)
-        assertEquals(null, filtros.conRuta("EMU-3").validacion)
+        // Buscar otro local es otro corte de negativos, pero el filtro que el
+        // usuario eligió se conserva: se apaga con "Limpiar" o tocando la
+        // tarjeta, nunca en silencio al cambiar la búsqueda.
+        assertEquals(ValidacionNegativo.CONTRADICE, filtros.conLocal("J502").validacion)
+        assertEquals(ValidacionNegativo.CONTRADICE, filtros.conRuta("EMU-3").validacion)
     }
 
     private fun osa(estaEnGondola: Boolean) = OsaRespuesta(

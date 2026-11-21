@@ -52,7 +52,11 @@ descarga por URL/Drive se conserva para una próxima fase.
 ### Cifras actuales (RM)
 
 - **296 locales** con stock, de 315 códigos del rutero en RM.
-- **42 rutas**: EMU-1…7, DMU-1/5/6/8, FMU, GMU, HMU, BR, PITUTO.
+- La app **excluye PITUTO y PROPAL**: trabaja con **208 locales**. Sólo quedan
+  fuera los **88 exclusivos** de esas rutas; los **41 compartidos** con una ruta
+  de la RM siguen visibles por ella (mismo local, otras marcas), así ninguna
+  ruta se recorta ni queda vacía (ver §7).
+- **40 rutas** (42 en el rutero menos PITUTO y PROPAL): EMU-1…7, DMU-1/5/6/8, FMU, GMU, HMU, BR.
 - **52 marcas**, ~**13.100 filas**, archivo de ~1,95 MB.
 - **172 filas con stock negativo** en 89 locales.
 - 71 locales pertenecen a más de una ruta.
@@ -137,8 +141,14 @@ Al buscar por **local**, **ruta** o **SKU**, la app consulta KPI One en el momen
 (`inventory-browse`) y usa el snapshot solo como respaldo:
 
 - Las rutas se resuelven contra Room (`RouteEntryDao`), no contra el snapshot.
-- Debounce de 250 ms, `collectLatest` y caché de 30 s. No hay botón de recarga:
+- Debounce de 300 ms, `collectLatest` y caché de 60 s. No hay botón de recarga:
   el cambio de filtro dispara la consulta solo.
+- La caché se indexa por **local + ruta + SKU**; la marca se filtra en memoria
+  para no volver a paginar al cambiarla. La ruta es parte de la clave: antes no
+  estaba y dos rutas distintas compartían las filas de la primera durante la
+  vigencia de la caché.
+- Local y ruta piden **2 caracteres** para consultar en vivo: con uno solo la
+  resolución por subcadena arrastraba cientos de locales.
 - **Pintado en dos fases**: primero se muestra el snapshot local o la caché (si
   hay filas para esa base) y después se revalida contra KPI One. Así el cambio de
   local/ruta se percibe casi instantáneo aunque la red tarde.
@@ -147,14 +157,38 @@ Al buscar por **local**, **ruta** o **SKU**, la app consulta KPI One en el momen
   descargadas, no de una animación independiente. Al terminar queda
   "Stock actualizado · 100%" un momento y vuelve la píldora de frescura.
 - La consulta pagina hasta el `pagination.total` que informa KPI One: una
-  ruta real (5.000-10.000 filas) ya no se corta en 1.500. Los topes de
-  seguridad son 10.000 filas (20 páginas de 500) y 150 locales por consulta.
-  Si se corta, la cabecera avisa "Resultados parciales" y los conteos de las
-  tarjetas se calculan sobre la base completa descargada.
-- Sin conexión o si KPI One falla, se muestra el snapshot con el aviso
-  "Sin conexión: datos guardados"; la pantalla nunca queda en blanco.
+  ruta real se descarga completa. El tope de filas es 10.000 (20 páginas de
+  500); si se corta, la cabecera avisa "Resultados parciales" y los conteos se
+  calculan sobre la base descargada.
+- **Consultas grandes**: por encima de `MAX_LOCALES_EN_VIVO` (60 locales) no se
+  pide el reporte en vivo. La ruta PITUTO tiene 131 y KPI One responde 503
+  "El reporte está temporalmente ocupado" tras ~30 s (o tarda 22-30 s y a veces
+  falla). Se muestran los datos del snapshot con un aviso que lo explica y se
+  sugiere acotar por local. El 503 "ocupado" se reintenta una sola vez: antes
+  se reintentaba 3 veces y la búsqueda quedaba ~90 s colgada.
+- Los fallos de la consulta en vivo ahora se distinguen en el aviso:
+  **sesión vencida** (reconectar en Ajustes), **503 ocupado**, **error HTTP**,
+  **sin conexión con KPI One** o error inesperado. Todos caen al snapshot y
+  la pantalla nunca queda en blanco.
+- Si el texto no resuelve **ningún local** del rutero, se cae al snapshot **sin**
+  banner de error: no es un problema de red ("No se pudo consultar KPI One" era
+  engañoso cuando el local simplemente no existía).
+- Búsqueda y sugerencias comparten la misma regla de coincidencia (normalizada
+  y compacta): "VEGMONKEY" encuentra "VEG MONKEY" y "jumbomaipu" encuentra
+  "JUMBO MAIPU". Una consulta de menos de 2 caracteres no muestra stock.
 - Una **marca sola** no dispara la consulta en vivo: puede ser todo el catálogo.
   Se sigue resolviendo sobre el snapshot.
+- **Catálogo remoto "aprende" marcas por ruta**: KPI One no expone marcas por
+  local ni por ruta (el endpoint inventory-filter-options sólo trae storeCodes,
+  brands y skus globales). En una instalación sin snapshot, el catálogo remoto
+  alimenta marcasPorRuta / localesPorRutaMarca con cada búsqueda en vivo exitosa
+  (las filas ya traen storeCode y brand; la ruta sale del rutero indexado en
+  Room). No se inventan endpoints ni se descargan inventarios masivos. Una ruta
+  sin datos no inventa marcas: StockCatalog.marcasPara() cae a la lista completa.
+  El snapshot local ya trae el desglose completo, así que el router lo prefiere y
+  este aprendizaje sólo importa cuando no hay snapshot. Al terminar una búsqueda
+  en vivo se refresca el catálogo (sin disparar una búsqueda nueva, así no hay
+  bucle de recarga).
 - La cabecera muestra "KPI One en vivo" cuando la última consulta fue remota.
 - "En vivo" significa **el último snapshot disponible**, no un dato de este
   segundo: cada fila conserva su `snapshot_date` y puede venir de días distintos.
@@ -204,17 +238,43 @@ La actualización sigue siendo `StockSyncWorker`; la barra se reengancha al `Wor
 del worker, así que sobrevive rotación y pantalla apagada.
 
 ### Buscador
-- **Local** (código o nombre, con sugerencias en línea).
+- **Local** (código o nombre, con sugerencias en línea). El campo muestra el
+  texto que realmente se busca (código o nombre); el nombre completo del local
+  aparece debajo cuando el código coincide con uno del catálogo.
 - **Ruta** y **Marca** en una fila. La ruta muestra cuántos locales tiene.
 - **Producto / SKU**.
 - Los filtros se recuerdan entre sesiones (DataStore).
+- **Sugerencias** ordenadas por relevancia, no alfabéticamente
+  (`StockSuggestions.kt`): valor exacto → prefijo de código/valor → prefijo de
+  etiqueta → inicio de palabra → contiene (normal o compacto) → error de tipeo.
+  Se muestran hasta 8 y la cabecera indica el total ("12 coincidencias"); la
+  parte que coincide va resaltada (misma normalización que la búsqueda).
+  La tolerancia a errores de tipeo es sólo para sugerencias: la lista exige
+  coincidencia exacta/compacta para no inflarse.
+- **Historial de selecciones**: se persisten en DataStore (preferencia
+  versionada stock_busquedas_v1, con kotlinx.serialization) las SELECCIONES de
+  Local/Ruta/Marca (elegidas del combo o aplicadas desde una sugerencia del
+  estado vacío), nunca cada tecla. Cada entrada guarda usos y ultimoUso, con
+  tope de 8 por tipo. "Limpiar filtros" NO borra el historial.
+- Con el campo vacío, el combo muestra primero una sección "Recientes" (hasta
+  5, icono de historial de Material Icons con contentDescription y targets de
+  48 dp) y después el resto. Con texto, las sugerencias desempatan por usos
+  DESPUÉS de la relevancia (exacto > prefijo > contiene > typo): el uso no pisa
+  la relevancia.
+- **Estado vacío con motivo real**: si el texto no corresponde a ningún local,
+  ruta o marca, dice "No encontramos ese local/ruta" o "Marca fuera del stock
+  descargado" y ofrece "¿Quisiste decir…?" con hasta 3 sugerencias que se pueden
+  tocar para aplicar el filtro. Para marcas nuevas hay además "Actualizar stock".
 
-**Independencia de filtros:** local y marca son caminos alternativos a la ruta.
-Escribir un local o una marca **limpia la ruta**; elegir una ruta **limpia local, marca
-y Producto/SKU** (`conLocal`, `conMarca`, `conRuta` en `StockModels.kt`).
+**Independencia de filtros:** local y ruta son caminos alternativos entre sí:
+escribir o elegir uno **limpia el otro**. Marca y Producto/SKU se conservan porque
+acotan la misma base; con una ruta elegida, el selector de marca se limita a las
+marcas presentes en sus locales (`marcaFueraDeRuta`). Ver `conLocal`, `conMarca`
+y `conRuta` en `StockModels.kt`.
 
 Al buscar por **local** o por **ruta** (escribiendo o eligiendo una opción), la tarjeta
-**Disponible** queda seleccionada automáticamente y se apagan **Quiebres/Negativos**.
+**Disponible** queda seleccionada como default **sólo si no hay un filtro de estado
+elegido**: los Quiebres/Negativos/Cobertura del usuario ya no se apagan al buscar.
 
 ### Tarjetas de estado (filtros)
 Una sola activa a la vez; cada una muestra **siempre** su número aunque otra esté
@@ -326,6 +386,9 @@ node tools/stock-sync.mjs --all
 | Conteos sobre la búsqueda base | Evita que las tarjetas se apaguen al filtrar |
 | Estado por días de inventario | Un umbral fijo de unidades no refleja la realidad |
 | Deduplicar local+SKU | KPI devuelve filas repetidas y rompía la lista (claves duplicadas) |
+| Catálogo remoto aprende marcas por ruta | KPI One no trae el desglose por ruta; sin snapshot se completa con las búsquedas en vivo |
+| Historial de selecciones en DataStore | "Recientes" y desempate por uso, sin tocar Room ni el esquema |
+| PITUTO y PROPAL excluidas del módulo | Pedido explícito: no se muestran, no se consultan en vivo ni se guardan en `stock.json`. Salen sólo los **88 locales exclusivos**; los **41 compartidos** con una ruta de la RM siguen por ella, con otras marcas, para no recortar las rutas de los supervisores. El QC compara contra la base previa ya filtrada para no bloquear la primera actualización |
 
 ---
 

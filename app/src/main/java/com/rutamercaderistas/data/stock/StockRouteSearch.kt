@@ -12,7 +12,8 @@ import com.rutamercaderistas.data.local.RouteEntryEntity
  */
 fun codigosDeRuta(entradas: List<RouteEntryEntity>, ruta: String): List<String> {
     val buscada = normalizarRuta(ruta)
-    if (buscada.isBlank()) return emptyList()
+    // PITUTO y PROPAL están dados de baja del módulo: no resuelven consulta.
+    if (buscada.isBlank() || rutaExcluida(ruta)) return emptyList()
     val exactas = entradas.filter { normalizarRuta(it.rutero) == buscada }
     val elegidas = when {
         exactas.isNotEmpty() -> exactas
@@ -28,7 +29,7 @@ fun codigosDeRuta(entradas: List<RouteEntryEntity>, ruta: String): List<String> 
  */
 fun codigosDeRuta(locales: List<StockLocal>, ruta: String): Set<String> {
     val buscada = normalizarRuta(ruta)
-    if (buscada.isBlank()) return emptySet()
+    if (buscada.isBlank() || rutaExcluida(ruta)) return emptySet()
     return locales
         .filter { local ->
             local.rutas.any { nombre ->

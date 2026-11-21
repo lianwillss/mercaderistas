@@ -21,7 +21,7 @@ class CodProvScreenTest {
 
     @Test
     fun codProvItems_sizeMatchesExpected() {
-        // 12 proveedores definidos
-        assertTrue(CodProvItems.size == 12)
+        // 13 proveedores definidos (incluye KHATAR)
+        assertTrue(CodProvItems.size == 13)
     }
 }

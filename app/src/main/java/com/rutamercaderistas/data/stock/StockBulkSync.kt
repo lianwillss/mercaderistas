@@ -212,21 +212,38 @@ class StockBulkSync @Inject constructor(
                 StockLocal(
                     code = codigo,
                     name = catalogo.names[codigo] ?: codigo,
-                    rutas = mapa[codigo].orEmpty().sorted(),
+                    rutas = rutasDeStock(mapa[codigo].orEmpty().toList()).sorted(),
                 )
             }
             val datos = DemoStockData(items = filas, locales = locales, marcas = catalogo.brands)
 
             val previo = storage.read(META_FILE)?.let { StockFileCodec.decodeMeta(it) }
             val cambioAlcance = previo != null && previo.scope != alcance
+            // El QC compara contra el snapshot anterior con el MISMO criterio:
+            // si antes entraban PITUTO/PROPAL y ahora no, la caída es esperada
+            // y no debe bloquear la actualización.
+            val basePrevia = storage.read(STOCK_FILE)
+                ?.let { texto -> runCatching { StockDemoData.parse(texto) }.getOrNull() }
+                ?.let { datos ->
+                    val codigos = datos.locales
+                        .filterNot { localExcluido(it.rutas) }
+                        .map { it.code.trim().uppercase() }
+                        .toSet()
+                    val filasBase = datos.items.count { item ->
+                        item.storeCode.trim().uppercase() in codigos &&
+                            !marcaExcluida(item.brand)
+                    }
+                    filasBase to codigos.size
+                } ?: ((previo?.rows ?: 0) to (previo?.locales ?: 0))
+            val (filasPrevias, localesPrevios) = basePrevia
             if (!request.force && previo != null && !cambioAlcance) {
-                val caeFilas = previo.rows > 0 && filas.size < previo.rows * 0.9
-                val caeLocales = previo.locales > 0 && locales.size < previo.locales * 0.9
+                val caeFilas = filasPrevias > 0 && filas.size < filasPrevias * 0.9
+                val caeLocales = localesPrevios > 0 && locales.size < localesPrevios * 0.9
                 if (caeFilas || caeLocales) {
                     return@withContext StockSyncOutcome.Blocked(
                         message = "El snapshot nuevo parece incompleto: " +
-                            filas.size + " filas vs " + previo.rows + " antes, " +
-                            locales.size + " locales vs " + previo.locales + " antes.",
+                            filas.size + " filas vs " + filasPrevias + " antes, " +
+                            locales.size + " locales vs " + localesPrevios + " antes.",
                         rows = filas.size,
                         previousRows = previo.rows,
                         locales = locales.size,
@@ -320,6 +337,10 @@ class StockBulkSync @Inject constructor(
         val rutasBuscadas = request.rutas.map { it.trim() }.filter { it.isNotEmpty() }
         val localesBuscados = request.locales.map { it.trim().uppercase() }.filter { it.isNotEmpty() }
         val filtrarPorRegion = rutasBuscadas.isEmpty() && localesBuscados.isEmpty()
+        // PITUTO/PROPAL dados de baja. Un local compartido con una ruta de la RM
+        // sigue visible por esa ruta: se excluye sólo si TODAS sus rutas están
+        // dadas de baja.
+        val rutasPorCodigo = entries.groupBy({ it.codigo.trim().uppercase() }) { it.rutero }
 
         return entries.asSequence()
             .filter { entry ->
@@ -329,6 +350,7 @@ class StockBulkSync @Inject constructor(
                 val porLista = codigo in rm
                 val sinDatosDeRegion = rm.isEmpty() && entry.region.isBlank()
                 codigo.isNotEmpty() &&
+                    !localExcluido(rutasPorCodigo[codigo].orEmpty()) &&
                     (localesBuscados.isEmpty() || codigo in localesBuscados) &&
                     (rutasBuscadas.isEmpty() ||
                         rutasBuscadas.any { it.equals(entry.rutero.trim(), ignoreCase = true) }) &&

@@ -39,6 +39,31 @@ class KpiOneClientTest {
     }
 
     @Test
+    fun `un reporte ocupado se reintenta una sola vez`() = runBlocking {
+        QueueHttpServer(
+            response(200, """{"ok":true}""", "Set-Cookie: session=abc; Path=/"),
+            response(503, """{"error":"El reporte está temporalmente ocupado. Acota la consulta."}"""),
+            response(503, """{"error":"El reporte está temporalmente ocupado. Acota la consulta."}"""),
+        ).use { server ->
+            val session = InMemoryKpiSessionStore()
+            val client = client(server, session)
+            assertTrue(client.ensureSession())
+
+            var error: Throwable? = null
+            try {
+                client.fetchInventory(listOf("J503"))
+            } catch (e: Throwable) {
+                error = e
+            }
+
+            assertTrue("Esperaba KpiHttpException: $error", error is KpiHttpException)
+            assertEquals(503, (error as KpiHttpException).statusCode)
+            // login + 2 intentos (antes eran 4 y la búsqueda quedaba ~90 s colgada)
+            assertEquals(3, server.requestCount())
+        }
+    }
+
+    @Test
     fun fetchInventoryPaginaYConvierteLosCamposDeKpiOne() = runBlocking {
         QueueHttpServer(
             response(200, """{"ok":true}""", "Set-Cookie: session=abc; Path=/"),
@@ -77,6 +102,36 @@ class KpiOneClientTest {
             assertEquals(94.0 / (48.0 / 28.0), fila.coberturaDias!!, 0.0001)
             assertTrue(server.lastRequest()!!.contains("/api/b2b-reports/terreno/inventory-browse"))
             assertTrue(server.lastRequest()!!.contains("storeCodes=J503"))
+        }
+    }
+
+    @Test
+    fun `una respuesta gzip del inventario se descomprime y parsea`() = runBlocking {
+        QueueHttpServer(
+            response(200, """{"ok":true}""", "Set-Cookie: session=abc; Path=/").toByteArray(),
+            responseGzip(
+                200,
+                """{
+                  "items":[
+                    {"store_code":"J503","store_name":"JUMBO MAIPU","brand_raw":"CASO Y CIA",
+                     "product_desc_raw":"Nectar Jumex","sku_b2b_raw":"192829","stock_units":94,
+                     "snapshot_date":"2026-11-21"}
+                  ],
+                  "pagination":{"total":1}
+                }""".trimIndent(),
+            ),
+        ).use { server ->
+            val session = InMemoryKpiSessionStore()
+            val client = client(server, session)
+            assertTrue(client.ensureSession())
+
+            // KPI One comprime si el cliente pide gzip; OkHttp debe descomprimir
+            // solo o json.parseToJsonElement recibe los bytes 1f 8b y la
+            // búsqueda cae al snapshot.
+            val pagina = client.fetchInventory(listOf("J503"))
+            assertEquals(1, pagina.total)
+            assertEquals(1, pagina.items.size)
+            assertEquals(94.0, pagina.items.first().stockUnits, 0.0)
         }
     }
 
@@ -179,6 +234,20 @@ class KpiOneClientTest {
                 "\r\n" +
                 body
         }
+
+        /** Respuesta comprimida con gzip: KPI One la envía cuando el cliente la pide. */
+        fun responseGzip(status: Int, body: String): ByteArray {
+            val gzip = java.io.ByteArrayOutputStream().use { salida ->
+                java.util.zip.GZIPOutputStream(salida).use { it.write(body.toByteArray()) }
+                salida.toByteArray()
+            }
+            val texto = "HTTP/1.1 $status OK\r\n" +
+                "Content-Type: application/json\r\n" +
+                "Content-Encoding: gzip\r\n" +
+                "Content-Length: " + gzip.size + "\r\n" +
+                "Connection: close\r\n\r\n"
+            return texto.toByteArray() + gzip
+        }
     }
 }
 
@@ -216,14 +285,20 @@ class InMemoryKpiSessionStore : KpiSessionStore {
 }
 
 /** Servidor HTTP mínimo: entrega una respuesta de la cola por request. */
-class QueueHttpServer(vararg responses: String) : Closeable {
+class QueueHttpServer private constructor(
+    respuestasIniciales: List<ByteArray>,
+) : Closeable {
+    constructor() : this(emptyList())
+    constructor(vararg responses: String) : this(responses.map { it.toByteArray() })
+    constructor(vararg responses: ByteArray) : this(responses.toList())
+
     private val server = ServerSocket(0)
-    private val cola = LinkedBlockingQueue<String>()
+    private val cola = LinkedBlockingQueue<ByteArray>()
     private val pedidos = LinkedBlockingQueue<String>()
     @Volatile private var vivo = true
 
     private val hilo = thread(isDaemon = true) {
-        responses.forEach { cola.offer(it) }
+        respuestasIniciales.forEach { cola.offer(it) }
         while (vivo) {
             try {
                 server.accept().use { socket ->
@@ -237,7 +312,7 @@ class QueueHttpServer(vararg responses: String) : Closeable {
                     val respuesta = cola.poll(2, TimeUnit.SECONDS)
                     if (respuesta != null) {
                         socket.getOutputStream().apply {
-                            write(respuesta.toByteArray())
+                            write(respuesta)
                             flush()
                         }
                     }

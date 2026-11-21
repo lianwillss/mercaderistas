@@ -34,6 +34,46 @@ class DemoStockRepositoryTest {
         assertTrue(StockFilters(ruta = "EMU-3").hayCriterio)
         assertTrue(StockFilters(marca = "CASO Y CIA").hayCriterio)
         assertFalse(StockFilters().hayCriterio)
+        // Un solo caracter no alcanza: con "1" el filtro por subcadena
+        // devolvía cientos de locales y disparaba consultas enormes.
+        assertFalse(StockFilters(local = "J").hayCriterio)
+        assertFalse(StockFilters(sku = "1").hayCriterio)
+        assertFalse(StockFilters(marca = "C").hayCriterio)
+        assertFalse(StockFilters(ruta = "E").hayCriterio)
+    }
+
+    @Test
+    fun `marca sin espacios encuentra la marca con espacios`() = runBlocking {
+        val repoMonkey = DemoStockRepository(
+            DemoStockData(
+                items = listOf(
+                    StockItem(
+                        "J503", "JUMBO MAIPU", "VEG MONKEY", "Snack", "1",
+                        5.0, null, "2026-11-12", false,
+                    ),
+                ),
+            ),
+        )
+        // La sugerencia del combo ya aceptaba "VEGMONKEY": la búsqueda también.
+        assertEquals(1, repoMonkey.search(StockFilters(marca = "VEGMONKEY")).items.size)
+        assertEquals(1, repoMonkey.search(StockFilters(marca = "veg-monkey")).items.size)
+        assertEquals(1, repoMonkey.search(StockFilters(marca = "VEG MONKEY")).items.size)
+    }
+
+    @Test
+    fun `local compacto y sufijo de codigo encuentran el local`() = runBlocking {
+        val repoLocal = DemoStockRepository(
+            DemoStockData(
+                items = listOf(
+                    StockItem(
+                        "J503", "JUMBO MAIPU", "CASO Y CIA", "Nectar", "1",
+                        5.0, null, "2026-11-12", false,
+                    ),
+                ),
+            ),
+        )
+        assertEquals(1, repoLocal.search(StockFilters(local = "jumbomaipu")).items.size)
+        assertEquals(1, repoLocal.search(StockFilters(local = "503")).items.size)
     }
 
     @Test

@@ -98,7 +98,7 @@ class DemoStockRepository @Inject constructor(
 
     override val isDemo: Boolean get() = origin == StockOrigin.ASSET
 
-    override val tieneDatos: Boolean get() = data.items.isNotEmpty()
+    override val tieneDatos: Boolean get() = itemsFiltrados(data).isNotEmpty()
 
     val origen: StockOrigin get() = origin
 
@@ -109,11 +109,22 @@ class DemoStockRepository @Inject constructor(
     // pasan catálogo y búsqueda: así también aplica a los snapshots nuevos que
     // lleguen por URL o KPI One, no sólo al JSON empaquetado.
     private val items: List<StockItem>
-        get() {
-            return data.items.filterNot { item ->
-                marcaExcluida(item.brand)
-            }
+        get() = itemsFiltrados(data)
+
+    /** Ítems sin las marcas ni los locales de rutas dadas de baja. */
+    private fun itemsFiltrados(datos: DemoStockData): List<StockItem> {
+        val excluidos = codigosExcluidos(datos)
+        return datos.items.filterNot { item ->
+            marcaExcluida(item.brand) || item.storeCode.trim().uppercase() in excluidos
         }
+    }
+
+    /** Locales que tocan alguna ruta excluida (PITUTO/PROPAL). */
+    private fun codigosExcluidos(datos: DemoStockData): Set<String> =
+        datos.locales
+            .filter { local -> localExcluido(local.rutas) }
+            .map { it.code.trim().uppercase() }
+            .toSet()
 
     /** Reemplaza la muestra en memoria tras una actualización por URL o KPI One. */
     fun actualizarDatos(nuevos: DemoStockData, nuevoOrigen: StockOrigin = StockOrigin.KPI_ONE) {
@@ -141,12 +152,16 @@ class DemoStockRepository @Inject constructor(
     override suspend fun catalog(): StockCatalog {
         // Si data.locales esta vacio (por ejemplo, en tests o en el asset
         // empaquetado), se reconstruye a partir de los items cargados.
+        // Los locales de rutas dadas de baja no llegan al selector.
+        val excluidos = codigosExcluidos(data)
         val locales = if (data.locales.isNotEmpty()) {
             data.locales
-                .map { StockLocal(it.code, it.name, it.rutas) }
+                .map { StockLocal(it.code, it.name, rutasDeStock(it.rutas)) }
+                .filterNot { it.code.trim().uppercase() in excluidos }
                 .distinctBy { it.code }
                 .sortedBy { it.code }
         } else {
+            // Sin lista de locales no hay rutas que descartar; sólo marcas.
             items.map { StockLocal(it.storeCode, it.storeName) }
                 .distinctBy { it.code }
                 .sortedBy { it.code }
@@ -190,12 +205,14 @@ class DemoStockRepository @Inject constructor(
     }
 
     override suspend fun search(filters: StockFilters): StockResult {
+        // Las consultas se normalizan UNA vez; cada fila sólo se normaliza
+        // contra ellas (antes eran Normalizer por fila y por campo).
         val texto = normalizarStock(filters.sku)
-        val marca = normalizarStock(filters.marca)
+        val marca = ConsultaStock(filters.marca)
         // Si el usuario eligió un local, el campo muestra "J521 · JUMBO ...".
         // Basta con lo que va antes del separador para identificar el código.
-        val local = normalizarStock(filters.local)
-        val localCodigo = normalizarStock(filters.local.substringBefore("·"))
+        val local = ConsultaStock(filters.local)
+        val localCodigo = ConsultaStock(filters.local.substringBefore("·"))
         // La ruta viene del rutero: se resuelve a un conjunto de locales.
         val ruta = filters.ruta
         val codigosRuta: Set<String>? = if (ruta.isBlank()) {
@@ -205,10 +222,10 @@ class DemoStockRepository @Inject constructor(
         }
         val base = items.filter { item ->
             (codigosRuta == null || item.storeCode in codigosRuta) &&
-            (local.isEmpty() ||
-                normalizarStock(item.storeCode).contains(localCodigo) ||
-                normalizarStock(item.storeName).contains(local)) &&
-                (marca.isEmpty() || normalizarStock(item.brand).contains(marca)) &&
+                (local.vacia ||
+                    (!localCodigo.vacia && localCodigo.coincide(item.storeCode)) ||
+                    local.coincide(item.storeName)) &&
+                (marca.vacia || marca.coincide(item.brand)) &&
                 (texto.isEmpty() ||
                     normalizarStock(item.sku).contains(texto) ||
                     normalizarStock(item.product).contains(texto))

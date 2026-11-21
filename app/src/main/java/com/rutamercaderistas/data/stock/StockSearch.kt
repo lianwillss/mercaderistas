@@ -7,6 +7,37 @@ package com.rutamercaderistas.data.stock
  * Lo comparten el repositorio local y el remoto para que una búsqueda en vivo
  * y una del snapshot devuelvan exactamente los mismos conteos y el mismo orden.
  */
+/**
+ * Ordena las filas ya filtradas. Se separó de [construirStockResult] para
+ * reordenar en memoria al cambiar sólo el orden, sin volver a consultar.
+ */
+fun ordenarStock(items: List<StockItem>, orden: StockSort): List<StockItem> = when (orden) {
+    StockSort.GRAVEDAD -> items.sortedWith(
+        compareBy(
+            {
+                when {
+                    it.stockUnits >= 0.0 -> 2
+                    // Primero lo que hay que verificar: negativo con OSA "sí".
+                    validacionNegativo(it) == ValidacionNegativo.CONTRADICE -> 0
+                    else -> 1
+                }
+            },
+            { if (estadoDe(it) == EstadoTipo.Quiebre) 0 else 1 },
+            { it.daysOfInventory ?: Int.MAX_VALUE },
+            { it.stockUnits },
+        ),
+    )
+    StockSort.PRODUCTO_AZ -> items.sortedWith(
+        compareBy({ it.product.lowercase() }, { it.storeCode }),
+    )
+    StockSort.STOCK_ASC -> items.sortedBy { it.stockUnits }
+    StockSort.STOCK_DESC -> items.sortedByDescending { it.stockUnits }
+    // Sin dato va al final: no es "0 días", es "no sé".
+    StockSort.MENOR_COBERTURA -> items.sortedBy {
+        it.coberturaDias ?: Double.MAX_VALUE
+    }
+}
+
 fun construirStockResult(
     base: List<StockItem>,
     filtros: StockFilters,
@@ -52,32 +83,7 @@ fun construirStockResult(
             (filtros.validacion == null ||
                 (item.stockUnits < 0.0 && validacionNegativo(item) == filtros.validacion))
     }
-    val ordenados = when (filtros.orden) {
-        StockSort.GRAVEDAD -> filtrados.sortedWith(
-            compareBy(
-                {
-                    when {
-                        it.stockUnits >= 0.0 -> 2
-                        // Primero lo que hay que verificar: negativo con OSA "sí".
-                        validacionNegativo(it) == ValidacionNegativo.CONTRADICE -> 0
-                        else -> 1
-                    }
-                },
-                { if (estadoDe(it) == EstadoTipo.Quiebre) 0 else 1 },
-                { it.daysOfInventory ?: Int.MAX_VALUE },
-                { it.stockUnits },
-            ),
-        )
-        StockSort.PRODUCTO_AZ -> filtrados.sortedWith(
-            compareBy({ it.product.lowercase() }, { it.storeCode }),
-        )
-        StockSort.STOCK_ASC -> filtrados.sortedBy { it.stockUnits }
-        StockSort.STOCK_DESC -> filtrados.sortedByDescending { it.stockUnits }
-        // Sin dato va al final: no es "0 días", es "no sé".
-        StockSort.MENOR_COBERTURA -> filtrados.sortedBy {
-            it.coberturaDias ?: Double.MAX_VALUE
-        }
-    }
+    val ordenados = ordenarStock(filtrados, filtros.orden)
     return StockResult(
         items = ordenados,
         conteoQuiebre = conteoQuiebre,

@@ -28,3 +28,9 @@ actualizar-stock.sh
 
 # Excel fuente sueltos en la raíz (usar fuentes-locales/)
 /*.xlsx
+
+# Cachés y salidas locales que no son parte del repo
+/.kotlin/
+*.log
+/apk.txt
+/.claude/

@@ -128,6 +128,71 @@ class StockBulkSyncTest {
         }
     }
 
+    @Test
+    fun `el QC no bloquea la bajada de PITUTO y PROPAL`() = runBlocking {
+        QueueHttpServer(
+            response(200, """{"ok":true}""", "Set-Cookie: session=abc; Path=/"),
+            response(200, """{"storeCodes":["J503","J502"],"brands":["CASO Y CIA"]}"""),
+            response(
+                200,
+                """[{"storeCode":"J503","name":"JUMBO MAIPU"},{"storeCode":"J502","name":"JUMBO LA FLORIDA"}]""",
+            ),
+            response(200, inventarioDosLocales()),
+        ).use { server ->
+            val storage = InMemoryStockStorage()
+            // Snapshot anterior con 10 locales: 8 de PITUTO y 2 de EMU-3.
+            val previos = buildList {
+                repeat(8) { i -> add(entrada("P$i", "PITUTO")) }
+                add(entrada("J503"))
+                add(entrada("J502"))
+            }
+            val previoData = DemoStockData(
+                locales = previos.map { StockLocal(it.codigo, it.local, listOf(it.rutero)) },
+                marcas = listOf("CASO Y CIA"),
+                items = previos.mapIndexed { i, e ->
+                    StockItem(
+                        e.codigo, e.local, "CASO Y CIA", "Producto", "SKU$i",
+                        10.0, 0.0, "2026-10-27", false,
+                    )
+                },
+            )
+            storage.files[StockBulkSync.STOCK_FILE] = StockFileCodec.encode(previoData)
+            storage.files[StockBulkSync.META_FILE] = StockFileCodec.encodeMeta(
+                StockMeta(
+                    rows = previoData.items.size,
+                    locales = previoData.locales.size,
+                    maxSnapshot = "2026-10-27",
+                ),
+            )
+            // El rutero trae PITUTO/PROPAL y la RM: sólo deben bajarse los últimos.
+            val sync = sync(
+                server,
+                storage,
+                listOf(
+                    entrada("P1", "PITUTO"),
+                    entrada("P2", "PROPAL"),
+                    entrada("J503"),
+                    entrada("J502"),
+                ),
+            )
+
+            val resultado = sync.run(StockSyncRequest())
+
+            // Sin comparar contra la base filtrada, 2 filas vs 10 bloqueaba.
+            assertTrue(
+                "La baja de PITUTO/PROPAL es esperada y no debe bloquear: $resultado",
+                resultado is StockSyncOutcome.Success,
+            )
+            val exito = resultado as StockSyncOutcome.Success
+            assertEquals(2, exito.meta.locales)
+            assertEquals(2, exito.meta.rows)
+            // Y no se guardan: el snapshot nuevo no los incluye.
+            val guardado = StockFileCodec.decode(storage.read(StockBulkSync.STOCK_FILE)!!)
+            assertTrue(guardado.items.all { it.storeCode in setOf("J503", "J502") })
+            assertTrue(guardado.locales.map { it.code }.all { it in setOf("J503", "J502") })
+        }
+    }
+
     private fun sync(
         server: QueueHttpServer,
         storage: StockStorage,
