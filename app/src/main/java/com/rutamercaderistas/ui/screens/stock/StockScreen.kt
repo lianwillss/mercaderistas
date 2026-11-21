@@ -20,6 +20,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -95,15 +96,16 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -155,12 +157,15 @@ import com.rutamercaderistas.ui.theme.NegativosNeon
 import com.rutamercaderistas.ui.theme.QuiebreOrangeEnd
 import com.rutamercaderistas.ui.theme.QuiebreOrangeStart
 import com.rutamercaderistas.ui.theme.QuiebreYellow
+import com.rutamercaderistas.ui.theme.LimpiarNeonRed
+import com.rutamercaderistas.ui.theme.LimpiarNeonGlow
 import com.rutamercaderistas.ui.theme.AccentGreenText
 import com.rutamercaderistas.ui.theme.UrgencyOrangeSoft
 import com.rutamercaderistas.ui.theme.UrgencyOrangeText
 import com.rutamercaderistas.ui.theme.DownloadNeonViolet
 import com.rutamercaderistas.ui.theme.DownloadNeonGlow
 import com.rutamercaderistas.ui.theme.DownloadNeonIconEdge
+import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.ui.theme.metricValueCompact
 import com.rutamercaderistas.ui.theme.metricValue
@@ -416,10 +421,9 @@ fun StockScreen(
                     catalog = state.catalog,
                     filters = filters,
                     onFilter = vm::onFilter,
+                    modo = filters.modo,
+                    onModo = { modo -> vm.onFilter { it.copy(modo = modo) } },
                 )
-            }
-            item(key = "modo") {
-                ModoSelector(filters.modo) { modo -> vm.onFilter { it.copy(modo = modo) } }
             }
             if (state.status != StockStatus.Idle && state.status != StockStatus.SinSesion) {
                 item(key = "resumen") {
@@ -723,6 +727,8 @@ private fun StockFiltersCard(
     catalog: StockCatalog,
     filters: StockFilters,
     onFilter: ((StockFilters) -> StockFilters) -> Unit,
+    modo: StockMode,
+    onModo: (StockMode) -> Unit,
 ) {
     val dimens = LocalAppDimens.current
     val hayFiltros = filters.local.isNotBlank() ||
@@ -745,42 +751,12 @@ private fun StockFiltersCard(
             modifier = Modifier.padding(dimens.spacingMd),
             verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "Buscar",
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier
-                        .weight(1f)
-                        .semantics { heading() },
-                )
-                if (hayFiltros) {
-                    AppButton(
-                        text = "Limpiar",
-                        onClick = {
-                            onFilter {
-                                it.copy(
-                                    local = "",
-                                    ruta = "",
-                                    marca = "",
-                                    sku = "",
-                                    estado = null,
-                                    cobertura = null,
-                                    validacion = null,
-                                    soloQuiebre = false,
-                                    soloNegativos = false,
-                                )
-                            }
-                        },
-                        variant = AppButtonVariant.Text,
-                    )
-                }
-            }
-
             val localMostrado = catalog.locales
                 .firstOrNull { it.code == filters.local }
                 ?.label
                 ?: filters.local
 
+            // Fila 1: Local (ancho completo)
             StockCombo(
                 label = "Local",
                 texto = localMostrado,
@@ -795,11 +771,35 @@ private fun StockFiltersCard(
                 onTexto = { texto -> onFilter { it.conLocal(texto) } },
                 onElegir = { opcion -> onFilter { it.conLocal(opcion.valor) } },
             )
+
+            // Fila 2: Ruta | Marca (horizontal, dos combos)
             val localesPorRuta = remember(catalog.locales) {
                 catalog.locales.flatMap { it.rutas }.groupingBy { it }.eachCount()
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.weight(0.45f)) {
+            // Las marcas del combo se limitan a las presentes en los
+            // locales de la ruta elegida.
+            val marcasRuta = catalog.marcasPara(filters.ruta)
+            val hayRuta = filters.ruta.isNotBlank()
+            // Si la ruta cambia y la marca guardada ya no existe ahí, se
+            // limpia una sola vez. Nunca mientras el usuario escribe: el
+            // texto a medio escribir es la búsqueda en curso.
+            LaunchedEffect(filters.ruta, marcasRuta) {
+                if (catalog.marcaFueraDeRuta(filters.ruta, filters.marca)) {
+                    onFilter { it.copy(marca = "") }
+                }
+            }
+            val localesPorMarca = if (hayRuta) {
+                catalog.localesPorRutaMarca[normalizarRuta(filters.ruta)].orEmpty()
+            } else {
+                emptyMap()
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Ruta - peso 0.5
+                Box(modifier = Modifier.weight(0.5f, fill = false)) {
                     StockCombo(
                         label = "Ruta",
                         texto = filters.ruta,
@@ -818,25 +818,8 @@ private fun StockFiltersCard(
                         onElegir = { opcion -> onFilter { it.conRuta(opcion.valor) } },
                     )
                 }
-                Spacer(Modifier.width(8.dp))
-                Box(modifier = Modifier.weight(0.55f)) {
-                    // Las marcas del combo se limitan a las presentes en los
-                    // locales de la ruta elegida.
-                    val marcasRuta = catalog.marcasPara(filters.ruta)
-                    val hayRuta = filters.ruta.isNotBlank()
-                    // Si la ruta cambia y la marca guardada ya no existe ahí, se
-                    // limpia una sola vez. Nunca mientras el usuario escribe: el
-                    // texto a medio escribir es la búsqueda en curso.
-                    LaunchedEffect(filters.ruta, marcasRuta) {
-                        if (catalog.marcaFueraDeRuta(filters.ruta, filters.marca)) {
-                            onFilter { it.copy(marca = "") }
-                        }
-                    }
-                    val localesPorMarca = if (hayRuta) {
-                        catalog.localesPorRutaMarca[normalizarRuta(filters.ruta)].orEmpty()
-                    } else {
-                        emptyMap()
-                    }
+                // Marca - peso 0.5
+                Box(modifier = Modifier.weight(0.5f, fill = false)) {
                     StockCombo(
                         label = "Marca",
                         texto = filters.marca,
@@ -858,6 +841,8 @@ private fun StockFiltersCard(
                     )
                 }
             }
+
+            // Fila 3: Producto / SKU (ancho completo)
             OutlinedTextField(
                 value = filters.sku,
                 onValueChange = { texto -> onFilter { it.copy(sku = texto) } },
@@ -867,6 +852,87 @@ private fun StockFiltersCard(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            // Fila 4: Por Local | Por Marca | Limpiar (tres cápsulas alineadas)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Por Local - AppFilterChip
+                AppFilterChip(
+                    selected = modo == StockMode.POR_LOCAL,
+                    onClick = { onModo(StockMode.POR_LOCAL) },
+                    label = { Text("Por local") },
+                    leadingIcon = { Icon(Icons.Outlined.Storefront, contentDescription = null, Modifier.size(18.dp)) },
+                )
+                // Por Marca - AppFilterChip
+                AppFilterChip(
+                    selected = modo == StockMode.POR_MARCA,
+                    onClick = { onModo(StockMode.POR_MARCA) },
+                    label = { Text("Por marca") },
+                    leadingIcon = { Icon(Icons.Outlined.Inventory2, contentDescription = null, Modifier.size(18.dp)) },
+                )
+                // Limpiar - cápsula fluorescente
+                if (hayFiltros) {
+                    val reducir = LocalReducedMotionEnabled.current
+                    val pulso = if (reducir) {
+                        1f
+                    } else {
+                        val transicion = rememberInfiniteTransition(label = "limpiarPulse")
+                        transicion.animateFloat(
+                            initialValue = 0.7f,
+                            targetValue = 1f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(1200, easing = FastOutSlowInEasing),
+                                repeatMode = RepeatMode.Reverse,
+                            ),
+                            label = "limpiarPulseAlpha",
+                        ).value
+                    }
+                    val limpiarAction = { onFilter { it.copy(
+                        local = "",
+                        ruta = "",
+                        marca = "",
+                        sku = "",
+                        estado = null,
+                        cobertura = null,
+                        validacion = null,
+                        soloQuiebre = false,
+                        soloNegativos = false,
+                    ) } }
+                    Surface(
+                        modifier = Modifier
+                            .heightIn(min = dimens.touchMin)
+                            .widthIn(min = 96.dp)
+                            .padding(horizontal = dimens.spacingLg, vertical = dimens.spacingXs)
+                            .shadow(
+                                elevation = 4.dp,
+                                shape = ComponentShapes.pill,
+                                ambientColor = LimpiarNeonGlow.copy(alpha = 0.3f * pulso),
+                                spotColor = LimpiarNeonGlow.copy(alpha = 0.5f * pulso),
+                            )
+                            .graphicsLayer { this.alpha = pulso }
+                            .clickable(onClick = limpiarAction)
+                            .semantics {
+                                contentDescription = "Limpiar todos los filtros"
+                                role = Role.Button
+                            },
+                        shape = ComponentShapes.pill,
+                        color = LimpiarNeonRed,
+                        tonalElevation = 0.dp,
+                    ) {
+                        Text(
+                            text = "Limpiar",
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelLarge,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
         }
     }
 }

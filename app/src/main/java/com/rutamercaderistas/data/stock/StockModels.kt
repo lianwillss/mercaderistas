@@ -175,7 +175,12 @@ fun normalizarRuta(texto: String): String =
  * búsqueda, conteos, compartir). Se comparan sin espacios ni signos porque la
  * misma marca llega como "BERRY SUR" en el catálogo EAN y "BERRYSUR" en stock.
  */
-private val MARCAS_EXCLUIDAS = setOf("BERRYSUR")
+private val MARCAS_EXCLUIDAS = setOf(
+    "BERRYSUR",
+    // Baja pedida por el cliente: BREDEN MASTER no la ven los mercaderistas en sus zonas.
+    // Se excluye al cargar stock para aligerar la carga y no mostrarla en selectores.
+    "BREDENMASTER",
+)
 
 fun marcaExcluida(marca: String): Boolean =
     normalizarStock(marca).filter { it.isLetterOrDigit() } in MARCAS_EXCLUIDAS

@@ -8,6 +8,11 @@ val QuiebreOrangeStart = Color(0xFFE8590C)
 val QuiebreOrangeEnd = Color(0xFFC2410C)
 val QuiebreYellow = Color(0xFFFFF200)
 
+// Stock: botón Limpiar fluorescente rojo
+val LimpiarNeonRed = Color(0xFFFF1A1A)        // rojo intenso fluorescente
+val LimpiarNeonGlow = Color(0xFFFF4444)       // halo fluorescente para sombra/brillo
+val LimpiarNeonRedSoft = Color(0xFFFFCCCC)    // versión suave para estados sutiles
+
 // Stock: tarjeta de negativos (negro con neón)
 val NegativosBlack = Color(0xFF0B0B0B)
 val NegativosNeon = Color(0xFFCCFF00)
