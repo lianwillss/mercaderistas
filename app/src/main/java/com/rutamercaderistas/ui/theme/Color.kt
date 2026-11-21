@@ -8,10 +8,12 @@ val QuiebreOrangeStart = Color(0xFFE8590C)
 val QuiebreOrangeEnd = Color(0xFFC2410C)
 val QuiebreYellow = Color(0xFFFFF200)
 
-// Stock: botón Limpiar fluorescente rojo
-val LimpiarNeonRed = Color(0xFFFF1A1A)        // rojo intenso fluorescente
-val LimpiarNeonGlow = Color(0xFFFF4444)       // halo fluorescente para sombra/brillo
-val LimpiarNeonRedSoft = Color(0xFFFFCCCC)    // versión suave para estados sutiles
+// Stock: botón Limpiar (degradado Uiverse "wonderful-baboon-62")
+val LimpiarGradStart = Color(0xFFAF40FF)      // violeta del extremo izquierdo
+val LimpiarGradMid = Color(0xFF5B42F3)        // índigo al 50 %
+val LimpiarGradEnd = Color(0xFF00DDEB)        // cian del extremo derecho
+val LimpiarPlaca = Color(0xFF05062D)          // fondo oscuro de la etiqueta
+val LimpiarGlow = Color(0xFF9741FC)           // halo de la sombra (morado)
 
 // Stock: tarjeta de negativos (negro con neón)
 val NegativosBlack = Color(0xFF0B0B0B)

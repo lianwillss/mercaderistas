@@ -97,7 +97,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.SpanStyle
@@ -172,15 +171,12 @@ import com.rutamercaderistas.ui.theme.NegativosNeon
 import com.rutamercaderistas.ui.theme.QuiebreOrangeEnd
 import com.rutamercaderistas.ui.theme.QuiebreOrangeStart
 import com.rutamercaderistas.ui.theme.QuiebreYellow
-import com.rutamercaderistas.ui.theme.LimpiarNeonRed
-import com.rutamercaderistas.ui.theme.LimpiarNeonGlow
 import com.rutamercaderistas.ui.theme.AccentGreenText
 import com.rutamercaderistas.ui.theme.UrgencyOrangeSoft
 import com.rutamercaderistas.ui.theme.UrgencyOrangeText
 import com.rutamercaderistas.ui.theme.DownloadNeonViolet
 import com.rutamercaderistas.ui.theme.DownloadNeonGlow
 import com.rutamercaderistas.ui.theme.DownloadNeonIconEdge
-import com.rutamercaderistas.ui.theme.ComponentShapes
 import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.ui.theme.metricValueCompact
 import com.rutamercaderistas.ui.theme.metricValue
@@ -871,23 +867,8 @@ private fun StockFiltersCard(
                     label = { Text("Por marca") },
                     leadingIcon = { Icon(Icons.Outlined.Inventory2, contentDescription = null, Modifier.size(18.dp)) },
                 )
-                // Limpiar - cápsula fluorescente
+                // Limpiar - botón de degradado
                 if (hayFiltros) {
-                    val reducir = LocalReducedMotionEnabled.current
-                    val pulso = if (reducir) {
-                        1f
-                    } else {
-                        val transicion = rememberInfiniteTransition(label = "limpiarPulse")
-                        transicion.animateFloat(
-                            initialValue = 0.7f,
-                            targetValue = 1f,
-                            animationSpec = infiniteRepeatable(
-                                animation = tween(1200, easing = FastOutSlowInEasing),
-                                repeatMode = RepeatMode.Reverse,
-                            ),
-                            label = "limpiarPulseAlpha",
-                        ).value
-                    }
                     val limpiarAction = { onFilter { it.copy(
                         local = "",
                         ruta = "",
@@ -899,36 +880,14 @@ private fun StockFiltersCard(
                         soloQuiebre = false,
                         soloNegativos = false,
                     ) } }
-                    Surface(
+                    AppButton(
+                        text = "Limpiar",
+                        onClick = limpiarAction,
+                        variant = AppButtonVariant.Gradient,
                         modifier = Modifier
-                            .heightIn(min = dimens.touchMin)
-                            .widthIn(min = 96.dp)
-                            .padding(horizontal = dimens.spacingLg, vertical = dimens.spacingXs)
-                            .shadow(
-                                elevation = 4.dp,
-                                shape = ComponentShapes.pill,
-                                ambientColor = LimpiarNeonGlow.copy(alpha = 0.3f * pulso),
-                                spotColor = LimpiarNeonGlow.copy(alpha = 0.5f * pulso),
-                            )
-                            .graphicsLayer { this.alpha = pulso }
-                            .clickable(onClick = limpiarAction)
-                            .semantics {
-                                contentDescription = "Limpiar todos los filtros"
-                                role = Role.Button
-                            },
-                        shape = ComponentShapes.pill,
-                        color = LimpiarNeonRed,
-                        tonalElevation = 0.dp,
-                    ) {
-                        Text(
-                            text = "Limpiar",
-                            color = Color.White,
-                            style = MaterialTheme.typography.labelLarge,
-                            textAlign = TextAlign.Center,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                            .widthIn(min = 64.dp)
+                            .semantics { contentDescription = "Limpiar todos los filtros" },
+                    )
                 }
             }
         }
