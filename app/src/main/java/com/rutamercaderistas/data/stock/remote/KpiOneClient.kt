@@ -387,7 +387,7 @@ class KpiOneClient(
         fun defaultHttpClient(session: KpiSessionStore): OkHttpClient =
             OkHttpClient.Builder()
                 .connectTimeout(15, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(90, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
                 // HTTP/2 + Connection pooling: reusa conexiones TLS,
                 // evita handshake en cada request (KPI One en Railway soporta h2).
@@ -396,9 +396,14 @@ class KpiOneClient(
                 .addInterceptor { chain ->
                     val cookie = session.cookie()
                     val request = if (cookie.isNullOrBlank()) {
-                        chain.request()
+                        chain.request().newBuilder()
+                            .header("Accept-Encoding", "gzip")
+                            .build()
                     } else {
-                        chain.request().newBuilder().header("Cookie", cookie).build()
+                        chain.request().newBuilder()
+                            .header("Cookie", cookie)
+                            .header("Accept-Encoding", "gzip")
+                            .build()
                     }
                     chain.proceed(request)
                 }

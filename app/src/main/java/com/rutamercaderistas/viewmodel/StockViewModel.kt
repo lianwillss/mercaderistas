@@ -569,8 +569,13 @@ class StockViewModel @Inject constructor(
         // Sólo hay "100 %" si KPI One respondió de verdad. Si se cayó al
         // snapshot por red/error, se oculta la barra y manda el aviso.
         val actualizado = enVivo != null && enVivo.source == StockSource.LIVE
-        ultimaConsulta = filtros
-        filtrosMostrados = filtros
+        // Sólo actualizar ultimaConsulta y filtrosMostrados cuando la búsqueda
+        // en vivo tuvo éxito. Si falló y caímos a snapshot/previo, NO marcamos
+        // la consulta como resuelta para permitir reintentar al cambiar de ruta.
+        if (actualizado) {
+            ultimaConsulta = filtros
+            filtrosMostrados = filtros
+        }
         ultimaCargaEn = System.currentTimeMillis()
         _state.update {
             it.copy(
