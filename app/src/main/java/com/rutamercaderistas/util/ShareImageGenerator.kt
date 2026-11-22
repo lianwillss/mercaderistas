@@ -9,6 +9,7 @@ import android.graphics.Rect
 import android.graphics.Typeface
 import com.google.zxing.BarcodeFormat
 import com.journeyapps.barcodescanner.BarcodeEncoder
+import com.rutamercaderistas.data.local.EanProductEntity
 import java.io.File
 
 // Compilado una vez: se usa al partir los textos de cada tarjeta.
@@ -21,6 +22,48 @@ object ShareImageGenerator {
         productName: String,
         ean: String,
     ): File {
+        val bitmap = renderEanCard(productName, ean)
+        val dir = File(context.cacheDir, "share_images").also { it.mkdirs() }
+        val file = File(dir, "ean_${System.currentTimeMillis()}.png")
+        file.outputStream().use { out ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+        }
+        bitmap.recycle()
+        return file
+    }
+
+    /**
+     * Una tarjeta por producto, en el mismo orden de entrada. Limpia los
+     * `ean_*.png` previos y nombra con sello + índice para que no se pisen
+     * entre sí. Los productos que no se pueden dibujar se omiten.
+     */
+    fun generateForEanProducts(
+        context: Context,
+        products: List<EanProductEntity>,
+    ): List<File> {
+        val dir = File(context.cacheDir, "share_images").also { it.mkdirs() }
+        dir.listFiles { file -> file.name.startsWith("ean_") && file.name.endsWith(".png") }
+            ?.forEach { it.delete() }
+        val sello = System.currentTimeMillis()
+        val archivos = ArrayList<File>(products.size)
+        products.forEachIndexed { indice, product ->
+            val bitmap = runCatching {
+                renderEanCard(product.descripcionProducto, product.eanPrincipal)
+            }.getOrNull() ?: return@forEachIndexed
+            val file = File(dir, "ean_${sello}_${indice}.png")
+            val guardado = runCatching {
+                file.outputStream().use { out ->
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                }
+            }.isSuccess
+            bitmap.recycle()
+            if (guardado) archivos.add(file)
+        }
+        return archivos
+    }
+
+    /** Dibuja la tarjeta del producto; el bitmap vuelve sin reciclar para quien lo guarda. */
+    private fun renderEanCard(productName: String, ean: String): Bitmap {
         val width = 1080
         val height = 900
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
@@ -58,14 +101,8 @@ object ShareImageGenerator {
         paint.textSize = 38f
         canvas.drawText(digits, width / 2f, barcodeTop + 360f, paint)
 
-        val dir = File(context.cacheDir, "share_images").also { it.mkdirs() }
-        val file = File(dir, "ean_${System.currentTimeMillis()}.png")
-        file.outputStream().use { out ->
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-        }
         barcode.recycle()
-        bitmap.recycle()
-        return file
+        return bitmap
     }
 
     private fun wrapText(text: String, paint: Paint, maxWidth: Int): List<String> {

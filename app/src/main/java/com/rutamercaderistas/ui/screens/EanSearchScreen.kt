@@ -1,6 +1,7 @@
 package com.rutamercaderistas.ui.screens
 
 import android.app.Activity
+import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
 import android.widget.Toast
@@ -61,6 +62,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -106,8 +108,12 @@ import com.rutamercaderistas.util.ShareImageGenerator
 import com.rutamercaderistas.util.buildEanListShareText
 import com.rutamercaderistas.viewmodel.EanSearchUiState
 import com.rutamercaderistas.viewmodel.EanSearchViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun EanSearchScreen(
@@ -342,6 +348,8 @@ private fun EanSearchContent(
     // (no mutar el set interno) disponga recomposición.
     var selectionMode by remember { mutableStateOf(false) }
     var selectedEans by remember { mutableStateOf(emptySet<String>()) }
+    var compartiendo by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     val selectPress = rememberPressInteractionSource()
 
     Column(
@@ -534,42 +542,95 @@ private fun EanSearchContent(
                                     selectedEans.size,
                                 ),
                                 onClick = {
-                                    val selectedProducts = selectedEans
-                                        .mapNotNull { ean ->
-                                            rows.filterIsInstance<EanResultRow.Product>()
-                                                .firstOrNull { it.product.eanPrincipal == ean }
-                                                ?.product
+                                    scope.launch {
+                                        compartiendo = true
+                                        try {
+                                            val productosVisibles = rows
+                                                .filterIsInstance<EanResultRow.Product>()
+                                                .map { it.product }
+                                            val productos = selectedEans.mapNotNull { ean ->
+                                                productosVisibles.firstOrNull { it.eanPrincipal == ean }
+                                            }
+                                            val faltantes = selectedEans.count { ean ->
+                                                productosVisibles.none { it.eanPrincipal == ean }
+                                            }
+                                            val archivos = runCatching {
+                                                withContext(Dispatchers.IO) {
+                                                    ShareImageGenerator.generateForEanProducts(
+                                                        context = context,
+                                                        products = productos,
+                                                    )
+                                                }
+                                            }.getOrNull()
+                                            if (archivos.isNullOrEmpty()) {
+                                                Toast.makeText(
+                                                    context,
+                                                    R.string.ean_share_error,
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                                return@launch
+                                            }
+                                            if (faltantes > 0) {
+                                                Toast.makeText(
+                                                    context,
+                                                    context.resources.getQuantityString(
+                                                        R.plurals.ean_share_faltantes,
+                                                        faltantes,
+                                                        faltantes,
+                                                    ),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                            }
+                                            val uris = archivos.map { archivo ->
+                                                FileProvider.getUriForFile(
+                                                    context,
+                                                    "${context.packageName}.fileprovider",
+                                                    archivo,
+                                                )
+                                            }
+                                            val intent = if (uris.size == 1) {
+                                                Intent(Intent.ACTION_SEND).apply {
+                                                    type = "image/png"
+                                                    putExtra(Intent.EXTRA_STREAM, uris.first())
+                                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                }
+                                            } else {
+                                                Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                                                    type = "image/png"
+                                                    putParcelableArrayListExtra(
+                                                        Intent.EXTRA_STREAM,
+                                                        ArrayList(uris),
+                                                    )
+                                                    clipData = ClipData.newUri(
+                                                        context.contentResolver,
+                                                        "ean",
+                                                        uris.first(),
+                                                    ).apply {
+                                                        uris.drop(1).forEach { addItem(ClipData.Item(it)) }
+                                                    }
+                                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                }
+                                            }
+                                            context.startActivity(
+                                                Intent.createChooser(
+                                                    intent,
+                                                    context.getString(R.string.compartir),
+                                                ),
+                                            )
+                                        } catch (e: CancellationException) {
+                                            throw e
+                                        } catch (_: Exception) {
+                                            Toast.makeText(
+                                                context,
+                                                R.string.ean_share_error,
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                        } finally {
+                                            compartiendo = false
                                         }
-                                    val q = state.query.trim()
-                                    val title = if (q.isBlank()) {
-                                        context.getString(
-                                            R.string.ean_share_catalog_title,
-                                            selectedProducts.size,
-                                        )
-                                    } else {
-                                        context.getString(
-                                            R.string.ean_share_list_title,
-                                            q,
-                                            selectedProducts.size,
-                                        )
                                     }
-                                    val text = buildEanListShareText(
-                                        title = title,
-                                        products = selectedProducts,
-                                    ) { n ->
-                                        context.getString(R.string.ean_share_more, n)
-                                    }
-                                    val intent = Intent(Intent.ACTION_SEND).apply {
-                                        type = "text/plain"
-                                        putExtra(Intent.EXTRA_TEXT, text)
-                                    }
-                                    context.startActivity(
-                                        Intent.createChooser(
-                                            intent,
-                                            context.getString(R.string.compartir),
-                                        ),
-                                    )
                                 },
+                                enabled = !compartiendo,
                             )
                             AppButton(
                                 text = stringResource(
@@ -594,6 +655,23 @@ private fun EanSearchContent(
                                     ).show()
                                 },
                             )
+                        }
+                        if (compartiendo) {
+                            Column(
+                                modifier = Modifier.align(Alignment.Center),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(22.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                                Spacer(modifier = Modifier.height(dimens.spacingXs))
+                                Text(
+                                    text = stringResource(R.string.ean_share_loading),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     }
                 }
