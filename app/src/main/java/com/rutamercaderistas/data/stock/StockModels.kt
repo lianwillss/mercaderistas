@@ -30,7 +30,7 @@ data class StockFilters(
     val estado: EstadoTipo? = null,
     /** Filtra por tramo de cobertura de venta; null = todos. */
     val cobertura: CoberturaTipo? = null,
-    val orden: StockSort = StockSort.PRODUCTO_AZ,
+    val orden: StockSort = StockSort.PRIORIDAD,
     val modo: StockMode = StockMode.POR_LOCAL,
 )
 
@@ -265,6 +265,36 @@ fun StockFilters.conLocal(valor: String): StockFilters {
 
 fun StockFilters.conMarca(valor: String): StockFilters = copy(marca = valor)
 
+/**
+ * Cantidad de filtros activos, para el badge del botón Filtros. Es un
+ * derivado: no cambia la semántica de ninguno de los campos.
+ */
+val StockFilters.activos: Int
+    get() = listOf(
+        local.isNotBlank(),
+        ruta.isNotBlank(),
+        marca.isNotBlank(),
+        sku.isNotBlank(),
+        estado != null,
+        cobertura != null,
+        validacion != null,
+        soloQuiebre,
+        soloNegativos,
+    ).count { it }
+
+/** Limpia alcance, marca, producto y estado, conservando orden y modo. */
+fun StockFilters.limpiar(): StockFilters = copy(
+    local = "",
+    ruta = "",
+    marca = "",
+    sku = "",
+    estado = null,
+    cobertura = null,
+    validacion = null,
+    soloQuiebre = false,
+    soloNegativos = false,
+)
+
 fun StockFilters.conRuta(valor: String): StockFilters {
     val buscar = valor.trim().isNotEmpty()
     val teniaEstado = estado != null || cobertura != null || validacion != null ||
@@ -294,6 +324,8 @@ val StockFilters.hayCriterio: Boolean
         sku.trim().length >= 2
 
 enum class StockSort(val label: String) {
+    /** Negativos, luego quiebres, luego disponibles; dentro de cada grupo, A-Z. */
+    PRIORIDAD("Prioridad"),
     GRAVEDAD("Gravedad"),
     MENOR_COBERTURA("Menor cobertura"),
     PRODUCTO_AZ("Producto A-Z"),

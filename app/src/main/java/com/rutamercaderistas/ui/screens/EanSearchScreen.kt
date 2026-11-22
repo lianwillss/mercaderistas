@@ -5,8 +5,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
@@ -89,7 +87,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.google.zxing.integration.android.IntentIntegrator
 import com.rutamercaderistas.R
 import com.rutamercaderistas.data.local.BrandCountResult
 import com.rutamercaderistas.data.local.CajaCountResult
@@ -98,6 +95,7 @@ import com.rutamercaderistas.ui.components.AppButton
 import com.rutamercaderistas.ui.components.AppButtonVariant
 import com.rutamercaderistas.ui.components.AppFilterChip
 import com.rutamercaderistas.ui.components.IosModal
+import com.rutamercaderistas.ui.components.rememberBarcodeScannerLauncher
 import com.rutamercaderistas.ui.theme.LocalAppDimens
 import com.rutamercaderistas.ui.theme.LocalReducedMotionEnabled
 import com.rutamercaderistas.ui.theme.MotionSprings
@@ -130,32 +128,7 @@ fun EanSearchScreen(
     var showFlejes by remember { mutableStateOf(false) }
     var showAyudaEan by remember { mutableStateOf(false) }
 
-    val scannerLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult(),
-    ) { result ->
-        val intentResult = IntentIntegrator.parseActivityResult(
-            result.resultCode, result.data,
-        )
-        if (intentResult != null && !intentResult.contents.isNullOrBlank()) {
-            viewModel.onBarcodeScanned(intentResult.contents)
-        }
-    }
-
-    val launchScanner = {
-        Toast.makeText(
-            context,
-            R.string.ean_scanning_cd,
-            Toast.LENGTH_SHORT,
-        ).show()
-        val activity = context as? Activity
-        if (activity != null) {
-            val integrator = IntentIntegrator(activity)
-                .setOrientationLocked(false)
-                .setPrompt(activity.getString(R.string.ean_scanning_cd))
-                .setBeepEnabled(true)
-            scannerLauncher.launch(integrator.createScanIntent())
-        }
-    }
+    val launchScanner = rememberBarcodeScannerLauncher { viewModel.onBarcodeScanned(it) }
 
     Box(
         modifier = Modifier

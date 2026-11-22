@@ -168,7 +168,6 @@ class RemoteStockRepository @Inject constructor(
             var offset = 0
             var paginas = 0
             var cortadaPorTope = false
-            var primeraPaginaEmitida = false
             while (true) {
                 // collectLatest del ViewModel cancela la búsqueda anterior al
                 // cambiar de filtro; sin esto la paginación seguiría bajando
@@ -189,14 +188,12 @@ class RemoteStockRepository @Inject constructor(
                 total = maxOf(total, pagina.total)
                 items += pagina.items
                 paginas++
-                
-                // Early return: tras la primera página, emitimos progreso inmediato
-                // para que la UI pinte resultados mientras seguimos paginando en background.
-                if (!primeraPaginaEmitida) {
-                    primeraPaginaEmitida = true
-                    if (total > 0) onProgress(items.size.coerceAtMost(total), total)
-                }
-                
+
+                // Progreso en CADA página: antes sólo se emitía la primera y la
+                // última, así que una ruta de varias páginas dejaba el texto de
+                // "Conectando con KPI One…" congelado hasta el final.
+                if (total > 0) onProgress(items.size.coerceAtMost(total), total)
+
                 if (pagina.items.isEmpty()) break
                 // Se avanza por filas recibidas y no por el límite pedido:
                 // KPI One recorta "limit" a 500, así el offset sigue alineado.
@@ -227,9 +224,6 @@ class RemoteStockRepository @Inject constructor(
             // Cada búsqueda en vivo exitosa enseña marcas por ruta para el
             // catálogo remoto, que no trae ese desglose de la API.
             aprenderDe(items, entradas)
-            // Emitimos el progreso final solo si hubo más de una página
-            // (evita duplicado cuando todo entra en una sola request).
-            if (total > 0 && paginas > 1) onProgress(items.size.coerceAtMost(total), total)
 
             construirResultado(
                 items = items,

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.work.WorkInfo
+import com.rutamercaderistas.data.local.EanCodigo
 import com.rutamercaderistas.data.local.EanProductDao
 import com.rutamercaderistas.data.local.EanSkuLookup
 import com.rutamercaderistas.data.stock.CachedStock
@@ -87,6 +88,10 @@ data class StockUiState(
     val osaEnCurso: Boolean = false,
     /** Aviso cuando se cayó al snapshot por falta de red o error. */
     val aviso: String? = null,
+    /** EAN válido escrito o escaneado que no está en el catálogo EAN. */
+    val eanNoEncontrado: String? = null,
+    /** Pull-to-refresh en curso (no es lo mismo que una búsqueda con caché). */
+    val pullRefresh: Boolean = false,
 )
 
 @OptIn(FlowPreview::class)
@@ -491,6 +496,8 @@ class StockViewModel @Inject constructor(
                     truncado = false,
                     osaEnCurso = false,
                     aviso = null,
+                    eanNoEncontrado = null,
+                    pullRefresh = false,
                 )
             }
             return
@@ -502,6 +509,11 @@ class StockViewModel @Inject constructor(
             if (filtros == ultimaConsulta && _state.value.result.items.isNotEmpty()) return
         }
         consultaEnCurso = filtros
+        // Un EAN escrito o escaneado se resuelve a SKU con el catálogo EAN:
+        // el repositorio busca por SKU/nombre, no por código de barras. El
+        // filtro sigue mostrando el texto que escribió el usuario.
+        val consulta = resolverEan(filtros)
+        _state.update { it.copy(eanNoEncontrado = consulta.eanNoEncontrado) }
         try {
         // Fase 1: pintar ya. Si la base es la misma, se conserva la lista; si
         // es nueva, se intenta el snapshot local antes de tocar la red.
@@ -516,7 +528,7 @@ class StockViewModel @Inject constructor(
         var local: StockResult? = null
         if (!conservar) {
             local = try {
-                withContext(Dispatchers.Default) { repo.searchLocal(filtros) }
+                withContext(Dispatchers.Default) { repo.searchLocal(consulta.filtros) }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -548,13 +560,15 @@ class StockViewModel @Inject constructor(
         // en 25 % mientras KPI One tarda en responder la primera página.
         _state.update {
             it.copy(
-                progresoCarga = 0.30f,
+                // Antes de la primera página: 5 % ("Conectando con KPI One…").
+                // Desde la primera página el callback ya pasa de ahí.
+                progresoCarga = 0.05f,
                 progresoCompleto = false,
             )
         }
         val enVivo = try {
             withContext(Dispatchers.Default) {
-                repo.searchLive(filtros, force) { cargados, total ->
+                repo.searchLive(consulta.filtros, force) { cargados, total ->
                     if (generacion == generacionConsulta && total > 0) {
                         val fraccion = (cargados.toFloat() / total).coerceIn(0f, 1f)
                         _state.update {
@@ -651,7 +665,7 @@ class StockViewModel @Inject constructor(
             resultado.conteoNegativos > 0 &&
             !resultado.osaConsultada
         ) {
-            iniciarCruceOsa(generacion, filtros)
+            iniciarCruceOsa(generacion, filtros, consulta.filtros)
         }
         if (actualizado) ocultarProgreso(generacion)
         // El catálogo remoto "aprende" marcas por ruta con cada búsqueda en
@@ -676,13 +690,17 @@ class StockViewModel @Inject constructor(
      * que los conteos y los chips "Verificar / Confirmados / Sin OSA" queden
      * consistentes.
      */
-    private fun iniciarCruceOsa(generacion: Int, filtros: StockFilters) {
+    private fun iniciarCruceOsa(
+        generacion: Int,
+        filtros: StockFilters,
+        filtrosRepo: StockFilters,
+    ) {
         if (_state.value.osaEnCurso) return
         _state.update { it.copy(osaEnCurso = true) }
         viewModelScope.launch {
             val enriquecido = try {
                 withContext(Dispatchers.IO) {
-                    repo.completarOsa(filtros, _state.value.result)
+                    repo.completarOsa(filtrosRepo, _state.value.result)
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -719,6 +737,36 @@ class StockViewModel @Inject constructor(
         }
     }
 
+    /** Consulta con el EAN ya resuelto a SKU, lista para el repositorio. */
+    private data class ConsultaResuelta(
+        val filtros: StockFilters,
+        val eanNoEncontrado: String? = null,
+    )
+
+    /**
+     * Resuelve un EAN válido a su SKU del catálogo EAN.
+     *
+     * Solo consulta el catálogo cuando el texto es un EAN con dígito
+     * verificador correcto: si no, se busca tal cual (SKU o nombre). Un EAN
+     * que no está catalogado se deja como vino y se avisa en
+     * [StockUiState.eanNoEncontrado].
+     */
+    private suspend fun resolverEan(filtros: StockFilters): ConsultaResuelta {
+        val crudo = filtros.sku.trim()
+        val ean = EanCodigo.valido(crudo) ?: return ConsultaResuelta(filtros)
+        val sku = withContext(Dispatchers.IO) {
+            // El catálogo se importa si hizo falta; Stock no depende de haber
+            // abierto Cód. EAN.
+            runCatching { eanSyncer.ensure() }
+            runCatching { eanDao.skuPorEan(ean) }.getOrNull()
+        }
+        return if (sku.isNullOrBlank()) {
+            ConsultaResuelta(filtros, ean)
+        } else {
+            ConsultaResuelta(filtros.copy(sku = sku))
+        }
+    }
+
     /**
      * ¿La nueva búsqueda usa la misma base visible? El orden y el modo no
      * cambian las filas; el estado sí, así que se muestra el skeleton mientras
@@ -738,6 +786,26 @@ class StockViewModel @Inject constructor(
 
     fun onFilter(cambio: (StockFilters) -> StockFilters) {
         _filters.update(cambio)
+    }
+
+    /**
+     * Escaneo desde la barra de búsqueda: el código se normaliza (UPC-A →
+     * EAN-13) y se usa como producto. Se limpian los filtros de estado para no
+     * producto escaneado (viene de la misma decisión del módulo Cód. EAN, que
+     * al escanear quita los chips de marca/caja).
+     */
+    fun onBarcodeScanned(barcode: String) {
+        val ean = EanCodigo.normalizar(barcode) ?: barcode.trim()
+        onFilter {
+            it.copy(
+                sku = ean,
+                estado = null,
+                cobertura = null,
+                validacion = null,
+                soloQuiebre = false,
+                soloNegativos = false,
+            )
+        }
     }
 
     /**
@@ -768,6 +836,23 @@ class StockViewModel @Inject constructor(
 
     fun reintentar() {
         viewModelScope.launch { cargar(_filters.value, force = true) }
+    }
+
+    /**
+     * Pull-to-refresh: reconsulta el alcance actual sin pasar por la caché
+     * corta. La pantalla lo distingue de una búsqueda normal para no dejar
+     * el spinner delatado mientras se muestra la caché.
+     */
+    fun refrescar() {
+        if (_state.value.pullRefresh) return
+        _state.update { it.copy(pullRefresh = true) }
+        viewModelScope.launch {
+            try {
+                cargar(_filters.value, force = true)
+            } finally {
+                _state.update { it.copy(pullRefresh = false) }
+            }
+        }
     }
 
     /**

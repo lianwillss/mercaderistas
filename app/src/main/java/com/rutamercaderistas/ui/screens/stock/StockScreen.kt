@@ -35,14 +35,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.shadow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowDropDown
+import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Close
@@ -50,6 +53,7 @@ import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material.icons.outlined.WarningAmber
@@ -60,12 +64,16 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Badge
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -94,7 +102,9 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
@@ -142,6 +152,8 @@ import com.rutamercaderistas.data.stock.conLocal
 import com.rutamercaderistas.data.stock.conMarca
 import com.rutamercaderistas.data.stock.conRuta
 import com.rutamercaderistas.data.stock.estadoDe
+import com.rutamercaderistas.data.stock.limpiar
+import com.rutamercaderistas.data.stock.activos
 import com.rutamercaderistas.data.stock.marcaFueraDeRuta
 import com.rutamercaderistas.data.stock.marcaExcluida
 import com.rutamercaderistas.data.stock.marcasPara
@@ -178,16 +190,21 @@ import com.rutamercaderistas.ui.theme.DownloadNeonViolet
 import com.rutamercaderistas.ui.theme.DownloadNeonGlow
 import com.rutamercaderistas.ui.theme.DownloadNeonIconEdge
 import com.rutamercaderistas.ui.theme.LocalAppDimens
+import com.rutamercaderistas.ui.theme.MercaderistasTheme
 import com.rutamercaderistas.ui.theme.metricValueCompact
 import com.rutamercaderistas.ui.theme.metricValue
 import com.rutamercaderistas.ui.theme.metricLabel
 import com.rutamercaderistas.ui.theme.LocalReducedMotionEnabled
+import com.rutamercaderistas.ui.theme.pressScale
+import com.rutamercaderistas.ui.theme.rememberPressInteractionSource
+import com.rutamercaderistas.ui.components.rememberBarcodeScannerLauncher
 import com.rutamercaderistas.viewmodel.StockViewModel
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun StockScreen(
     onAbrirAjustes: () -> Unit = {},
@@ -203,13 +220,20 @@ fun StockScreen(
     val context = LocalContext.current
     val reducirMovimiento = LocalReducedMotionEnabled.current
     val scope = rememberCoroutineScope()
+    // Escáner del módulo Cód. EAN: al escanear, Stock filtra a ese producto.
+    val lanzarEscaner = rememberBarcodeScannerLauncher { vm.onBarcodeScanned(it) }
     var zoomItem by remember { mutableStateOf<StockItem?>(null) }
     // En tablets la columna no se estira: se centra a un ancho legible.
     val anchoPantalla = LocalConfiguration.current.screenWidthDp
     val margenAncho = (((anchoPantalla - 720).coerceAtLeast(0)) / 2).dp
 
-    val filas = remember(state.result.items, filters.modo) {
-        construirFilas(state.result.items, filters.modo)
+    val filas = remember(state.result.items, filters.modo, filters.ruta) {
+        construirFilas(
+            state.result.items,
+            filters.modo,
+            alcancesMultiples = filters.ruta.isNotBlank() ||
+                state.result.uniqueLocales > 1,
+        )
     }
     // El local solo aporta cuando la lista mezcla varios y no hay cabecera
     // de local que lo muestre (modo por marca).
@@ -218,7 +242,7 @@ fun StockScreen(
         val pct = (fraccion * 100f).roundToInt().coerceIn(0, 100)
         if (state.progresoCompleto || pct >= 100) {
             "Stock actualizado · 100%"
-        } else if (pct <= 30) {
+        } else if (pct <= 5) {
             // Fase inicial de conexión a KPI One: aún no hay % real.
             "Conectando con KPI One…"
         } else {
@@ -239,6 +263,14 @@ fun StockScreen(
             .filter { it.isNotBlank() && !marcaExcluida(it) }
             .distinct()
             .sorted()
+    }
+    // Marcas que ofrece el selector con la ruta actual; también alimenta la
+    // limpieza de una marca que dejó de existir en la ruta.
+    val marcasRuta = marcasParaSelector(state.catalog, filters.ruta, marcasVisibles)
+    LaunchedEffect(filters.ruta, marcasRuta) {
+        if (state.catalog.marcaFueraDeRuta(filters.ruta, filters.marca)) {
+            vm.onFilter { it.copy(marca = "") }
+        }
     }
 
     fun compartir(productos: List<StockItem>, tituloLocal: String? = null) {
@@ -423,11 +455,28 @@ fun StockScreen(
                 }
             },
         )
-        LazyColumn(
-            state = listState,
+        // Barra de búsqueda fija: no se mueve con el scroll de la lista.
+        StockSearchBar(
+            value = filters.sku,
+            onValueChange = { texto -> vm.onFilter { it.copy(sku = texto) } },
+            onScan = lanzarEscaner,
+            modifier = Modifier.padding(
+                start = dimens.spacingMd + margenAncho,
+                end = dimens.spacingMd + margenAncho,
+                top = dimens.spacingSm,
+                bottom = dimens.spacingSm,
+            ),
+        )
+        PullToRefreshBox(
+            isRefreshing = state.pullRefresh,
+            onRefresh = vm::refrescar,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
+        ) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxWidth(),
             contentPadding = PaddingValues(
                 start = dimens.spacingMd + margenAncho,
                 end = dimens.spacingMd + margenAncho,
@@ -437,17 +486,14 @@ fun StockScreen(
             verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
         ) {
             item(key = "filtros") {
-                StockFiltersCard(
+                StockScopeRow(
                     catalog = state.catalog,
                     filters = filters,
-                    onFilter = vm::onFilter,
                     historial = historial,
+                    marcasRuta = marcasRuta,
+                    onFilter = vm::onFilter,
                     onElegirLocal = vm::elegirLocal,
                     onElegirRuta = vm::elegirRuta,
-                    onElegirMarca = vm::elegirMarca,
-                    marcasVisibles = marcasVisibles,
-                    modo = filters.modo,
-                    onModo = { modo -> vm.onFilter { it.copy(modo = modo) } },
                 )
             }
             if (state.status != StockStatus.Idle && state.status != StockStatus.SinSesion) {
@@ -521,6 +567,7 @@ fun StockScreen(
                     BarraHerramientas(
                         filtros = filters,
                         onFilter = vm::onFilter,
+                        onLimpiar = { vm.onFilter { it.limpiar() } },
                         onCompartir = { compartir(state.result.items) },
                     )
                 }
@@ -579,6 +626,7 @@ fun StockScreen(
                             localElegido = localElegido,
                             osaEnCurso = state.osaEnCurso,
                             fechaDatos = state.fechaDatos,
+                            eanNoEncontrado = state.eanNoEncontrado,
                             onFilter = vm::onFilter,
                             onElegirLocal = vm::elegirLocal,
                             onElegirRuta = vm::elegirRuta,
@@ -588,34 +636,68 @@ fun StockScreen(
                         )
                     }
                 }
-                StockStatus.Ready -> items(filas, key = { it.key }) { fila ->
-                    val modificador = if (reducirMovimiento) Modifier else Modifier.animateItem()
-                    when (fila) {
-                        is FilaStock.Cabecera -> CabeceraSeccion(
-                            titulo = fila.titulo,
-                            detalle = fila.detalle,
-                            fecha = fila.fecha,
-                            modifier = modificador,
-                            onCompartir = fila.localCode?.let { codigo ->
-                                { compartir(fila.items, etiquetaLocal(codigo, fila.titulo)) }
-                            },
-                        )
-                        is FilaStock.Producto -> StockItemCard(
-                            item = fila.item,
-                            mostrarLocal = mostrarLocal,
-                            mostrarFecha = fila.mostrarFecha,
-                            mostrarSinOsa = state.result.osaConsultada,
-                            fraccion = if (maxStock > 0.0) {
-                                (fila.item.stockUnits / maxStock).toFloat().coerceIn(0f, 1f)
-                            } else {
-                                0f
-                            },
-                            onItemClick = { zoomItem = fila.item },
-                            modifier = modificador,
-                        )
+                StockStatus.Ready -> {
+                    filas.forEach { fila ->
+                        when (fila) {
+                            is FilaStock.Cabecera -> {
+                                if (fila.pegajosa) {
+                                    // Encabezado pegajoso: no usa animateItem.
+                                    stickyHeader(
+                                        key = fila.key,
+                                        contentType = { "cabecera" },
+                                    ) {
+                                        CabeceraSeccion(
+                                            titulo = fila.titulo,
+                                            detalle = fila.detalle,
+                                            fecha = fila.fecha,
+                                        )
+                                    }
+                                } else {
+                                    item(
+                                        key = fila.key,
+                                        contentType = { "cabecera" },
+                                    ) {
+                                        val modificador = if (reducirMovimiento) {
+                                            Modifier
+                                        } else {
+                                            Modifier.animateItem()
+                                        }
+                                        CabeceraSeccion(
+                                            titulo = fila.titulo,
+                                            detalle = fila.detalle,
+                                            fecha = fila.fecha,
+                                            modifier = modificador,
+                                        )
+                                    }
+                                }
+                            }
+                            is FilaStock.Producto -> item(
+                                key = fila.key,
+                                contentType = { "producto" },
+                            ) {
+                                val modificador = if (reducirMovimiento) {
+                                    Modifier
+                                } else {
+                                    Modifier.animateItem()
+                                }
+                                StockItemCard(
+                                    item = fila.item,
+                                    mostrarLocal = mostrarLocal,
+                                    mostrarSinOsa = state.result.osaConsultada,
+                                    fraccion = if (maxStock > 0.0) {
+                                        (fila.item.stockUnits / maxStock).toFloat().coerceIn(0f, 1f)
+                                    } else {
+                                        0f
+                                    },
+                                    onItemClick = { zoomItem = fila.item },
+                                    modifier = modificador,
+                                )
+                            }
+                        }
                     }
                 }
             }
+        }
         }
 
         zoomItem?.let { item ->
@@ -631,7 +713,7 @@ fun StockScreen(
 
 // ── Filas agrupadas ────────────────────────────────────────────────
 
-private sealed interface FilaStock {
+internal sealed interface FilaStock {
     val key: String
 
     data class Cabecera(
@@ -641,16 +723,26 @@ private sealed interface FilaStock {
         val fecha: String?,
         val localCode: String? = null,
         val items: List<StockItem> = emptyList(),
+        /** Encabezado pegajoso: se usa cuando el alcance abarca varios locales. */
+        val pegajosa: Boolean = false,
     ) : FilaStock
 
     data class Producto(
         val item: StockItem,
         override val key: String,
-        val mostrarFecha: Boolean,
     ) : FilaStock
 }
 
-private fun construirFilas(items: List<StockItem>, modo: StockMode): List<FilaStock> {
+/**
+ * Arma las filas de la lista. Con [alcancesMultiples] (ruta o varios locales)
+ * el encabezado de local es pegajoso y muestra código · nombre y el conteo de
+ * negativos y quiebres del local.
+ */
+internal fun construirFilas(
+    items: List<StockItem>,
+    modo: StockMode,
+    alcancesMultiples: Boolean = false,
+): List<FilaStock> {
     // Red de seguridad: si dos filas compartieran clave, LazyColumn crashea.
     val vistos = HashMap<String, Int>()
     fun claveUnica(base: String): String {
@@ -658,7 +750,6 @@ private fun construirFilas(items: List<StockItem>, modo: StockMode): List<FilaSt
         vistos[base] = veces
         return if (veces == 1) base else base + "#" + veces
     }
-    var ultimaFecha: String? = null
     var ultimaFechaGrupo: String? = null
     // La fecha del grupo se repite solo cuando cambia: si los 12 locales
     // comparten el mismo snapshot, se muestra una vez.
@@ -668,27 +759,37 @@ private fun construirFilas(items: List<StockItem>, modo: StockMode): List<FilaSt
         ultimaFechaGrupo = iso
         return fechaTexto(iso)
     }
-    fun producto(item: StockItem): FilaStock.Producto {
-        val mostrar = item.snapshotDate != ultimaFecha
-        if (mostrar) ultimaFecha = item.snapshotDate
-        return FilaStock.Producto(
-            item = item,
-            key = claveUnica("p:" + item.storeCode + "|" + item.sku),
-            mostrarFecha = mostrar,
-        )
-    }
+    fun conteos(lista: List<StockItem>): Pair<Int, Int> =
+        lista.count { it.stockUnits < 0.0 } to
+            lista.count { estadoDe(it) == EstadoTipo.Quiebre }
+    fun producto(item: StockItem): FilaStock.Producto = FilaStock.Producto(
+        item = item,
+        key = claveUnica("p:" + item.storeCode + "|" + item.sku),
+    )
     return when (modo) {
     StockMode.POR_LOCAL -> items
         .groupBy { it.storeCode to it.storeName }
         .flatMap { (clave, lista) ->
+            val pegajosa = alcancesMultiples
+            val (negativos, quiebres) = conteos(lista)
             listOf(
                 FilaStock.Cabecera(
                     key = "h:" + clave.first,
-                    titulo = clave.second,
-                    detalle = lista.size.toString() + " productos",
+                    titulo = if (pegajosa) {
+                        etiquetaLocal(clave.first, clave.second)
+                    } else {
+                        clave.second
+                    },
+                    detalle = if (pegajosa) {
+                        plural(negativos, "negativo", "negativos") + " · " +
+                            plural(quiebres, "quiebre", "quiebres")
+                    } else {
+                        lista.size.toString() + " productos"
+                    },
                     fecha = fechaGrupo(lista),
                     localCode = clave.first,
                     items = lista,
+                    pegajosa = pegajosa,
                 ),
             ) + lista.map { producto(it) }
         }
@@ -707,49 +808,161 @@ private fun construirFilas(items: List<StockItem>, modo: StockMode): List<FilaSt
     }
 }
 
-// ── Filtros ────────────────────────────────────────────────────────
+// ── Buscador ───────────────────────────────────────────────────────
 
+/**
+ * Barra de búsqueda del encabezado: acepta producto, SKU o EAN (escrito o
+ * escaneado). Queda fija bajo el banner, fuera del scroll de la lista.
+ */
 @Composable
-private fun StockFiltersCard(
-    catalog: StockCatalog,
-    filters: StockFilters,
-    onFilter: ((StockFilters) -> StockFilters) -> Unit,
-    historial: StockBusquedas,
-    onElegirLocal: (String) -> Unit,
-    onElegirRuta: (String) -> Unit,
-    onElegirMarca: (String) -> Unit,
-    marcasVisibles: List<String> = emptyList(),
-    modo: StockMode,
-    onModo: (StockMode) -> Unit,
+private fun StockSearchBar(
+    modifier: Modifier = Modifier,
+    value: String,
+    onValueChange: (String) -> Unit,
+    onScan: () -> Unit,
 ) {
     val dimens = LocalAppDimens.current
-    val hayFiltros = filters.local.isNotBlank() ||
-        filters.ruta.isNotBlank() ||
-        filters.marca.isNotBlank() ||
-        filters.sku.isNotBlank() ||
-        filters.cobertura != null ||
-        filters.estado != null ||
-        filters.validacion != null ||
-        filters.soloQuiebre ||
-        filters.soloNegativos
+    val scanCd = stringResource(R.string.escanear_codigo_barras)
+    val buscarCd = stringResource(R.string.buscar_cd)
+    val limpiarCd = stringResource(R.string.limpiar_cd)
+    val placeholder = stringResource(R.string.stock_buscar_placeholder)
 
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        ),
-        modifier = Modifier.fillMaxWidth(),
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
     ) {
-        Column(
-            modifier = Modifier.padding(dimens.spacingMd),
-            verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            placeholder = { Text(placeholder) },
+            leadingIcon = {
+                Icon(Icons.Outlined.Search, contentDescription = buscarCd)
+            },
+            trailingIcon = {
+                if (value.isNotEmpty()) {
+                    IconButton(
+                        onClick = { onValueChange("") },
+                        modifier = Modifier.semantics { contentDescription = limpiarCd },
+                    ) {
+                        Icon(Icons.Outlined.Close, contentDescription = null)
+                    }
+                }
+            },
+            singleLine = true,
+            modifier = Modifier.weight(1f),
+        )
+        // Botón de escaneo: mismo estilo que el de Cód. EAN.
+        val press = rememberPressInteractionSource()
+        Box(
+            modifier = Modifier
+                .size(dimens.touchMin)
+                .shadow(8.dp, CircleShape)
+                .clip(CircleShape)
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary,
+                            MaterialTheme.colorScheme.tertiary,
+                        ),
+                    ),
+                )
+                .pressScale(press)
+                .clickable(
+                    interactionSource = press,
+                    indication = LocalIndication.current,
+                    onClick = onScan,
+                    role = Role.Button,
+                )
+                .semantics { contentDescription = scanCd },
+            contentAlignment = Alignment.Center,
         ) {
-            // El campo muestra lo que realmente se busca (código o texto); el
-            // nombre del local va debajo. Antes se mostraba la etiqueta pero se
-            // buscaba el código: editarla rompía la búsqueda en los locales
-            // cuyo nombre ya empieza con el código ("J503-JUMBO MAIPU").
-            val localElegido = catalog.locales.firstOrNull { it.code == filters.local }
+            Icon(
+                painter = painterResource(R.drawable.ic_barcode),
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(24.dp),
+            )
+        }
+    }
+}
 
-            // Fila 1: Local (ancho completo)
+// ── Filtros ────────────────────────────────────────────────────────
+
+/**
+ * Segmento Local | Ruta. Mientras el usuario no tocó el control, manda el
+ * alcance activo; si lo tocó, manda su elección. Así se puede saltar de un
+ * alcance al otro sin tener que limpiar el filtro anterior.
+ */
+internal fun segmentoAlcance(filtros: StockFilters, ultimo: Boolean?): Boolean =
+    ultimo ?: (filtros.ruta.isNotBlank() && filtros.local.isBlank())
+
+@Composable
+private fun StockScopeRow(
+    catalog: StockCatalog,
+    filters: StockFilters,
+    historial: StockBusquedas,
+    marcasRuta: List<String>,
+    onFilter: ((StockFilters) -> StockFilters) -> Unit,
+    onElegirLocal: (String) -> Unit,
+    onElegirRuta: (String) -> Unit,
+) {
+    val dimens = LocalAppDimens.current
+    // El segmentado tiene estado propio: si el usuario lo tocó, su elección manda
+    // y se puede saltar de Local a Ruta sin limpiar el filtro anterior. Sólo
+    // cuando no lo tocó (pantalla recién abierta o pref restaurado) manda el
+    // alcance activo.
+    var ultimoSegmento by rememberSaveable { mutableStateOf<Boolean?>(null) }
+    val enRuta = segmentoAlcance(filters, ultimoSegmento)
+    var sheetAbierto by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+        ) {
+            SegmentoAlcance(
+                enRuta = enRuta,
+                onElegir = { ruta -> ultimoSegmento = ruta },
+                modifier = Modifier.weight(1f),
+            )
+            StockFiltrosBoton(
+                activos = filters.activos,
+                onClick = { sheetAbierto = true },
+            )
+        }
+
+        if (enRuta) {
+            val localesPorRuta = remember(catalog.locales) {
+                catalog.locales.flatMap { it.rutas }.groupingBy { it }.eachCount()
+            }
+            StockCombo(
+                label = "Ruta",
+                texto = filters.ruta,
+                placeholder = "EMU-3",
+                opciones = catalog.rutas
+                    .sortedByDescending { localesPorRuta[it] ?: 0 }
+                    .map { ruta ->
+                        StockSugerencia(
+                            valor = ruta,
+                            etiqueta = ruta + " · " + (localesPorRuta[ruta] ?: 0),
+                            claves = ruta + " " + normalizarRuta(ruta) + " " +
+                                ruta.replace("-", " "),
+                        )
+                    },
+                recientes = historial.rutas,
+                usos = usosPorTipo(historial, TipoBusquedaStock.RUTA),
+                onTexto = { texto -> onFilter { it.conRuta(texto) } },
+                onElegir = { opcion -> onElegirRuta(opcion.valor) },
+            )
+        } else {
+            // El campo muestra lo que realmente se busca (código o texto); el
+            // nombre del local va debajo.
+            val localElegido = catalog.locales.firstOrNull { it.code == filters.local }
             StockCombo(
                 label = "Local",
                 texto = filters.local,
@@ -761,154 +974,224 @@ private fun StockFiltersCard(
                 onTexto = { texto -> onFilter { it.conLocal(texto) } },
                 onElegir = { opcion -> onElegirLocal(opcion.valor) },
             )
+        }
+    }
 
-            // Fila 2: Ruta | Marca (horizontal, dos combos)
-            val localesPorRuta = remember(catalog.locales) {
-                catalog.locales.flatMap { it.rutas }.groupingBy { it }.eachCount()
-            }
-            // Las marcas del combo se limitan a las presentes en los
-            // locales de la ruta elegida.
-            val marcasRuta = marcasParaSelector(catalog, filters.ruta, marcasVisibles)
-            val hayRuta = filters.ruta.isNotBlank()
-            // Si la ruta cambia y la marca guardada ya no existe ahí, se
-            // limpia una sola vez. Nunca mientras el usuario escribe: el
-            // texto a medio escribir es la búsqueda en curso.
-            LaunchedEffect(filters.ruta, marcasRuta) {
-                if (catalog.marcaFueraDeRuta(filters.ruta, filters.marca)) {
-                    onFilter { it.copy(marca = "") }
-                }
-            }
-            val localesPorMarca = if (hayRuta) {
-                catalog.localesPorRutaMarca[normalizarRuta(filters.ruta)].orEmpty()
-            } else {
-                emptyMap()
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+    if (sheetAbierto) {
+        StockFiltrosSheet(
+            catalog = catalog,
+            filters = filters,
+            historial = historial,
+            marcasRuta = marcasRuta,
+            onAplicar = { marca, modo ->
+                onFilter { it.copy(marca = marca, modo = modo) }
+                sheetAbierto = false
+            },
+            onDismiss = { sheetAbierto = false },
+        )
+    }
+}
+
+/** Segmentado Local | Ruta: elige el alcance principal de la búsqueda. */
+@Composable
+private fun SegmentoAlcance(
+    enRuta: Boolean,
+    onElegir: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val localLabel = stringResource(R.string.stock_segmento_local)
+    val rutaLabel = stringResource(R.string.stock_segmento_ruta)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        listOf(false to localLabel, true to rutaLabel).forEach { (esRuta, etiqueta) ->
+            val activo = esRuta == enRuta
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = if (activo) {
+                    MaterialTheme.colorScheme.secondaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerLow
+                },
+                contentColor = if (activo) {
+                    MaterialTheme.colorScheme.onSecondaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                border = BorderStroke(
+                    1.dp,
+                    if (activo) {
+                        MaterialTheme.colorScheme.secondary
+                    } else {
+                        MaterialTheme.colorScheme.outlineVariant
+                    },
+                ),
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(10.dp))
+                    .selectable(
+                        selected = activo,
+                        role = Role.Tab,
+                        onClick = { if (!activo) onElegir(esRuta) },
+                    ),
             ) {
-                // Ruta - peso 0.5
-                Box(modifier = Modifier.weight(0.5f, fill = false)) {
-                    StockCombo(
-                        label = "Ruta",
-                        texto = filters.ruta,
-                        placeholder = "EMU-3",
-                        opciones = catalog.rutas
-                            .sortedByDescending { localesPorRuta[it] ?: 0 }
-                            .map { ruta ->
-                                StockSugerencia(
-                                    valor = ruta,
-                                    etiqueta = ruta + " · " + (localesPorRuta[ruta] ?: 0),
-                                    claves = ruta + " " + normalizarRuta(ruta) + " " +
-                                        ruta.replace("-", " "),
-                                )
-                            },
-                        recientes = historial.rutas,
-                        usos = usosPorTipo(historial, TipoBusquedaStock.RUTA),
-                        onTexto = { texto -> onFilter { it.conRuta(texto) } },
-                        onElegir = { opcion -> onElegirRuta(opcion.valor) },
-                    )
-                }
-                // Marca - peso 0.5
-                Box(modifier = Modifier.weight(0.5f, fill = false)) {
-                    StockCombo(
-                        label = "Marca",
-                        texto = filters.marca,
-                        placeholder = "Marca",
-                        opciones = marcasRuta.map { marca ->
-                            StockSugerencia(
-                                valor = marca,
-                                // El conteo de locales sólo tiene sentido con ruta.
-                                etiqueta = if (hayRuta) {
-                                    marca + " · " + (localesPorMarca[marca] ?: 0)
-                                } else {
-                                    marca
-                                },
-                                claves = marca,
-                            )
-                        },
-                        recientes = historial.marcas,
-                        usos = usosPorTipo(historial, TipoBusquedaStock.MARCA),
-                        onTexto = { texto -> onFilter { it.conMarca(texto) } },
-                        onElegir = { opcion -> onElegirMarca(opcion.valor) },
-                    )
-                }
-            }
-
-            // Fila 3: Producto / SKU (ancho completo)
-            OutlinedTextField(
-                value = filters.sku,
-                onValueChange = { texto -> onFilter { it.copy(sku = texto) } },
-                label = { Text("Producto / SKU") },
-                placeholder = { Text("Ej. Aceite o 2088850") },
-                leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            // Fila 4: Por Local | Por Marca | Limpiar (tres cápsulas alineadas)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Por Local - AppFilterChip
-                AppFilterChip(
-                    selected = modo == StockMode.POR_LOCAL,
-                    onClick = { onModo(StockMode.POR_LOCAL) },
-                    label = { Text("Por local") },
-                    leadingIcon = { Icon(Icons.Outlined.Storefront, contentDescription = null, Modifier.size(18.dp)) },
+                Text(
+                    text = etiqueta,
+                    style = MaterialTheme.typography.labelLarge,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
                 )
-                // Por Marca - AppFilterChip
-                AppFilterChip(
-                    selected = modo == StockMode.POR_MARCA,
-                    onClick = { onModo(StockMode.POR_MARCA) },
-                    label = { Text("Por marca") },
-                    leadingIcon = { Icon(Icons.Outlined.Inventory2, contentDescription = null, Modifier.size(18.dp)) },
-                )
-                // Limpiar - botón de degradado
-                if (hayFiltros) {
-                    val limpiarAction = { onFilter { it.copy(
-                        local = "",
-                        ruta = "",
-                        marca = "",
-                        sku = "",
-                        estado = null,
-                        cobertura = null,
-                        validacion = null,
-                        soloQuiebre = false,
-                        soloNegativos = false,
-                    ) } }
-                    AppButton(
-                        text = "Limpiar",
-                        onClick = limpiarAction,
-                        variant = AppButtonVariant.Gradient,
-                        modifier = Modifier
-                            .widthIn(min = 64.dp)
-                            .semantics { contentDescription = "Limpiar todos los filtros" },
-                    )
-                }
             }
         }
     }
 }
 
+/** Botón Filtros con la cuenta de filtros activos. */
 @Composable
-private fun ModoSelector(modo: StockMode, onModo: (StockMode) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+private fun StockFiltrosBoton(
+    activos: Int,
+    onClick: () -> Unit,
+) {
+    val filtrosLabel = stringResource(R.string.stock_filtros)
+    Box {
         AppFilterChip(
-            selected = modo == StockMode.POR_LOCAL,
-            onClick = { onModo(StockMode.POR_LOCAL) },
-            label = { Text("Por local") },
-            leadingIcon = { Icon(Icons.Outlined.Storefront, contentDescription = null, Modifier.size(18.dp)) },
+            selected = activos > 0,
+            onClick = onClick,
+            label = { Text(filtrosLabel) },
+            leadingIcon = {
+                Icon(
+                    Icons.Outlined.FilterList,
+                    contentDescription = null,
+                    Modifier.size(18.dp),
+                )
+            },
         )
-        AppFilterChip(
-            selected = modo == StockMode.POR_MARCA,
-            onClick = { onModo(StockMode.POR_MARCA) },
-            label = { Text("Por marca") },
-            leadingIcon = { Icon(Icons.Outlined.Inventory2, contentDescription = null, Modifier.size(18.dp)) },
-        )
+        if (activos > 0) {
+            Badge(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.align(Alignment.TopEnd),
+            ) {
+                Text(
+                    text = activos.toString(),
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Bottom sheet de Filtros: Marca y agrupación. Los cambios se aplican sólo
+ * con "Aplicar"; el "Limpiar" global vive en la fila de orden.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun StockFiltrosSheet(
+    catalog: StockCatalog,
+    filters: StockFilters,
+    historial: StockBusquedas,
+    marcasRuta: List<String>,
+    onAplicar: (marca: String, modo: StockMode) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val dimens = LocalAppDimens.current
+    var marca by rememberSaveable { mutableStateOf(filters.marca) }
+    var modoNombre by rememberSaveable { mutableStateOf(filters.modo.name) }
+    val modo = runCatching { StockMode.valueOf(modoNombre) }
+        .getOrDefault(StockMode.POR_LOCAL)
+    val hayRuta = filters.ruta.isNotBlank()
+    val localesPorMarca = if (hayRuta) {
+        catalog.localesPorRutaMarca[normalizarRuta(filters.ruta)].orEmpty()
+    } else {
+        emptyMap()
+    }
+
+    val filtrosLabel = stringResource(R.string.stock_filtros)
+    val agruparLabel = stringResource(R.string.stock_agrupar_por)
+    val porLocalLabel = stringResource(R.string.stock_por_local)
+    val porMarcaLabel = stringResource(R.string.stock_por_marca)
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = dimens.spacingLg)
+                .padding(bottom = dimens.spacingXxl),
+            verticalArrangement = Arrangement.spacedBy(dimens.spacingMd),
+        ) {
+            Text(
+                text = filtrosLabel,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.semantics { heading() },
+            )
+            StockCombo(
+                label = "Marca",
+                texto = marca,
+                placeholder = "Marca",
+                opciones = marcasRuta.map { nombre ->
+                    StockSugerencia(
+                        valor = nombre,
+                        // El conteo de locales sólo tiene sentido con ruta.
+                        etiqueta = if (hayRuta) {
+                            nombre + " · " + (localesPorMarca[nombre] ?: 0)
+                        } else {
+                            nombre
+                        },
+                        claves = nombre,
+                    )
+                },
+                recientes = historial.marcas,
+                usos = usosPorTipo(historial, TipoBusquedaStock.MARCA),
+                onTexto = { marca = it },
+                onElegir = { opcion -> marca = opcion.valor },
+            )
+            Text(
+                text = agruparLabel,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AppFilterChip(
+                    selected = modo == StockMode.POR_LOCAL,
+                    onClick = { modoNombre = StockMode.POR_LOCAL.name },
+                    label = { Text(porLocalLabel) },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Outlined.Storefront,
+                            contentDescription = null,
+                            Modifier.size(18.dp),
+                        )
+                    },
+                )
+                AppFilterChip(
+                    selected = modo == StockMode.POR_MARCA,
+                    onClick = { modoNombre = StockMode.POR_MARCA.name },
+                    label = { Text(porMarcaLabel) },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Outlined.Inventory2,
+                            contentDescription = null,
+                            Modifier.size(18.dp),
+                        )
+                    },
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Spacer(Modifier.weight(1f))
+                AppButton(
+                    text = "Aplicar",
+                    onClick = { onAplicar(marca, modo) },
+                )
+            }
+        }
     }
 }
 
@@ -1456,6 +1739,7 @@ private fun TarjetaEstado(
 private fun BarraHerramientas(
     filtros: StockFilters,
     onFilter: ((StockFilters) -> StockFilters) -> Unit,
+    onLimpiar: () -> Unit,
     onCompartir: () -> Unit,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1472,6 +1756,14 @@ private fun BarraHerramientas(
             compacto = true,
         )
         Spacer(Modifier.weight(1f))
+        // Limpiar sólo aparece cuando hay algo que limpiar.
+        if (filtros.activos > 0) {
+            AppButton(
+                text = "Limpiar",
+                onClick = onLimpiar,
+                variant = AppButtonVariant.Text,
+            )
+        }
         AppButton(
             text = "Compartir",
             onClick = onCompartir,
@@ -1487,7 +1779,6 @@ private fun BarraHerramientas(
 private fun StockItemCard(
     item: StockItem,
     mostrarLocal: Boolean,
-    mostrarFecha: Boolean,
     mostrarSinOsa: Boolean,
     fraccion: Float,
     onItemClick: () -> Unit = {},
@@ -1497,22 +1788,23 @@ private fun StockItemCard(
     val estado = estadoDe(item)
     val transito = item.transitUnits ?: 0.0
     val validacion = validacionNegativo(item)
-    val descripcion = buildString {
-        append(item.product)
-        append(", ").append(item.brand)
-        append(", SKU ").append(item.sku)
-        append(", ").append(item.stockLabel).append(" unidades")
-        append(", ").append(estado.texto.lowercase())
-        item.coberturaDias?.let { append(", cobertura ").append(it.toInt()).append(" días") }
-        when (validacion) {
-            ValidacionNegativo.CONTRADICE ->
-                append(", OSA dice que sí está en góndola: verificar el stock")
-            ValidacionNegativo.CONFIRMADO -> append(", OSA confirma que no está en góndola")
-            ValidacionNegativo.SIN_DATO -> if (mostrarSinOsa) append(", sin respuesta OSA")
+    val descripcion = remember(item, mostrarLocal, mostrarSinOsa) {
+        buildString {
+            append(item.product)
+            append(", ").append(item.brand)
+            append(", SKU ").append(item.sku)
+            append(", ").append(item.stockLabel).append(" unidades")
+            append(", ").append(estado.texto.lowercase())
+            item.coberturaDias?.let { append(", cobertura ").append(it.toInt()).append(" días") }
+            when (validacion) {
+                ValidacionNegativo.CONTRADICE ->
+                    append(", OSA dice que sí está en góndola: verificar el stock")
+                ValidacionNegativo.CONFIRMADO -> append(", OSA confirma que no está en góndola")
+                ValidacionNegativo.SIN_DATO -> if (mostrarSinOsa) append(", sin respuesta OSA")
+            }
+            if (mostrarLocal) append(", ").append(item.storeName)
+            if (transito > 0.0) append(", tránsito ").append(item.transitLabel)
         }
-        if (mostrarLocal) append(", ").append(item.storeName)
-        if (transito > 0.0) append(", tránsito ").append(item.transitLabel)
-        if (mostrarFecha) append(", ").append(fechaTexto(item.snapshotDate))
     }
 
     Card(
@@ -1556,20 +1848,26 @@ private fun StockItemCard(
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                BadgeEstado(estado)
-                if (item.coberturaDias != null) {
+                // El chip de estado solo aparece cuando hay algo que marcar.
+                if (estado != EstadoTipo.Disponible) {
+                    BadgeEstado(estado)
                     Spacer(Modifier.width(6.dp))
+                }
+                if (item.coberturaDias != null) {
                     BadgeCobertura(item)
+                    Spacer(Modifier.width(6.dp))
                 }
                 if (item.stockUnits < 0.0 && (item.osa != null || mostrarSinOsa)) {
-                    Spacer(Modifier.width(6.dp))
                     BadgeOsa(item, mostrarSinOsa)
+                    Spacer(Modifier.width(6.dp))
                 }
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = buildString {
                         append("SKU ").append(item.sku)
-                        if (transito > 0.0) append(" · tránsito ").append(item.transitLabel)
+                        if (transito > 0.0) {
+                            append(" · tránsito ").append(item.transitLabel)
+                        }
                     },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1577,11 +1875,12 @@ private fun StockItemCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (mostrarFecha) {
-                    Text(
-                        text = fechaTexto(item.snapshotDate),
-                        style = MaterialTheme.metricLabel,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                if (transito > 0.0) {
+                    Icon(
+                        imageVector = Icons.Outlined.LocalShipping,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp),
                     )
                 }
             }
@@ -1593,18 +1892,27 @@ private fun StockItemCard(
                 )
             }
         }
-            // Barra pegada al borde inferior de la tarjeta.
-            LinearProgressIndicator(
-                progress = { fraccion },
-                // Decorativa: el porcentaje no le dice nada al usuario y TalkBack
-                // lo anunciaría como "3 por ciento" al final de cada producto.
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(3.dp)
-                    .clearAndSetSemantics { },
-                color = colorDe(estado),
-                trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            )
+            // Barra pegada al borde inferior, con el estado como etiqueta.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = estado.texto,
+                    style = MaterialTheme.metricLabel,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.widthIn(min = 56.dp),
+                )
+                Spacer(Modifier.width(dimens.spacingXs))
+                LinearProgressIndicator(
+                    progress = { fraccion },
+                    // Decorativa: el porcentaje no le dice nada al usuario y TalkBack
+                    // lo anunciaría como "3 por ciento" al final de cada producto.
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(3.dp)
+                        .clearAndSetSemantics { },
+                    color = colorDe(estado),
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                )
+            }
         }
     }
 }
@@ -1727,7 +2035,6 @@ private fun CabeceraSeccion(
     detalle: String,
     fecha: String?,
     modifier: Modifier = Modifier,
-    onCompartir: (() -> Unit)? = null,
 ) {
     val dimens = LocalAppDimens.current
     val reducirMovimiento = LocalReducedMotionEnabled.current
@@ -1797,16 +2104,6 @@ private fun CabeceraSeccion(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
-        if (onCompartir != null) {
-            IconButton(onClick = onCompartir) {
-                Icon(
-                    imageVector = Icons.Outlined.Share,
-                    contentDescription = "Compartir " + titulo,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-        }
     }
 }
 
@@ -1831,6 +2128,7 @@ private fun StockVacio(
     localElegido: StockLocal?,
     osaEnCurso: Boolean,
     fechaDatos: String?,
+    eanNoEncontrado: String? = null,
     onFilter: ((StockFilters) -> StockFilters) -> Unit,
     onElegirLocal: (String) -> Unit,
     onElegirRuta: (String) -> Unit,
@@ -1914,6 +2212,10 @@ private fun StockVacio(
             "Sin negativos confirmados" to "Ningún negativo está confirmado por OSA en este corte."
         filters.validacion == ValidacionNegativo.SIN_DATO ->
             "Sin negativos sin OSA" to "Todos los negativos de este corte tienen respuesta OSA."
+        eanNoEncontrado != null ->
+            "EAN no encontrado" to
+                "«" + eanNoEncontrado + "» no está en el catálogo EAN. " +
+                "Revisa el código o busca por nombre o SKU."
         localSinCoincidencia ->
             "No encontramos ese local" to
                 "«" + filters.local + "» no coincide con ningún local del rutero. " +
@@ -1986,19 +2288,7 @@ private fun StockVacio(
                     )
                 }
             } else {
-                onFilter {
-                    it.copy(
-                        local = "",
-                        ruta = "",
-                        marca = "",
-                        sku = "",
-                        estado = null,
-                        cobertura = null,
-                        validacion = null,
-                        soloQuiebre = false,
-                        soloNegativos = false,
-                    )
-                }
+                onFilter { it.limpiar() }
             }
         },
         accionSecundaria = if (marcaSoloSnapshot || (textoMarca.length >= 2 && !marcaEnCatalogo)) {
@@ -2546,4 +2836,60 @@ private fun resumenTexto(result: StockResult): String = buildString {
     appendLine("Locales: " + result.uniqueLocales)
     appendLine("Quiebres: " + result.quiebres)
     result.maxSnapshot?.let { appendLine("Datos al: " + fechaCorta(it)) }
+}
+
+// ── Previews ───────────────────────────────────────────────────────
+
+@Preview(showBackground = true)
+@Composable
+private fun StockSearchBarPreview() {
+    MercaderistasTheme {
+        StockSearchBar(value = "Aceite", onValueChange = {}, onScan = {})
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun StockItemCardPreview() {
+    MercaderistasTheme {
+        StockItemCard(
+            item = StockItem(
+                storeCode = "AL3083",
+                storeName = "JUMBO NUNOA",
+                brand = "CASO Y CIA",
+                product = "N\u00e9ctar Jumex 335 cc Durazno",
+                sku = "192829",
+                stockUnits = 94.0,
+                transitUnits = 0.0,
+                snapshotDate = "2026-11-12",
+                quiebre = false,
+            ),
+            mostrarLocal = false,
+            mostrarSinOsa = false,
+            fraccion = 0.6f,
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun StockItemCardNegativoPreview() {
+    MercaderistasTheme {
+        StockItemCard(
+            item = StockItem(
+                storeCode = "HI45",
+                storeName = "LIDER MAIPU",
+                brand = "SUK",
+                product = "Falafel",
+                sku = "555001",
+                stockUnits = -2.0,
+                transitUnits = 4.0,
+                snapshotDate = "2026-11-12",
+                quiebre = false,
+            ),
+            mostrarLocal = true,
+            mostrarSinOsa = true,
+            fraccion = 0f,
+        )
+    }
 }

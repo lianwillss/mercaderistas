@@ -67,6 +67,32 @@ interface EanProductDao {
         """,
     )
     fun eanPorSkuFlow(sku: String): Flow<String?>
+
+    /**
+     * SKU (Cód. Cencosud) del producto que tiene este código de barras.
+     *
+     * Es el cruce inverso de [eanPorSkuFlow]: se usa al buscar o escanear un
+     * EAN en Stock. Acepta el código en `eanPrincipal` o `codigoBarra` y, como
+     * respaldo, igualdad ignorando ceros iniciales (el mismo criterio de
+     * `eanPorSkuFlow`). Devuelve null si el EAN no está catalogado.
+     */
+    @Query(
+        """
+        SELECT codCencosud
+        FROM ean_products
+        WHERE codCencosud != ''
+          AND (
+            eanPrincipal = :ean
+            OR codigoBarra = :ean
+            OR (eanPrincipal != '' AND ltrim(eanPrincipal, '0') = ltrim(:ean, '0'))
+            OR (codigoBarra != '' AND ltrim(codigoBarra, '0') = ltrim(:ean, '0'))
+          )
+        ORDER BY (eanPrincipal = :ean) DESC,
+                 length(eanPrincipal) DESC
+        LIMIT 1
+        """,
+    )
+    suspend fun skuPorEan(ean: String): String?
 }
 
 // Resultados de las facetas de filtro.

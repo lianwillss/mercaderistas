@@ -635,4 +635,11 @@
     <string name="stock_sku_copiado">SKU copiado al portapapeles</string>
     <string name="stock_compartir_barras">Compartir código y stock</string>
     <string name="stock_error_compartir">No se pudo preparar la imagen</string>
+    <string name="stock_buscar_placeholder">Producto, SKU o EAN</string>
+    <string name="stock_filtros">Filtros</string>
+    <string name="stock_agrupar_por">Agrupar por</string>
+    <string name="stock_segmento_local">Local</string>
+    <string name="stock_segmento_ruta">Ruta</string>
+    <string name="stock_por_local">Por local</string>
+    <string name="stock_por_marca">Por marca</string>
 </resources>

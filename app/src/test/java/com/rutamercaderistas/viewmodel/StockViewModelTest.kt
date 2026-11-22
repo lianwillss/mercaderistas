@@ -18,10 +18,13 @@ import com.rutamercaderistas.data.stock.StockSort
 import com.rutamercaderistas.data.stock.StockRepository
 import com.rutamercaderistas.data.stock.StockResult
 import com.rutamercaderistas.data.stock.StockSource
+import com.rutamercaderistas.data.stock.StockStatus
 import com.rutamercaderistas.data.stock.StockSyncScheduler
 import com.rutamercaderistas.data.stock.StockSyncRequest
 import com.rutamercaderistas.data.stock.StockUpdater
 import com.rutamercaderistas.data.stock.conLocal
+import com.rutamercaderistas.data.stock.conMarca
+import com.rutamercaderistas.data.stock.conRuta
 import com.rutamercaderistas.data.stock.remote.KpiOneClient
 import com.rutamercaderistas.data.stock.remote.KpiSessionStore
 import com.rutamercaderistas.services.EanCatalogSyncer
@@ -268,6 +271,164 @@ class StockViewModelTest {
         // memoria: no hay una segunda consulta ni skeleton.
         assertEquals("2", vm!!.state.value.result.items.first().sku)
         coVerify(exactly = 1) { repo.searchLocal(any()) }
+    }
+
+    // ── Caracterización de filtros (no cambiar con el rediseño) ──────
+
+    @Test
+    fun `elegir local limpia la ruta y conserva marca y producto`() = runBlocking {
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer, historialStore)
+        await { it.status == StockStatus.Idle }
+        vm!!.onFilter { it.copy(marca = "CASO Y CIA", sku = "jumex", ruta = "EMU-3") }
+
+        vm!!.elegirLocal("J503")
+
+        val filtros = vm!!.filters.value
+        assertEquals("J503", filtros.local)
+        assertEquals("", filtros.ruta)
+        assertEquals("CASO Y CIA", filtros.marca)
+        assertEquals("jumex", filtros.sku)
+        // Sin estado elegido, el local lo pone en Disponible.
+        assertEquals(EstadoTipo.Disponible, filtros.estado)
+    }
+
+    @Test
+    fun `elegir ruta limpia el local y conserva marca y producto`() = runBlocking {
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer, historialStore)
+        await { it.status == StockStatus.Idle }
+        vm!!.onFilter { it.copy(marca = "CASO Y CIA", sku = "jumex", local = "J503") }
+
+        vm!!.elegirRuta("EMU-3")
+
+        val filtros = vm!!.filters.value
+        assertEquals("EMU-3", filtros.ruta)
+        assertEquals("", filtros.local)
+        assertEquals("CASO Y CIA", filtros.marca)
+        assertEquals("jumex", filtros.sku)
+        assertEquals(EstadoTipo.Disponible, filtros.estado)
+    }
+
+    @Test
+    fun `elegir marca no toca local ruta ni estado`() = runBlocking {
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer, historialStore)
+        await { it.status == StockStatus.Idle }
+        vm!!.onFilter { it.copy(local = "J503", estado = EstadoTipo.Negativo) }
+
+        vm!!.elegirMarca("CASO Y CIA")
+
+        val filtros = vm!!.filters.value
+        assertEquals("CASO Y CIA", filtros.marca)
+        assertEquals("J503", filtros.local)
+        assertEquals(EstadoTipo.Negativo, filtros.estado)
+    }
+
+    @Test
+    fun `sin criterio la pantalla queda en Idle y no consulta`() = runBlocking {
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer, historialStore)
+        await { it.status == StockStatus.Idle }
+        delay(900)
+
+        assertEquals(StockStatus.Idle, vm!!.state.value.status)
+        assertTrue(vm!!.state.value.result.items.isEmpty())
+        coVerify(exactly = 0) { repo.searchLocal(any()) }
+    }
+
+    @Test
+    fun `la busqueda se reenvia con los filtros combinados`() = runBlocking {
+        val capturados = mutableListOf<StockFilters>()
+        coEvery { repo.searchLocal(any()) } answers {
+            capturados += firstArg<StockFilters>()
+            StockResult(items = listOf(item("J503", 8.0)), source = StockSource.SNAPSHOT)
+        }
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer, historialStore)
+        await { it.status == StockStatus.Idle }
+
+        vm!!.onFilter { it.conRuta("EMU-3").conMarca("CASO Y CIA").copy(sku = "jumex") }
+        await { it.result.items.isNotEmpty() }
+
+        val filtro = capturados.last()
+        assertEquals("EMU-3", filtro.ruta)
+        assertEquals("CASO Y CIA", filtro.marca)
+        assertEquals("jumex", filtro.sku)
+    }
+
+    @Test
+    fun `buscar por EAN resuelve el SKU del catalogo`() = runBlocking {
+        coEvery { eanDao.skuPorEan("0859547004701") } returns "1986305"
+        val capturados = mutableListOf<StockFilters>()
+        coEvery { repo.searchLocal(any()) } answers {
+            capturados += firstArg<StockFilters>()
+            StockResult(
+                items = listOf(item("J503", 8.0).copy(sku = "1986305")),
+                source = StockSource.SNAPSHOT,
+            )
+        }
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer, historialStore)
+        await { it.status == StockStatus.Idle }
+
+        vm!!.onFilter { it.conLocal("J503").copy(sku = "0859547004701") }
+        await { it.result.items.isNotEmpty() }
+
+        // El repo busca por el SKU resuelto; el campo sigue mostrando el EAN.
+        assertEquals("1986305", capturados.last().sku)
+        assertEquals("0859547004701", vm!!.filters.value.sku)
+    }
+
+    @Test
+    fun `EAN con digito verificador invalido no consulta el catalogo`() = runBlocking {
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer, historialStore)
+        await { it.status == StockStatus.Idle }
+
+        vm!!.onFilter { it.conLocal("J503").copy(sku = "5901234123458") }
+        delay(900)
+
+        coVerify(exactly = 0) { eanDao.skuPorEan(any()) }
+    }
+
+    @Test
+    fun `EAN no catalogado deja el texto y marca el aviso`() = runBlocking {
+        coEvery { eanDao.skuPorEan("5901234123457") } returns null
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer, historialStore)
+        await { it.status == StockStatus.Idle }
+
+        vm!!.onFilter { it.conLocal("J503").copy(sku = "5901234123457") }
+        val estado = await { it.eanNoEncontrado != null }
+
+        assertEquals("5901234123457", estado.eanNoEncontrado)
+        assertEquals("5901234123457", vm!!.filters.value.sku)
+    }
+
+    @Test
+    fun `escanear normaliza el UPC-A y limpia el estado`() = runBlocking {
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer, historialStore)
+        await { it.status == StockStatus.Idle }
+        vm!!.onFilter { it.copy(estado = EstadoTipo.Negativo) }
+
+        vm!!.onBarcodeScanned("859547004701")
+
+        val filtros = vm!!.filters.value
+        assertEquals("0859547004701", filtros.sku)
+        assertEquals(null, filtros.estado)
+        assertEquals(false, filtros.soloNegativos)
+    }
+
+    @Test
+    fun `refrescar fuerza la consulta y apaga el spinner`() = runBlocking {
+        coEvery { repo.searchLive(any(), any(), any()) } returns StockResult(
+            items = listOf(item("J503", 8.0)),
+            source = StockSource.LIVE,
+        )
+        vm = StockViewModel(repo, cookies, updater, prefs, scheduler, client, cache, eanDao, eanSyncer, historialStore)
+        await { it.status == StockStatus.Idle }
+        vm!!.onFilter { it.conLocal("J503") }
+        await { it.result.items.isNotEmpty() }
+
+        vm!!.refrescar()
+
+        val refrescando = await { it.pullRefresh }
+        assertTrue(refrescando.pullRefresh)
+        await { !it.pullRefresh }
+        coVerify(exactly = 2) { repo.searchLive(any(), any(), any()) }
     }
 
     private suspend fun await(predicado: (StockUiState) -> Boolean): StockUiState =

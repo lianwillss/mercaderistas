@@ -405,6 +405,10 @@ class KpiOneClient(
                 .connectTimeout(15, TimeUnit.SECONDS)
                 .readTimeout(90, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
+                // Techo total por request: si el servidor gotea, el readTimeout
+                // se renueva en cada byte y la búsqueda queda colgada. Con el
+                // callTimeout cae al snapshot en lugar de no terminar nunca.
+                .callTimeout(90, TimeUnit.SECONDS)
                 // HTTP/2 + Connection pooling: reusa conexiones TLS,
                 // evita handshake en cada request (KPI One en Railway soporta h2).
                 .protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))

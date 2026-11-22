@@ -12,6 +12,19 @@ package com.rutamercaderistas.data.stock
  * reordenar en memoria al cambiar sólo el orden, sin volver a consultar.
  */
 fun ordenarStock(items: List<StockItem>, orden: StockSort): List<StockItem> = when (orden) {
+    StockSort.PRIORIDAD -> items.sortedWith(
+        compareBy(
+            {
+                when {
+                    it.stockUnits < 0.0 -> 0
+                    estadoDe(it) == EstadoTipo.Quiebre -> 1
+                    else -> 2
+                }
+            },
+            { it.product.lowercase() },
+            { it.storeCode },
+        ),
+    )
     StockSort.GRAVEDAD -> items.sortedWith(
         compareBy(
             {
