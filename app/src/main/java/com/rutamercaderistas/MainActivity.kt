@@ -146,7 +146,15 @@ class MainActivity : ComponentActivity() {
 
             LaunchedEffect(updateMessage) {
                 val msg = updateMessage ?: return@LaunchedEffect
-                snackbarHostState.showSnackbar(msg)
+                if (updateViewModel.lastErrorWasSpace) {
+                    snackbarHostState.showSnackbar(
+                        message = msg,
+                        actionLabel = "Liberar espacio",
+                        duration = SnackbarHostState.LENGTH_INDEFINITE,
+                    ) { updateViewModel.openStorageCleaner() }
+                } else {
+                    snackbarHostState.showSnackbar(msg)
+                }
                 updateViewModel.clearMessage()
             }
 

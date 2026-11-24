@@ -19,6 +19,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
@@ -597,6 +598,37 @@ object ApkDownloader {
     }
 
     /**
+     * Abre el gestor de almacenamiento de Samsung (OneUI) o el genérico de Android.
+     * Útil cuando falla la instalación por espacio: el usuario puede liberar
+     * caché/sistema directamente desde la app del fabricante.
+     */
+    fun openStorageCleaner(context: Context): Boolean {
+        // Samsung OneUI: "Mantenimiento del dispositivo → Almacenamiento"
+        val samsungIntent = Intent().apply {
+            action = "com.samsung.android.lool.STORAGE_MANAGER"
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        if (samsungIntent.resolveActivity(context.packageManager) != null) {
+            try {
+                context.startActivity(samsungIntent)
+                return true
+            } catch (_: Exception) {
+                // Caer al genérico
+            }
+        }
+        // Fallback genérico: ajustes de almacenamiento interno
+        val genericIntent = Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            context.startActivity(genericIntent)
+            return true
+        } catch (_: Exception) {
+            return false
+        }
+    }
+
+    /**
      * Instala con una sesión de PackageInstaller (no con un Intent
      * ACTION_VIEW). La sesión usa la confirmación estándar del sistema
      * (USER_ACTION_REQUIRED): en MIUI/HyperOS y con Play Protect activo la
@@ -660,6 +692,114 @@ object ApkDownloader {
             sessionId?.let { runCatching { installer.abandonSession(it) } }
             // El detalle técnico queda en Timber; la tarjeta muestra un
             // mensaje accionable en español.
+            InstallStart.Error(context.getString(R.string.update_instalacion_error))
+        }
+    }
+
+    /**
+     * Instala con streaming directo: descarga el APK de GitHub y lo escribe
+     * en la sesión de PackageInstaller sin guardarlo en disco.
+     * Ahorra el 2× espacio (no necesita el APK intermedio en filesDir).
+     * Requiere que el release publique `apkSize` (Content-Length) para setSize().
+     *
+     * Devuelve InstallStart igual que installApk para que el flujo del
+     * ViewModel no cambie: el usuario ve "Confirmar instalación" y el
+     * receiver maneja el resultado.
+     */
+    fun installApkStreaming(
+        context: Context,
+        apkUrl: String,
+        expectedSize: Long,
+        expectedSha256: String = "",
+        expectedVersionName: String = "",
+        expectedVersionCode: Int = 0,
+        onProgress: ((Long, Long) -> Unit)? = null,
+    ): InstallStart = withContext(Dispatchers.IO) {
+        if (!isOnline(context)) {
+            return@withContext InstallStart.Error(
+                context.getString(R.string.update_sin_internet)
+            )
+        }
+        if (!canInstallPackages(context)) {
+            return@withContext InstallStart.Error(
+                context.getString(R.string.update_permiso_instalar)
+            )
+        }
+        if (expectedSize <= 0) {
+            return@withContext InstallStart.Error(
+                context.getString(R.string.update_tamano_desconocido)
+            )
+        }
+
+        // Espacio solo para la instalación (metadatos + copia en /data/app):
+        // ~1.2× el APK + margen, no 2×.
+        val free = context.filesDir.usableSpace
+        val needed = (expectedSize * 12 / 10) + DISK_MARGIN_BYTES
+        if (free < needed) {
+            val missingMb = ((needed - free) / 1_000_000.0)
+            return@withContext InstallStart.Error(
+                context.getString(R.string.update_poco_espacio, formatMb(missingMb))
+            )
+        }
+
+        val installer = context.packageManager.packageInstaller
+        var sessionId: Int? = null
+        try {
+            abandonInstallSessions(context)
+            val params = PackageInstaller.SessionParams(
+                PackageInstaller.SessionParams.MODE_FULL_INSTALL,
+            ).apply {
+                setAppPackageName(context.packageName)
+                setSize(expectedSize)
+            }
+            val id = installer.createSession(params)
+            sessionId = id
+            installer.openSession(id).use { session ->
+                session.openWrite("base.apk", 0, expectedSize).use { output ->
+                    val request = Request.Builder().url(apkUrl).build()
+                    client.newCall(request).execute().use { response ->
+                        if (response.code != 200) {
+                            throw IOException("HTTP ${response.code} descargando APK")
+                        }
+                        val body = response.body ?: throw IOException("Respuesta vacía")
+                        val contentLength = body.contentLength()
+                        if (contentLength > 0 && contentLength != expectedSize) {
+                            throw IOException(
+                                "Tamaño no coincide: esperado $expectedSize, recibido $contentLength"
+                            )
+                        }
+                        var downloaded = 0L
+                        val buffer = ByteArray(DOWNLOAD_BUFFER_SIZE)
+                        body.byteStream().use { input ->
+                            while (true) {
+                                currentCoroutineContext().ensureActive()
+                                val read = input.read(buffer)
+                                if (read == -1) break
+                                output.write(buffer, 0, read)
+                                downloaded += read
+                                onProgress?.invoke(downloaded, expectedSize)
+                            }
+                            session.fsync(output)
+                        }
+                        if (downloaded != expectedSize) {
+                            throw IOException("Descarga incompleta: $downloaded / $expectedSize")
+                        }
+                    }
+                }
+
+                val statusIntent = Intent(context, UpdateInstallReceiver::class.java).apply {
+                    action = ACTION_INSTALL_STATUS
+                    putExtra(EXTRA_SESSION_ID, id)
+                }
+                val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
+                val pendingIntent = PendingIntent.getBroadcast(context, id, statusIntent, flags)
+                session.commit(pendingIntent.intentSender)
+            }
+            InstallStart.Started(id)
+        } catch (e: Exception) {
+            Timber.e(e, "Error en instalación streaming")
+            sessionId?.let { runCatching { installer.abandonSession(it) } }
             InstallStart.Error(context.getString(R.string.update_instalacion_error))
         }
     }

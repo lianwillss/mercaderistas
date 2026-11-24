@@ -105,6 +105,7 @@ class UpdateViewModelTest {
         every { ApkDownloader.openInstallPermissionSettings(any()) } returns true
         every { ApkDownloader.clearDownloadedApk(any()) } returns Unit
         every { ApkDownloader.clearPartial(any()) } returns Unit
+        every { ApkDownloader.installApkStreaming(any(), any(), any(), any(), any(), any(), any()) } returns InstallStart.Started(99)
         coEvery {
             ApkDownloader.download(any(), any(), any(), any(), any(), any(), any())
         } returns DownloadResult.Success(apkFile)
@@ -389,6 +390,45 @@ class UpdateViewModelTest {
     }
 
     @Test
+    fun `startUpdate with insufficient space shows message and does not download`() = runTest {
+        mockkObject(UpdateChecker)
+        coEvery {
+            UpdateChecker.check(any(), any())
+        } returns UpdateInfo(
+            available = true,
+            versionCode = 12053,
+            versionName = "12.53",
+            apkUrl = "http://x.apk",
+            tag = "v12.53",
+            apkSize = 50_000_000L, // 50 MB
+        )
+        try {
+            viewModel.checkForUpdate(force = true, showFeedback = false)
+            awaitOnMain { viewModel.pendingUpdate.value != null }
+
+            // mockkObject(ApkDownloader) en setUp devuelve 0 para Long;
+            // forzamos el cálculo real para 50MB: 50*2 + 20 = 120 MB.
+            every { ApkDownloader.espacioNecesarioParaInstalacion(any()) } returns 120_000_000L
+            val mockFilesDir = mockk<File>(relaxed = true)
+            every { mockFilesDir.usableSpace } returns 10_000_000L // 10 MB libre
+            every { application.filesDir } returns mockFilesDir
+
+            viewModel.startUpdate()
+            testDispatcher.scheduler.advanceUntilIdle()
+
+            awaitOnMain { viewModel.message.value != null }
+            assertTrue(viewModel.message.value!!.contains("No hay espacio suficiente"))
+            // No debe haber iniciado la descarga
+            awaitCoVerify {
+                coVerify(exactly = 0) { ApkDownloader.download(any(), any(), any(), any(), any(), any(), any()) }
+            }
+            assertEquals(UpdateState.Idle, viewModel.state.value)
+        } finally {
+            unmockkObject(UpdateChecker)
+        }
+    }
+
+    @Test
     fun `network error keeps pending and shows message`() = runTest {
         mockAvailableUpdate()
         try {
@@ -612,6 +652,38 @@ class UpdateViewModelTest {
             awaitOnMain { viewModel.state.value is UpdateState.Installed }
             awaitCoVerify { coVerify { preferencesRepository.clearPendingUpdate() } }
             awaitCoVerify { coVerify { preferencesRepository.clearUpdateState() } }
+        } finally {
+            unmockkObject(UpdateChecker)
+        }
+    }
+
+    @Test
+    fun `install falls back to streaming when normal install fails due to space`() = runTest {
+        mockAvailableUpdate()
+        try {
+            viewModel.checkForUpdate(force = true, showFeedback = false)
+            awaitOnMain { viewModel.state.value is UpdateState.ReadyToInstall }
+            apkFile.writeBytes(ByteArray(2048))
+
+            // Primera llamada falla por espacio, segunda (streaming) ok
+            var callCount = 0
+            every { ApkDownloader.installApk(any(), any()) } answers {
+                callCount++
+                if (callCount == 1) {
+                    InstallStart.Error("No hay espacio suficiente. Libera 100 MB e inténtalo de nuevo.")
+                } else {
+                    InstallStart.Started(2)
+                }
+            }
+            every { ApkDownloader.installApkStreaming(any(), any(), any(), any(), any(), any(), any()) } returns InstallStart.Started(2)
+
+            viewModel.installApk()
+            awaitOnMain { (viewModel.state.value as? UpdateState.Installing)?.sessionId == 2 }
+
+            awaitCoVerify {
+                coVerify(exactly = 1) { ApkDownloader.installApk(any(), any()) }
+                coVerify(exactly = 1) { ApkDownloader.installApkStreaming(any(), any(), any(), any(), any(), any(), any()) }
+            }
         } finally {
             unmockkObject(UpdateChecker)
         }

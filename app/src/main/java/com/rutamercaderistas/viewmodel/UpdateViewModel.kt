@@ -430,7 +430,7 @@ class UpdateViewModel @Inject constructor(
     /** Inicia la descarga usando el pendiente guardado. */
     fun startUpdate() {
         val pending = _pendingUpdate.value ?: return
-        startUpdate(pending)
+        viewModelScope.launch { startUpdate(pending) }
     }
 
     /** Consulta obligatoria al abrir: si hay versión nueva, descarga sola. */
@@ -454,7 +454,7 @@ class UpdateViewModel @Inject constructor(
      * Descarga el pendiente en el proceso de la app, actualizando el
      * porcentaje en la tarjeta. No usa WorkManager ni notificaciones.
      */
-    private fun startUpdate(pending: PendingUpdate) {
+    private suspend fun startUpdate(pending: PendingUpdate) {
         val currentState = _state.value
         if (currentState is UpdateState.Downloading ||
             currentState is UpdateState.Verifying ||
@@ -466,6 +466,27 @@ class UpdateViewModel @Inject constructor(
         if (downloadJob?.isActive == true) return
 
         val context = getApplication<Application>()
+
+        // Chequeo de espacio ANTES de empezar la descarga: si se llenó el
+        // almacenamiento entre el chequeo automático y la acción del usuario,
+        // evitamos descargar para luego fallar con error genérico del instalador.
+        if (pending.apkSize > 0L) {
+            val missingMb = withContext(Dispatchers.IO) {
+                val dir = context.filesDir
+                val free = dir?.usableSpace ?: 0L
+                if (free == 0L) return@withContext null
+                val needed = ApkDownloader.espacioNecesarioParaInstalacion(pending.apkSize)
+                if (free >= needed) null else ((needed - free) / 1_000_000.0)
+            }
+            missingMb?.let { mb ->
+                _message.value = context.getString(
+                    R.string.update_poco_espacio,
+                    ApkDownloader.formatMb(mb),
+                )
+                return
+            }
+        }
+
         installSessionActive = false
         downloadJob?.cancel()
         downloadJob = viewModelScope.launch {
@@ -763,9 +784,31 @@ class UpdateViewModel @Inject constructor(
             // "Instalación pendiente" en vez de re-descargar todo.
             (_state.value as? UpdateState.Installing)?.let { persistState(it) }
 
-            when (val start = withContext(Dispatchers.IO) {
+            // Intento 1: instalación normal (requiere APK en disco, 2× espacio).
+            var start = withContext(Dispatchers.IO) {
                 ApkDownloader.installApk(context, apk)
-            }) {
+            }
+            // Fallback: si falla por espacio y tenemos URL/tamaño, streaming (1.2×).
+            if (start is InstallStart.Error &&
+                start.message.contains("espacio", ignoreCase = true) &&
+                pending != null &&
+                pending.apkUrl.isNotBlank() &&
+                pending.apkSize > 0
+            ) {
+                Timber.i("Instalación normal falló por espacio, probando streaming…")
+                start = withContext(Dispatchers.IO) {
+                    ApkDownloader.installApkStreaming(
+                        context = context,
+                        apkUrl = pending.apkUrl,
+                        expectedSize = pending.apkSize,
+                        expectedSha256 = pending.apkSha256.orEmpty(),
+                        expectedVersionName = pending.versionName.orEmpty(),
+                        expectedVersionCode = pending.versionCode,
+                    )
+                }
+            }
+
+            when (start) {
                 is InstallStart.Started -> {
                     if (installResultReceived) {
                         // El receiver ya informó el resultado: no pisar Error/Installed.
@@ -792,6 +835,8 @@ class UpdateViewModel @Inject constructor(
                     withContext(Dispatchers.IO) {
                         preferencesRepository.clearInstallSessionId()
                     }
+                    val isSpaceError = start.message.contains("espacio", ignoreCase = true)
+                    _lastErrorWasSpace = isSpaceError
                     setState(
                         UpdateState.Error(
                             versionName = versionName,
@@ -1117,7 +1162,18 @@ class UpdateViewModel @Inject constructor(
             ApkDownloader.clearDownloadedApk(context)
         }
         _pendingUpdate.value = null
+        _lastErrorWasSpace = false
         setState(UpdateState.Idle)
         if (showMessage) _message.value = context.getString(R.string.update_no_disponible)
+    }
+
+    /** True si el último error mostrado fue por espacio insuficiente. */
+    private var _lastErrorWasSpace = false
+    val lastErrorWasSpace: Boolean get() = _lastErrorWasSpace
+
+    /** Abre el limpiador de almacenamiento (Samsung OneUI o genérico). */
+    fun openStorageCleaner() {
+        val context = getApplication<Application>()
+        ApkDownloader.openStorageCleaner(context)
     }
 }
