@@ -236,6 +236,7 @@
     <string name="update_sin_internet">Sin conexión a internet. Revisa tu red e inténtalo de nuevo.</string>
     <string name="update_descarga_interrumpida">La descarga se interrumpió. Reintenta y se reanudará.</string>
     <string name="update_poco_espacio">No hay espacio suficiente. Libera %1$s MB e inténtalo de nuevo.</string>
+    <string name="update_poco_espacio_detalle">Espacio insuficiente: necesitas %1$s MB más (disponibles %2$s MB). Libera espacio e inténtalo de nuevo.</string>
     <string name="update_tamano_desconocido">El release no publica el tamaño del APK; no se puede instalar por streaming. Intenta con la descarga normal.</string>
     <string name="update_apk_corrupto">El archivo descargado está dañado. Inténtalo de nuevo.</string>
     <string name="update_tamano_no_coincide">El tamaño del APK no coincide con el publicado por el CI (%1$s MB esperados, %2$s MB). Se descartó el archivo.</string>

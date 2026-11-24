@@ -288,14 +288,15 @@ object ApkDownloader {
                 val needed = total * INSTALL_SPACE_FACTOR + DISK_MARGIN_BYTES
                 if (free < needed) {
                     val missingMb = ((needed - free) / 1_000_000.0)
+                    val freeMb = (free / 1_000_000.0)
                     return@withContext DownloadResult.Error(
-                        context.getString(R.string.update_poco_espacio, formatMb(missingMb)),
+                        context.getString(R.string.update_poco_espacio_detalle, formatMb(missingMb), formatMb(freeMb)),
                         retryable = true,
                     )
                 }
             } else if (free < UNKNOWN_SIZE_MIN_FREE) {
                 return@withContext DownloadResult.Error(
-                    context.getString(R.string.update_poco_espacio, formatMbLong(UNKNOWN_SIZE_MIN_FREE)),
+                    context.getString(R.string.update_poco_espacio_detalle, formatMbLong(UNKNOWN_SIZE_MIN_FREE), formatMb(free / 1_000_000.0)),
                     retryable = true,
                 )
             }
@@ -649,7 +650,8 @@ object ApkDownloader {
         val needed = apkFile.length() * INSTALL_SPACE_FACTOR + DISK_MARGIN_BYTES
         if (free < needed) {
             val missingMb = ((needed - free) / 1_000_000.0)
-            return InstallStart.Error(context.getString(R.string.update_poco_espacio, formatMb(missingMb)))
+            val freeMb = (free / 1_000_000.0)
+            return InstallStart.Error(context.getString(R.string.update_poco_espacio_detalle, formatMb(missingMb), formatMb(freeMb)))
         }
         if (!canInstallPackages(context)) {
             return InstallStart.Error(context.getString(R.string.update_permiso_instalar))
@@ -737,8 +739,9 @@ object ApkDownloader {
         val needed = (expectedSize * 12 / 10) + DISK_MARGIN_BYTES
         if (free < needed) {
             val missingMb = ((needed - free) / 1_000_000.0)
+            val freeMb = (free / 1_000_000.0)
             return@withContext InstallStart.Error(
-                context.getString(R.string.update_poco_espacio, formatMb(missingMb))
+                context.getString(R.string.update_poco_espacio_detalle, formatMb(missingMb), formatMb(freeMb))
             )
         }
 

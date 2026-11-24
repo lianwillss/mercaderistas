@@ -358,17 +358,18 @@ class UpdateViewModel @Inject constructor(
             )
 
             if (pending.apkSize > 0L) {
-                val missingMb = withContext(Dispatchers.IO) {
+                val spaceCheck = withContext(Dispatchers.IO) {
                     val dir = context.filesDir
                     val free = dir?.usableSpace ?: 0L
                     if (free == 0L) return@withContext null
                     val needed = ApkDownloader.espacioNecesarioParaInstalacion(pending.apkSize)
-                    if (free >= needed) null else ((needed - free) / 1_000_000.0)
+                    if (free >= needed) null else Pair((needed - free) / 1_000_000.0, free / 1_000_000.0)
                 }
-                missingMb?.let { mb ->
+                spaceCheck?.let { (missingMb, freeMb) ->
                     _message.value = context.getString(
-                        R.string.update_poco_espacio,
-                        ApkDownloader.formatMb(mb),
+                        R.string.update_poco_espacio_detalle,
+                        ApkDownloader.formatMb(missingMb),
+                        ApkDownloader.formatMb(freeMb),
                     )
                     return@launch
                 }
@@ -471,17 +472,18 @@ class UpdateViewModel @Inject constructor(
         // almacenamiento entre el chequeo automático y la acción del usuario,
         // evitamos descargar para luego fallar con error genérico del instalador.
         if (pending.apkSize > 0L) {
-            val missingMb = withContext(Dispatchers.IO) {
+            val spaceCheck = withContext(Dispatchers.IO) {
                 val dir = context.filesDir
                 val free = dir?.usableSpace ?: 0L
                 if (free == 0L) return@withContext null
                 val needed = ApkDownloader.espacioNecesarioParaInstalacion(pending.apkSize)
-                if (free >= needed) null else ((needed - free) / 1_000_000.0)
+                if (free >= needed) null else Pair((needed - free) / 1_000_000.0, free / 1_000_000.0)
             }
-            missingMb?.let { mb ->
+            spaceCheck?.let { (missingMb, freeMb) ->
                 _message.value = context.getString(
-                    R.string.update_poco_espacio,
-                    ApkDownloader.formatMb(mb),
+                    R.string.update_poco_espacio_detalle,
+                    ApkDownloader.formatMb(missingMb),
+                    ApkDownloader.formatMb(freeMb),
                 )
                 return
             }
