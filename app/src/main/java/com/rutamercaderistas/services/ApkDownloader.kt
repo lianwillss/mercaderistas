@@ -706,7 +706,7 @@ object ApkDownloader {
      * ViewModel no cambie: el usuario ve "Confirmar instalación" y el
      * receiver maneja el resultado.
      */
-    fun installApkStreaming(
+    suspend fun installApkStreaming(
         context: Context,
         apkUrl: String,
         expectedSize: Long,

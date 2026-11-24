@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -149,9 +150,8 @@ class MainActivity : ComponentActivity() {
                 if (updateViewModel.lastErrorWasSpace) {
                     snackbarHostState.showSnackbar(
                         message = msg,
-                        actionLabel = "Liberar espacio",
-                        duration = SnackbarHostState.LENGTH_INDEFINITE,
-                    ) { updateViewModel.openStorageCleaner() }
+                        duration = SnackbarDuration.Indefinite,
+                    )
                 } else {
                     snackbarHostState.showSnackbar(msg)
                 }
