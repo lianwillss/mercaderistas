@@ -53,6 +53,7 @@ class EanCodigosParserTest {
         assertTrue(brandFromFilename("ean_pet_kitchen.xlsx") == "PET KITCHEN")
         assertTrue(brandFromFilename("ean_indomitable.xlsx") == "PET KITCHEN")
         assertTrue(brandFromFilename("ean_caso_cia.xlsx") == "CASO Y CIA")
+        assertTrue(brandFromFilename("ean_sr_pecado.xlsx") == "SR PECADO")
     }
 
     @Test
@@ -731,5 +732,41 @@ class EanCodigosParserTest {
 
         assertTrue("parser should succeed", result.isSuccess)
         assertTrue("should parse CASO Y CIA super products", (result.getOrNull() ?: 0) > 0)
+    }
+
+    @Test
+    fun `sr_pecado xlsx parses 4 SR PECADO products enlazados al stock`() = runTest {
+        val dao = mockk<EanProductDao>(relaxed = true)
+        coEvery { dao.clearAll() } returns Unit
+        val insertedSlot = slot<List<EanProductEntity>>()
+        coEvery { dao.insertAll(capture(insertedSlot)) } returns Unit
+        val parser = EanExcelParser(mockk<Context>(relaxed = true), dao)
+
+        val result = parser.loadFromFile(
+            "src/main/assets/ean_sr_pecado.xlsx",
+            brandFromFilename("ean_sr_pecado.xlsx"),
+        )
+
+        assertTrue("parser should succeed: ${result.exceptionOrNull()}", result.isSuccess)
+        assertEquals(4, result.getOrNull())
+        val inserted = insertedSlot.captured
+        assertTrue(
+            "marca debe ser SR PECADO, got ${inserted.map { it.marca }}",
+            inserted.all { it.marca == "SR PECADO" },
+        )
+        assertTrue(
+            "EAN deben ser los 4 de SR PECADO, got ${inserted.map { it.eanPrincipal }}",
+            inserted.map { it.eanPrincipal }.containsAll(
+                listOf("7804689020013", "7804689020006", "7804689020037", "7804689020020"),
+            ),
+        )
+        // Los SKU son los que usa el módulo Stock: así el detalle del SKU recibe
+        // el código de barras sin importar qué pantalla se abra primero.
+        assertTrue(
+            "SKU deben ser los de stock, got ${inserted.map { it.codCencosud }}",
+            inserted.map { it.codCencosud }.containsAll(
+                listOf("2080505", "2080506", "2080507", "2080508"),
+            ),
+        )
     }
 }

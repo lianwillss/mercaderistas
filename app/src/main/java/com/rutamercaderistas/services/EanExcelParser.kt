@@ -17,7 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 
-const val EAN_DATA_VERSION = 54
+const val EAN_DATA_VERSION = 56
 
 // Prefijo/sufijo de los archivos Excel de catálogo EAN en assets.
 // Para agregar más productos basta con soltar otro archivo "ean*.xlsx"
@@ -66,6 +66,7 @@ private val EAN_FILE_BRANDS = mapOf(
     "huentelauquen" to "HUENTELAUQUEN",
     "khatar_jh" to "KHATAR",
     "huentelauquen_uuu" to "HUENTELAUQUEN",
+    "sr_pecado" to "SR PECADO",
 )
 
 // Alias de marca: la empresa ve algunas marcas con un nombre distinto al del
