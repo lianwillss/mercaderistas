@@ -105,7 +105,7 @@ class UpdateViewModelTest {
         every { ApkDownloader.openInstallPermissionSettings(any()) } returns true
         every { ApkDownloader.clearDownloadedApk(any()) } returns Unit
         every { ApkDownloader.clearPartial(any()) } returns Unit
-        every { ApkDownloader.installApkStreaming(any(), any(), any(), any(), any(), any(), any()) } returns InstallStart.Started(99)
+        coEvery { ApkDownloader.installApkStreaming(any(), any(), any(), any(), any(), any(), any()) } returns InstallStart.Started(99)
         coEvery {
             ApkDownloader.download(any(), any(), any(), any(), any(), any(), any())
         } returns DownloadResult.Success(apkFile)
@@ -675,7 +675,7 @@ class UpdateViewModelTest {
                     InstallStart.Started(2)
                 }
             }
-            every { ApkDownloader.installApkStreaming(any(), any(), any(), any(), any(), any(), any()) } returns InstallStart.Started(2)
+            coEvery { ApkDownloader.installApkStreaming(any(), any(), any(), any(), any(), any(), any()) } returns InstallStart.Started(2)
 
             viewModel.installApk()
             awaitOnMain { (viewModel.state.value as? UpdateState.Installing)?.sessionId == 2 }

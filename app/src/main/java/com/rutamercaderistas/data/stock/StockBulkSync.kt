@@ -152,20 +152,21 @@ class StockBulkSync @Inject constructor(
                 currentCoroutineContext().ensureActive()
                 try {
                     var offset = 0
-                    var total = Int.MAX_VALUE
+                    var total = 0
                     var paginas = 0
-                    while (offset < total && paginas < MAX_PAGINAS) {
+                    while (paginas < MAX_PAGINAS) {
+                        currentCoroutineContext().ensureActive()
                         val pagina = client.fetchInventory(
                             storeCodes = lote,
                             offset = offset,
                             limit = KpiOneClient.LIMIT,
                         )
                         items += pagina.items
-                        total = pagina.total
-                        if (pagina.items.isEmpty()) break
-                        offset += KpiOneClient.LIMIT
+                        total = maxOf(total, pagina.total)
                         paginas++
-                        currentCoroutineContext().ensureActive()
+                        if (pagina.items.isEmpty()) break
+                        offset += pagina.items.size
+                        if (offset >= total) break
                     }
                 } catch (e: CancellationException) {
                     throw e

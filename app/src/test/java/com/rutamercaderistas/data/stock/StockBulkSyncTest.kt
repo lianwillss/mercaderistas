@@ -193,6 +193,51 @@ class StockBulkSyncTest {
         }
     }
 
+    @Test
+    fun laPaginacionAvanzaPorFilasRecibidasYConservaElTotalMayor() = runBlocking {
+        val pagina1 = """{
+          "items":[
+            {"store_code":"J503","store_name":"JUMBO MAIPU","brand_raw":"CASO Y CIA",
+             "product_desc_raw":"Prod 1","sku_b2b_raw":"SKU1","stock_units":10,
+             "transit_units":0,"snapshot_date":"2026-10-28","quiebre":0,"days_of_inventory":5},
+            {"store_code":"J503","store_name":"JUMBO MAIPU","brand_raw":"CASO Y CIA",
+             "product_desc_raw":"Prod 2","sku_b2b_raw":"SKU2","stock_units":5,
+             "transit_units":0,"snapshot_date":"2026-10-28","quiebre":0,"days_of_inventory":3}
+          ],
+          "pagination":{"total":3}
+        }""".trimIndent()
+        val pagina2 = """{
+          "items":[
+            {"store_code":"J502","store_name":"JUMBO LA FLORIDA","brand_raw":"CASO Y CIA",
+             "product_desc_raw":"Prod 3","sku_b2b_raw":"SKU3","stock_units":0,
+             "transit_units":4,"snapshot_date":"2026-10-28","quiebre":1,"days_of_inventory":0}
+          ],
+          "pagination":{"total":3}
+        }""".trimIndent()
+
+        QueueHttpServer(
+            response(200, """{"ok":true}""", "Set-Cookie: session=abc; Path=/"),
+            response(200, """{"storeCodes":["J503","J502"],"brands":["CASO Y CIA"]}"""),
+            response(
+                200,
+                """[{"storeCode":"J503","name":"JUMBO MAIPU"},{"storeCode":"J502","name":"JUMBO LA FLORIDA"}]""",
+            ),
+            response(200, pagina1),
+            response(200, pagina2),
+        ).use { server ->
+            val storage = InMemoryStockStorage()
+            val sync = sync(server, storage, listOf(entrada("J503"), entrada("J502")))
+
+            val resultado = sync.run(StockSyncRequest())
+
+            assertTrue(resultado is StockSyncOutcome.Success)
+            val exito = resultado as StockSyncOutcome.Success
+            assertEquals(3, exito.meta.rows)
+            assertEquals(3, exito.data.items.size)
+            assertTrue(server.lastRequest().orEmpty().contains("offset=2"))
+        }
+    }
+
     private fun sync(
         server: QueueHttpServer,
         storage: StockStorage,

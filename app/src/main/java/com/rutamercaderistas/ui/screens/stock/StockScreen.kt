@@ -481,7 +481,7 @@ fun StockScreen(
                 start = dimens.spacingMd + margenAncho,
                 end = dimens.spacingMd + margenAncho,
                 top = dimens.spacingSm,
-                bottom = dimens.spacingLg,
+                bottom = dimens.scrollBottomPadding,
             ),
             verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
         ) {
