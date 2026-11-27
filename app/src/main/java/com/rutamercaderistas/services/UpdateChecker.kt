@@ -1,6 +1,7 @@
 package com.rutamercaderistas.services
 
 import android.os.Build
+import androidx.annotation.VisibleForTesting
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -46,6 +47,23 @@ object UpdateChecker {
     private const val ARMV7_ASSET = "app-armeabi-v7a-release.apk"
     private const val CHECKSUMS_ASSET = "SHA256SUMS.txt"
     private const val MAX_CHECKSUMS_BYTES = 64 * 1024
+
+    /** URL base configurable para tests (MockWebServer). */
+    @VisibleForTesting
+    var apiUrl: String = API_URL
+        private set
+
+    /** Sobrescribe la URL base (solo para tests). */
+    @VisibleForTesting
+    fun setApiUrlForTest(url: String) {
+        apiUrl = url
+    }
+
+    /** Restaura la URL por defecto (solo para tests). */
+    @VisibleForTesting
+    fun resetApiUrl() {
+        apiUrl = API_URL
+    }
 
     /**
      * Consulta el último release y decide con datos numéricos:
@@ -172,7 +190,7 @@ object UpdateChecker {
     private fun fetchLatestRelease(): JSONObject? {
         var conn: HttpURLConnection? = null
         try {
-            conn = URL(API_URL).openConnection() as HttpURLConnection
+            conn = URL(apiUrl).openConnection() as HttpURLConnection
             conn.instanceFollowRedirects = true
             conn.connectTimeout = 15000
             conn.readTimeout = 30000

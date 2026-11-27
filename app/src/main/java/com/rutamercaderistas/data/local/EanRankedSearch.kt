@@ -25,17 +25,30 @@ data class RankedQuery(val sql: String, val args: List<Any?>) {
     fun toQuery(): SimpleSQLiteQuery = SimpleSQLiteQuery(sql, args.toTypedArray())
 }
 
-// Columnas por las que se puede matchear un token. Debe coincidir con el
-// orden de los argumentos que agrega [whereClause] (10 LIKE + 4 ltrim).
-private const val TOKEN_MATCHES = "p.eanPrincipal LIKE ? OR p.codCencosud LIKE ?" +
-    " OR p.codProveedor LIKE ? OR p.codigoBarra LIKE ?" +
-    " OR p.descripcionProducto LIKE ? OR p.marca LIKE ?" +
-    " OR p.descripcion_norm LIKE ? OR p.marca_norm LIKE ?" +
-    " OR p.descripcion_norm_nospace LIKE ? OR p.marca_norm_nospace LIKE ?" +
-    " OR ltrim(p.eanPrincipal,'0') LIKE ? OR ltrim(p.codCencosud,'0') LIKE ?" +
-    " OR ltrim(p.codProveedor,'0') LIKE ? OR ltrim(p.codigoBarra,'0') LIKE ?"
+/** Columnas buscables: las 10 primeras usan LIKE directo, las 4 últimas usan ltrim(col,'0'). */
+private val SEARCH_COLUMNS = listOf(
+    "p.eanPrincipal",
+    "p.codCencosud",
+    "p.codProveedor",
+    "p.codigoBarra",
+    "p.descripcionProducto",
+    "p.marca",
+    "p.descripcion_norm",
+    "p.marca_norm",
+    "p.descripcion_norm_nospace",
+    "p.marca_norm_nospace",
+)
+private val LTRIM_COLUMNS = listOf(
+    "p.eanPrincipal",
+    "p.codCencosud",
+    "p.codProveedor",
+    "p.codigoBarra",
+)
 
-private const val TOKEN_ARG_COUNT = 14
+private val TOKEN_MATCHES: String = (SEARCH_COLUMNS.map { "$it LIKE ?" } + LTRIM_COLUMNS.map { "ltrim($it,'0') LIKE ?" })
+    .joinToString(" OR ")
+
+private const val TOKEN_ARG_COUNT = 14 // SEARCH_COLUMNS.size + LTRIM_COLUMNS.size
 
 private val SPACES = Regex("\\s+")
 
@@ -61,10 +74,10 @@ private fun whereClause(
     // Args de un token en el orden de [TOKEN_MATCHES] (10 LIKE + 4 ltrim).
     fun addTokenArgs(token: String) {
         val like = "%$token%"
-        repeat(TOKEN_ARG_COUNT - 4) { args.add(like) }
+        repeat(SEARCH_COLUMNS.size) { args.add(like) }
         // Token sin ceros: "0658…" y "658…" deben encontrarse igual.
         val likeTrimmed = "%${token.trimStart('0')}%"
-        repeat(4) { args.add(likeTrimmed) }
+        repeat(LTRIM_COLUMNS.size) { args.add(likeTrimmed) }
     }
     tokens.forEach { token ->
         parts.add("($TOKEN_MATCHES)")

@@ -120,7 +120,7 @@ class UpdateViewModel @Inject constructor(
             preferencesRepository.getPendingUpdate()
         }
         val installed = withContext(Dispatchers.IO) {
-            InstalledVersion.read(getApplication())
+            InstalledVersion.provider(getApplication())
         }
         val rejected = withContext(Dispatchers.IO) {
             preferencesRepository.getRejectedUpdateTag()
@@ -307,7 +307,7 @@ class UpdateViewModel @Inject constructor(
 
             _checking.value = true
             val context = getApplication<Application>()
-            val installed = withContext(Dispatchers.IO) { InstalledVersion.read(context) }
+            val installed = withContext(Dispatchers.IO) { InstalledVersion.provider(context) }
             val rejected = withContext(Dispatchers.IO) {
                 preferencesRepository.getRejectedUpdateTag()
             }
@@ -1035,7 +1035,7 @@ class UpdateViewModel @Inject constructor(
         // Si hay estado Installed, mostrar aviso y limpiar
         val currentState = _state.value
         if (currentState is UpdateState.Installed) {
-            val installed = InstalledVersion.read(getApplication())
+            val installed = InstalledVersion.provider(getApplication())
             if (installed.versionCode >= currentState.versionCode) {
                 _message.value = getApplication<Application>().getString(
                     R.string.update_installed_notice,

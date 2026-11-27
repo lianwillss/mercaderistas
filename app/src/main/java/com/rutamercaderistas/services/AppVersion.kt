@@ -2,6 +2,7 @@ package com.rutamercaderistas.services
 
 import android.content.Context
 import android.os.Build
+import androidx.annotation.VisibleForTesting
 import com.rutamercaderistas.BuildConfig
 
 /**
@@ -61,6 +62,22 @@ data class InstalledVersion(
             } else {
                 buildConfig()
             }
+        }
+
+        /** Proveedor inyectable para tests: usa buildConfig() por defecto. */
+        var provider: (Context) -> InstalledVersion = ::read
+            private set
+
+        /** Sobreescribe el proveedor (solo para tests). */
+        @VisibleForTesting
+        fun setProviderForTest(provider: (Context) -> InstalledVersion) {
+            this.provider = provider
+        }
+
+        /** Restaura el proveedor por defecto (solo para tests). */
+        @VisibleForTesting
+        fun resetProvider() {
+            provider = ::read
         }
 
         fun buildConfig(): InstalledVersion = InstalledVersion(

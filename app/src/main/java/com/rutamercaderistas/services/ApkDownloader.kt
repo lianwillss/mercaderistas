@@ -547,7 +547,7 @@ object ApkDownloader {
             }
         }
 
-        val installedVersion = InstalledVersion.read(context)
+        val installedVersion = InstalledVersion.provider(context)
         if (!AppVersion.isApkNewer(info.versionName, info.versionCode, installedVersion)) {
             return@withContext ApkValidation.Failed(
                 context.getString(R.string.update_version_no_reciente),

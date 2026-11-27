@@ -28,6 +28,7 @@ datastorePreferences = "1.2.1"
 timber = "5.0.1"
 junit = "4.13.2"
 mockk = "1.13.12"
+mockwebserver = "5.4.0"
 testExtJunit = "1.2.1"
 testRunner = "1.7.0"
 testRules = "1.7.0"
@@ -78,6 +79,7 @@ coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutin
 coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutinesTest" }
 oothp-pdf-viewer = { group = "io.github.oothp", name = "android-pdf-viewer", version.ref = "oothpPdfViewer" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver", version.ref = "mockwebserver" }
 mlkit-text-recognition = { group = "com.google.mlkit", name = "text-recognition", version.ref = "mlkitTextRecognition" }
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 zxing-android-embedded = { group = "com.journeyapps", name = "zxing-android-embedded", version = "4.3.0" }

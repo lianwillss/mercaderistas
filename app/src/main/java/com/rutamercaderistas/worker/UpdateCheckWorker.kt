@@ -28,7 +28,7 @@ class UpdateCheckWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         return try {
-            val installed = InstalledVersion.read(applicationContext)
+            val installed = InstalledVersion.provider(applicationContext)
             val rejected = preferencesRepository.getRejectedUpdateTag()
             val info = UpdateChecker.check(installed, rejected)
 
